@@ -44,28 +44,30 @@ test('changing someone’s access level takes effect straight away', async ({ br
 test('sign-off responsibilities are handed over from each person’s row', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/admin');
+  // Final sign-off is already approved by Fiona; add Pete as a second approver (any one can sign off)
   const pete = await openPerson(page, 'pete@ukcw.test');
-  await expect(pete.getByText('now Fiona Final')).toBeVisible();
+  await expect(pete.getByText('also Fiona Final')).toBeVisible();
   await pete.getByLabel('Final sign-off', { exact: true }).check();
   await pete.getByRole('checkbox', { name: 'BuildCo', exact: true }).check();
   await pete.getByRole('button', { name: 'Save sign-off' }).click();
   await expect(okMessage(pete, 'Saved. Pete is now approver for Final sign-off and account manager for BuildCo.')).toBeVisible();
 
-  const fiona = await openPerson(page, 'fiona@ukcw.test');
-  await expect(fiona.getByLabel('Final sign-off', { exact: true })).not.toBeChecked();
-  await expect(fiona.getByText('now Pete Production').first()).toBeVisible();
-
+  // Both now approve Final sign-off
   await page.goto('/settings/stages');
-  await expect(panel(page, /^\d+\s*Final sign-off$/).locator('select option:checked')).toHaveText('Pete Production');
+  const finalStage = panel(page, /^\d+\s*Final sign-off$/);
+  await expect(finalStage.getByRole('checkbox', { name: 'Pete Production' })).toBeChecked();
+  await expect(finalStage.getByRole('checkbox', { name: 'Fiona Final' })).toBeChecked();
   await page.goto('/sponsors');
   await expect(page.locator('tr', { hasText: 'BuildCo' })).toContainText('Pete Production');
 
-  // Handed back
+  // Remove Fiona, so only Pete approves it, and hand the sponsor back to Amy
   await page.goto('/admin');
   const f = await openPerson(page, 'fiona@ukcw.test');
-  await f.getByLabel('Final sign-off', { exact: true }).check();
+  await expect(f.getByLabel('Final sign-off', { exact: true })).toBeChecked();
+  await expect(f.getByText('also Pete Production').first()).toBeVisible();
+  await f.getByLabel('Final sign-off', { exact: true }).uncheck();
   await f.getByRole('button', { name: 'Save sign-off' }).click();
-  await expect(okMessage(f, 'Saved. Fiona is now approver for Final sign-off.')).toBeVisible();
+  await expect(okMessage(f, 'Saved. Fiona is now no longer approver for Final sign-off.')).toBeVisible();
   const amy = await openPerson(page, 'amy@ukcw.test');
   await amy.getByRole('checkbox', { name: 'BuildCo', exact: true }).check();
   await amy.getByRole('button', { name: 'Save sign-off' }).click();

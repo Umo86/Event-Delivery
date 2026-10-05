@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
-import { bool, date, int, num, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
+import { bool, date, int, isUuid, num, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor } from '@/lib/auth/session';
 import { logActivity } from '@/lib/activity';
 import { EVENT_COOKIE } from '@/lib/data/load';
@@ -89,9 +89,15 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
       const [ev] = await tx<{ id: string }[]>`
         insert into events ${tx({ name, venue, build_start: buildStart, show_open: showOpen, show_close: showClose, breakdown_end: breakdownEnd, ...base, ...d } as never)} returning id`;
       if (copyFrom) {
-        await tx`insert into stages (event_id, position, name, approver_id, uses_account_manager, applies_os, applies_ss, applies_si)
-                 select ${ev.id}, position, name, approver_id, uses_account_manager, applies_os, applies_ss, applies_si
+        await tx`insert into stages (event_id, position, name, department_id, approver_id, uses_account_manager, applies_os, applies_ss, applies_si)
+                 select ${ev.id}, position, name, department_id, approver_id, uses_account_manager, applies_os, applies_ss, applies_si
                  from stages where event_id = ${copyFrom} and not archived order by position`;
+        // Carry over each stage's approvers, matching old and new stages by position.
+        await tx`insert into stage_approvers (stage_id, user_id)
+                 select ns.id, sa.user_id from stage_approvers sa
+                   join stages os on os.id = sa.stage_id and os.event_id = ${copyFrom}
+                   join stages ns on ns.event_id = ${ev.id} and ns.position = os.position
+                 on conflict do nothing`;
         if (copySponsors) {
           await tx`insert into sponsors (event_id, name, package, account_manager_id, contact_name, contact_email, notes)
                    select ${ev.id}, name, package, account_manager_id, contact_name, contact_email, notes from sponsors where event_id = ${copyFrom}`;
@@ -99,12 +105,17 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
       }
       const [{ n }] = await tx<{ n: number }[]>`select count(*)::int as n from stages where event_id = ${ev.id}`;
       if (n === 0) {
+        const depts = await tx<{ id: string; name: string }[]>`select id, name from departments`;
+        const deptId = (name: string | null) => (name ? depts.find((x) => x.name.toLowerCase() === name.toLowerCase())?.id ?? null : null);
         let pos = 1;
         for (const s of DEFAULT_STAGES) {
-          await tx`insert into stages (event_id, position, name, uses_account_manager, applies_os, applies_ss, applies_si)
-                   values (${ev.id}, ${pos++}, ${s.name}, ${s.uses_account_manager}, ${s.applies_os}, ${s.applies_ss}, ${s.applies_si})`;
+          await tx`insert into stages (event_id, position, name, department_id, uses_account_manager, applies_os, applies_ss, applies_si)
+                   values (${ev.id}, ${pos++}, ${s.name}, ${deptId(s.department)}, ${s.uses_account_manager}, ${s.applies_os}, ${s.applies_ss}, ${s.applies_si})`;
         }
       }
+      await tx`insert into event_departments (event_id, department_id)
+               select distinct ${ev.id}::uuid, department_id from stages where event_id = ${ev.id} and department_id is not null
+               on conflict do nothing`;
       return ev.id;
     });
     await logActivity(sql, { eventId: newId, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Created event ${name}` });
@@ -139,20 +150,28 @@ export async function saveStage(_prev: ActionResult | null, fd: FormData): Promi
     const me = await actor('admin');
     const id = uuidOrNull(fd, 'stage_id');
     if (!id) throw new UserError('Missing stage.');
-    const approver = uuidOrNull(fd, 'approver_id');
-    if (!(await userExists(approver))) throw new UserError('Choose an approver from the team.');
+    const usesAm = bool(fd, 'uses_account_manager');
+    const departmentId = usesAm ? null : uuidOrNull(fd, 'department_id');
+    const approverIds = usesAm ? [] : [...new Set(fd.getAll('approver_ids').filter(isUuid))];
     const values = {
       name: required(fd, 'name', 'Stage name', 60),
-      approver_id: approver,
-      uses_account_manager: bool(fd, 'uses_account_manager'),
+      department_id: departmentId,
+      approver_id: approverIds[0] ?? null, // keep the legacy single column pointing at the first
+      uses_account_manager: usesAm,
       applies_os: bool(fd, 'applies_os'),
       applies_ss: bool(fd, 'applies_ss'),
       applies_si: bool(fd, 'applies_si'),
     };
     if (!values.applies_os && !values.applies_ss && !values.applies_si) throw new UserError('Tick at least one list this stage applies to, or remove the stage.');
     const sql = await db();
-    const [s] = await sql<{ event_id: string }[]>`update stages set ${sql(values as never)} where id = ${id} returning event_id`;
-    if (!s) throw new UserError('That stage no longer exists.');
+    if (departmentId && !(await sql`select 1 from departments where id = ${departmentId}`).length) throw new UserError('Choose a department from the list.');
+    const [s] = await sql.begin(async (tx) => {
+      const r = await tx<{ event_id: string }[]>`update stages set ${tx(values as never)} where id = ${id} returning event_id`;
+      if (!r[0]) throw new UserError('That stage no longer exists.');
+      await tx`delete from stage_approvers where stage_id = ${id}`;
+      for (const uid of approverIds) await tx`insert into stage_approvers (stage_id, user_id) values (${id}, ${uid}) on conflict do nothing`;
+      return r;
+    });
     await logActivity(sql, { eventId: s.event_id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Updated sign-off stage ${values.name}` });
     refresh();
     return { ok: true, message: `${values.name} saved.` };

@@ -54,7 +54,9 @@ export interface StageRow {
   event_id: string;
   position: number;
   name: string;
-  approver_id: string | null;
+  approver_id: string | null; // legacy single approver; the real set is approver_ids
+  approver_ids: string[]; // loaded: the named approvers (any one can sign off)
+  department_id: string | null;
   uses_account_manager: boolean;
   applies_os: boolean;
   applies_ss: boolean;
@@ -71,6 +73,13 @@ export interface SponsorRow {
   contact_name: string | null;
   contact_email: string | null;
   notes: string | null;
+}
+
+export interface DepartmentRow {
+  id: string;
+  name: string;
+  position: number;
+  archived: boolean;
 }
 
 export interface SupplierRow {

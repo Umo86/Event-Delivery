@@ -64,7 +64,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ den
   const dueWeek = active.filter((r) => r.state.due && r.state.due >= today && r.state.due <= addDays(today, 7) && r.state.group !== 'installed');
   const slow = active.filter((r) => (r.state.group === 'in_signoff' || r.state.group === 'on_hold') && (r.state.daysWaiting ?? 0) > event.turnaround_days);
   const approved = active.filter((r) => r.state.phase >= 4);
-  const unassigned = active.filter((r) => r.state.waitingOnLabel && !r.state.waitingOnUserId);
+  const unassigned = active.filter((r) => r.state.waitingOnLabel && r.state.waitingOnUserIds.length === 0);
   const daysToOpen = event.show_open ? daysBetween(today, event.show_open) : null;
 
   // Sign-off by stage
@@ -82,15 +82,20 @@ export default async function DashboardPage(props: { searchParams: Promise<{ den
   });
   const maxWaiting = Math.max(1, ...stages.map((s) => s.waiting));
 
-  // Workload
+  // Workload — a line counts for each person who can act on it now (a step may have several approvers)
+  const names = bundle.ctx.userNames;
   const people = new Map<string, { label: string; id: string | null; n: number; urgent: number }>();
   for (const r of active) {
     if (!r.state.waitingOnLabel) continue;
-    const k = r.state.waitingOnUserId ?? r.state.waitingOnLabel;
-    const p = people.get(k) ?? { label: r.state.waitingOnLabel, id: r.state.waitingOnUserId, n: 0, urgent: 0 };
-    p.n += 1;
-    if (r.state.rank === 1) p.urgent += 1;
-    people.set(k, p);
+    const buckets: { key: string; label: string; id: string | null }[] = r.state.waitingOnUserIds.length
+      ? r.state.waitingOnUserIds.map((uid) => ({ key: uid, label: names.get(uid) ?? 'Someone', id: uid }))
+      : [{ key: r.state.waitingOnLabel, label: r.state.waitingOnLabel, id: null }];
+    for (const b of buckets) {
+      const p = people.get(b.key) ?? { label: b.label, id: b.id, n: 0, urgent: 0 };
+      p.n += 1;
+      if (r.state.rank === 1) p.urgent += 1;
+      people.set(b.key, p);
+    }
   }
   const workload = [...people.values()].sort((a, b) => b.n - a.n);
   const maxLoad = Math.max(1, ...workload.map((w) => w.n));

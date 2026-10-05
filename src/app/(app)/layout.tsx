@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const sched = await loadSchedule(current.id);
     for (const r of sched?.rows ?? []) {
       if (r.state.group === 'cancelled') continue;
-      if (r.state.waitingOnUserId === user.id) myCount += 1;
+      if (r.state.waitingOnUserIds.includes(user.id)) myCount += 1;
       if (r.item.category === 'organiser_signage') counts.os += 1;
       else if (r.item.category === 'sponsor_signage') counts.ss += 1;
       else counts.si += 1;

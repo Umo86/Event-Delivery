@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { fmtDateTime } from '@/lib/dates';
 import { ACCESS_LEVELS, accessLevel, canCancelInvite, personStatus, STATUS_INFO } from '@/lib/domain/access';
-import type { Role, SponsorRow, StageRow } from '@/lib/domain/types';
+import type { DepartmentRow, Role, SponsorRow, StageRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { Chip, Field, inputCls } from '@/components/ui';
 import { DetailsForm } from './details-form';
 import {
   cancelInvite, changeAccess, saveSignoffDuties, sendNewPassword, setPersonActive, updatePersonDetails,
 } from '@/app/actions/admin';
+import { setPersonDepartments } from '@/app/actions/departments';
 
 export interface AdminPerson {
   id: string;
@@ -33,7 +34,7 @@ const ROLE_TONE = { admin: 'blue', member: 'teal', viewer: 'grey' } as const;
 const h3 = 'mb-2 text-[15px] font-semibold text-ink';
 const help = 'text-[13px] text-muted';
 
-export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, names, open }: {
+export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, names, departments, deptIds, open }: {
   u: AdminPerson;
   me: string;
   /** Whether the admin looking at the page is a super admin, and whether they're using the demo login. */
@@ -44,6 +45,8 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
   stages: StageRow[];
   sponsors: SponsorRow[];
   names: Map<string, string>;
+  departments: DepartmentRow[];
+  deptIds: string[];
   open?: boolean;
 }) {
   const isMe = u.id === me;
@@ -53,7 +56,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
   const info = STATUS_INFO[status];
   const locked = !!u.locked_until && new Date(u.locked_until) > new Date();
   const neverSignedIn = !u.last_login_at;
-  const myStages = stages.filter((s) => s.approver_id === u.id);
+  const myStages = stages.filter((s) => s.approver_ids.includes(u.id));
   const mySponsors = sponsors.filter((s) => s.account_manager_id === u.id);
   const duties = [...myStages.map((s) => s.name), ...mySponsors.map((s) => s.name)];
   const first = u.full_name.split(' ')[0];
@@ -172,6 +175,29 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
             <p className={`${help} mt-1.5`}>{accessLevel(u.role).summary}</p>
           </section>
 
+          {/* Departments */}
+          <section aria-label={`Departments for ${u.full_name}`} className="min-w-0">
+            <h3 className={h3}>Departments</h3>
+            {departments.length === 0 ? (
+              <p className={help}>No departments yet. Add them in Settings › Departments.</p>
+            ) : (
+              <ActionForm action={setPersonDepartments} className="space-y-2">
+                <input type="hidden" name="user_id" value={u.id} />
+                <ul className="grid gap-x-5 gap-y-1 sm:grid-cols-2">
+                  {departments.map((d) => (
+                    <li key={d.id}>
+                      <label className="flex items-center gap-2 text-[14.5px] text-ink">
+                        <input type="checkbox" name="department_ids" value={d.id} defaultChecked={deptIds.includes(d.id)} className="h-4 w-4 accent-[#13233b]" />
+                        {d.name}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <SubmitButton variant="secondary" small>Save departments</SubmitButton>
+              </ActionForm>
+            )}
+          </section>
+
           {/* Sign-off */}
           {event && (
             <section aria-label={`Sign-off for ${u.full_name}`} className="min-w-0">
@@ -196,9 +222,8 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
                     {stages.length === 0 ? <p className={help}>No stages with a named approver.</p> : (
                       <ul className="space-y-1">
                         {stages.map((s) => (
-                          <DutyOption key={s.id} uid={u.id} name="stage_ids" value={s.id} label={s.name} checked={s.approver_id === u.id}
-                            holder={s.approver_id && s.approver_id !== u.id ? names.get(s.approver_id) ?? 'someone else' : null}
-                            none="No approver yet" />
+                          <DutyOption key={s.id} uid={u.id} name="stage_ids" value={s.id} label={s.name} checked={s.approver_ids.includes(u.id)}
+                            hint={otherNames(s.approver_ids, u.id, names)} none="No approver yet" />
                         ))}
                       </ul>
                     )}
@@ -209,7 +234,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
                       <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
                         {sponsors.map((s) => (
                           <DutyOption key={s.id} uid={u.id} name="sponsor_ids" value={s.id} label={s.name} checked={s.account_manager_id === u.id}
-                            holder={s.account_manager_id && s.account_manager_id !== u.id ? names.get(s.account_manager_id) ?? 'someone else' : null}
+                            hint={s.account_manager_id && s.account_manager_id !== u.id ? `now ${names.get(s.account_manager_id) ?? 'someone else'}` : null}
                             none="No account manager yet" />
                         ))}
                       </ul>
@@ -244,8 +269,14 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
   );
 }
 
-function DutyOption({ uid, name, value, label, checked, holder, none }: {
-  uid: string; name: string; value: string; label: string; checked: boolean; holder: string | null; none: string;
+/** Names of the other approvers already on a stage, for the hint. */
+function otherNames(ids: string[], selfId: string, names: Map<string, string>): string | null {
+  const others = ids.filter((id) => id !== selfId).map((id) => names.get(id) ?? 'someone');
+  return others.length ? `also ${others.join(', ')}` : null;
+}
+
+function DutyOption({ uid, name, value, label, checked, hint, none }: {
+  uid: string; name: string; value: string; label: string; checked: boolean; hint: string | null; none: string;
 }) {
   const id = `${uid}-${name}-${value}`;
   return (
@@ -257,7 +288,7 @@ function DutyOption({ uid, name, value, label, checked, holder, none }: {
         {label}
       </label>
       <span id={`${id}-who`} className="text-[12.5px] text-muted">
-        {checked ? '' : holder ? `now ${holder}` : none}
+        {hint ?? (checked ? '' : none)}
       </span>
     </li>
   );

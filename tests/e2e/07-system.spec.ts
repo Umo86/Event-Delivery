@@ -9,7 +9,7 @@ test('the system page shows health and runs a full check', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/settings/system');
   const health = panel(page, 'Health');
-  await expect(health).toContainText('Connected (schema v6, up to date)');
+  await expect(health).toContainText('Connected (schema v7, up to date)');
   await expect(health).toContainText('Connected (private store)');
   await expect(health).toContainText(/\d+ versions, [\d.]+ MB of originals/);
 
@@ -85,7 +85,7 @@ test('a new event copies stages and sponsors, and people can switch between even
   const switcher = page.locator('#event-switch');
   await expect(switcher.locator('option:checked')).toHaveText('UKCW Birmingham 2027');
   await page.goto('/settings/stages');
-  await expect(panel(page, /^\d+\s*Operations$/).locator('select option:checked')).toHaveText('Olivia Ops');
+  await expect(panel(page, /^\d+\s*Operations$/).getByRole('checkbox', { name: 'Olivia Ops' })).toBeChecked();
   await page.goto('/sponsors');
   await expect(page.getByRole('link', { name: 'Acme Steel' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'BuildCo' })).toBeVisible();

@@ -174,9 +174,10 @@ test('sign-off stages: approvers, adding, reordering and removing', async ({ pag
   await expect(stage('Operations').getByRole('button', { name: 'Move up' })).toHaveCount(0);
   await expect(stage('Final sign-off').getByRole('button', { name: 'Move down' })).toHaveCount(0);
 
+  // Each stage draws its approvers from a department; tick one or more (any can sign off)
   for (const [name, person] of [['Operations', 'Olivia Ops'], ['Marketing', 'Mark Marketing'], ['Final sign-off', 'Fiona Final']]) {
     const s = stage(name);
-    await s.getByLabel('Approver').selectOption({ label: person });
+    await s.getByRole('checkbox', { name: person }).check();
     await s.getByRole('button', { name: 'Save stage' }).click();
     await expect(okMessage(s, `${name} saved.`)).toBeVisible();
   }
@@ -188,7 +189,7 @@ test('sign-off stages: approvers, adding, reordering and removing', async ({ pag
   await expect(errorMessage(ops, 'Tick at least one list')).toBeVisible();
   await page.reload();
   await expect(stage('Operations').getByLabel('Organiser signage')).toBeChecked();
-  await expect(stage('Operations').locator('select option:checked')).toHaveText('Olivia Ops');
+  await expect(stage('Operations').getByRole('checkbox', { name: 'Olivia Ops' })).toBeChecked();
 
   await page.fill('#new-stage', 'Health and safety');
   await page.getByRole('button', { name: 'Add stage' }).click();

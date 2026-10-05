@@ -17,6 +17,7 @@ interface Summary {
   approved: number;
   overdue: number;
   cost: number;
+  departments: string[];
   when: { label: string; tone: 'now' | 'soon' | 'future' | 'past' | 'none' };
 }
 
@@ -36,8 +37,11 @@ export default async function ShowsPage() {
   const summaries: Summary[] = await Promise.all(events.map(async (e) => {
     const sched = await loadSchedule(e.id);
     const rows = (sched?.rows ?? []).filter((r) => r.state.group !== 'cancelled');
+    const b = sched?.bundle;
+    const departments = b ? b.departments.filter((d) => b.eventDepartmentIds.includes(d.id)).map((d) => d.name) : [];
     return {
       e,
+      departments,
       total: rows.length,
       signoff: rows.filter((r) => r.state.phase === 2).length,
       attention: rows.filter((r) => r.state.phase === 3).length,
@@ -85,6 +89,7 @@ export default async function ShowsPage() {
             <span className={cx('inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-semibold ring-1 ring-inset', toneClass[s.when.tone])}>{s.when.label}</span>
           </p>
           <p className="text-[13px] text-muted">{s.e.venue}{s.e.show_open ? ` · ${fmtDate(s.e.show_open, 'long')}` : ''}</p>
+          {s.departments.length > 0 && <p className="mt-0.5 text-[12.5px] text-muted">Departments: {s.departments.join(', ')}</p>}
         </div>
         <dl className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[13.5px]">
           <Stat label="Lines" value={s.total} />

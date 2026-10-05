@@ -36,9 +36,9 @@ export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string): Sch
       if (!['attention', 'open', 'approved_plus'].includes(f.status) && s.group !== f.status) return false;
     }
     if (f.waiting) {
-      if (f.waiting === 'me' && s.waitingOnUserId !== meId) return false;
-      if (f.waiting === 'unassigned' && !(s.waitingOnLabel && !s.waitingOnUserId)) return false;
-      if (!['me', 'unassigned'].includes(f.waiting) && s.waitingOnUserId !== f.waiting) return false;
+      if (f.waiting === 'me' && !s.waitingOnUserIds.includes(meId)) return false;
+      if (f.waiting === 'unassigned' && !(s.waitingOnLabel && s.waitingOnUserIds.length === 0)) return false;
+      if (!['me', 'unassigned'].includes(f.waiting) && !s.waitingOnUserIds.includes(f.waiting)) return false;
     }
     if (f.sponsor) {
       if (f.sponsor === 'none' ? r.item.sponsor_id : r.item.sponsor_id !== f.sponsor) return false;

@@ -10,6 +10,7 @@ import { ActionForm, SubmitButton } from '@/components/forms';
 import { cx, Field, inputCls, PageHeader, Panel } from '@/components/ui';
 import { DetailsForm } from '@/components/admin/details-form';
 import { PersonRow, type AdminPerson } from '@/components/admin/person-row';
+import type { DepartmentRow } from '@/lib/domain/types';
 import { invitePerson, setSponsorLinks } from '@/app/actions/admin';
 
 export const metadata: Metadata = { title: 'Admin' };
@@ -19,7 +20,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
   const sp = await props.searchParams;
   const sql = await db();
   const event = await getCurrentEvent();
-  const [bundle, people, log, linksOn, [{ openLinks }]] = await Promise.all([
+  const [bundle, people, log, linksOn, [{ openLinks }], departments, memberships] = await Promise.all([
     event ? loadBundle(event.id) : Promise.resolve(null),
     sql<AdminPerson[]>`
       select u.id, u.email, u.full_name, u.job_title, u.role, u.active, u.must_change_password, u.last_login_at, u.created_at,
@@ -31,7 +32,11 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     sponsorLinksEnabled(),
     sql<{ openLinks: number }[]>`
       select count(*)::int as "openLinks" from share_links where revoked_at is null and used_at is null and expires_at > now()`,
+    sql<DepartmentRow[]>`select id, name, position, archived from departments where not archived order by position, lower(name)`,
+    sql<{ user_id: string; department_id: string }[]>`select user_id, department_id from user_departments`,
   ]);
+  const deptIds = new Map<string, string[]>();
+  for (const m of memberships) (deptIds.get(m.user_id) ?? deptIds.set(m.user_id, []).get(m.user_id)!).push(m.department_id);
   const names = new Map(people.map((p) => [p.id, p.full_name]));
   const byId = new Map(people.map((p) => [p.id, p]));
   const stages = (bundle?.stages ?? []).filter((s) => !s.uses_account_manager);
@@ -63,9 +68,14 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     return p && (!p.active || p.role === 'viewer') ? p : null;
   };
   for (const s of stages) {
-    const p = cantSignOff(s.approver_id);
-    if (!s.approver_id) attention.push({ text: `The ${s.name} stage has no approver.`, href: '/settings/stages', action: 'Choose' });
-    else if (p) attention.push({ text: `${p.full_name} approves ${s.name} but ${p.active ? 'is a viewer' : 'is deactivated'}.`, href: personLink(p.id), action: 'Open' });
+    if (s.approver_ids.length === 0) {
+      attention.push({ text: `The ${s.name} stage has no approver.`, href: '/settings/stages', action: 'Choose' });
+      continue;
+    }
+    for (const aid of s.approver_ids) {
+      const p = cantSignOff(aid);
+      if (p) attention.push({ text: `${p.full_name} approves ${s.name} but ${p.active ? 'is a viewer' : 'is deactivated'}.`, href: personLink(p.id), action: 'Open' });
+    }
   }
   const noManager = sponsors.filter((s) => !s.account_manager_id).length;
   if (noManager) attention.push({ text: `${noManager} sponsor${noManager === 1 ? ' has' : 's have'} no account manager.`, href: '/sponsors', action: 'View' });
@@ -133,7 +143,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
             <ul>
               {people.map((p) => (
                 <PersonRow key={p.id} u={p} me={me.id} meSuper={me.is_super_admin} meDemo={me.is_demo} event={event ? { id: event.id, name: event.name } : null}
-                  stages={stages} sponsors={sponsors} names={names} open={sp.person === p.id} />
+                  stages={stages} sponsors={sponsors} names={names} departments={departments} deptIds={deptIds.get(p.id) ?? []} open={sp.person === p.id} />
               ))}
             </ul>
           </Panel>

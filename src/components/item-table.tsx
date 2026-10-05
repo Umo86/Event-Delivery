@@ -60,7 +60,7 @@ export function ItemTable({ rows, today, showCategory = false, showAction = fals
                 <td className="px-3 py-2 align-middle text-ink-2">
                   {showAction ? <span className="text-ink">{r.state.action}</span> : (
                     r.state.waitingOnLabel
-                      ? <span className={cx(!r.state.waitingOnUserId && 'font-semibold text-red-700')}>{r.state.waitingOnLabel}</span>
+                      ? <span className={cx(r.state.waitingOnUserIds.length === 0 && 'font-semibold text-red-700')}>{r.state.waitingOnLabel}</span>
                       : <span className="text-muted">Nobody</span>
                   )}
                   {r.state.daysWaiting !== null && r.state.daysWaiting > 0 && (

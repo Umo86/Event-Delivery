@@ -2,7 +2,7 @@
 // Pure functions only, so it can be unit-tested without a database.
 import { addDays, daysBetween, londonDate } from '../dates';
 import type {
-  Category, DecisionRow, EventRow, Flag, Group, ItemRow, SponsorRow, StageRow, VersionRow,
+  Category, DecisionRow, DepartmentRow, EventRow, Flag, Group, ItemRow, SponsorRow, StageRow, VersionRow,
 } from './types';
 
 export interface EngineContext {
@@ -10,6 +10,7 @@ export interface EngineContext {
   stages: StageRow[]; // non-archived stages of the event (any order)
   sponsorsById: Map<string, SponsorRow>;
   userNames: Map<string, string>; // user id -> full name
+  departmentsById: Map<string, DepartmentRow>;
   today: string; // YYYY-MM-DD (UK)
 }
 
@@ -33,7 +34,8 @@ export interface ItemState {
   currentStageNumber: number | null; // 1-based among stages that apply to this line
   currentDecision: DecisionRow | null;
   staleApproval: boolean;
-  waitingOnUserId: string | null;
+  waitingOnUserId: string | null; // the single person responsible, or null (0 or several people)
+  waitingOnUserIds: string[]; // everyone who can act now (e.g. a step's named approvers); empty when nobody is assigned
   waitingOnLabel: string; // '' when nobody needs to act
   due: string | null;
   flag: Flag | null;
@@ -144,19 +146,34 @@ export function computeItemState(
             : group === 'installed' ? 5
               : 4;
 
-  // Who needs to act
+  // Who needs to act. waiting = [single responsible id | null, label]; waitingIds = everyone who can act now.
   const am = sponsor?.account_manager_id ?? null;
   const amOrNotSet = (): [string | null, string] => (am ? [am, name(am) ?? NOT_SET] : [null, NOT_SET]);
   const ownerOr = (id: string | null): [string | null, string] => (id ? [id, name(id) ?? NOT_ASSIGNED] : [null, NOT_ASSIGNED]);
   let waiting: [string | null, string] = [null, ''];
+  let waitingIds: string[] = [];
   if (group === 'awaiting_artwork' || group === 'changes_requested' || group === 'rejected') {
     if (item.artwork_by === 'sponsor') waiting = amOrNotSet();
     else if (item.artwork_by === 'supplier') waiting = ownerOr(event.production_owner_id);
     else waiting = ownerOr(event.studio_owner_id);
+    waitingIds = waiting[0] ? [waiting[0]] : [];
   } else if (group === 'in_signoff' || group === 'on_hold') {
-    waiting = current!.uses_account_manager ? amOrNotSet() : ownerOr(current!.approver_id);
+    if (current!.uses_account_manager) {
+      waiting = amOrNotSet();
+      waitingIds = am ? [am] : [];
+    } else {
+      const ids = current!.approver_ids;
+      waitingIds = ids;
+      if (ids.length === 0) waiting = [null, 'No approver set'];
+      else if (ids.length === 1) waiting = [ids[0], name(ids[0]) ?? NOT_ASSIGNED];
+      else {
+        const dept = current!.department_id ? ctx.departmentsById.get(current!.department_id) : null;
+        waiting = [null, `${dept?.name ?? current!.name} (${ids.length})`];
+      }
+    }
   } else if (group === 'approved' || group === 'sent_to_supplier' || group === 'in_production' || group === 'delivered') {
     waiting = ownerOr(event.production_owner_id);
+    waitingIds = waiting[0] ? [waiting[0]] : [];
   }
 
   // Next deadline
@@ -225,7 +242,7 @@ export function computeItemState(
   return {
     group, phase, statusLabel, version, artIn, fullyApproved,
     currentStage: current, currentStageNumber: currentNumber, currentDecision, staleApproval,
-    waitingOnUserId: waiting[0], waitingOnLabel: waiting[1],
+    waitingOnUserId: waiting[0], waitingOnUserIds: waitingIds, waitingOnLabel: waiting[1],
     due, flag, daysWaiting, since, action, rank, stages,
   };
 }

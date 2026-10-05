@@ -323,6 +323,62 @@ alter table suppliers
   add column works_on_si boolean not null default true;
 `,
   },
+  {
+    version: 7,
+    name: 'departments',
+    sql: /* sql */ `
+-- Departments are the teams people belong to (Sales, Marketing, Content, External, …). A shared catalogue,
+-- assigned to shows, and used to organise who approves each sign-off step.
+create table departments (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  position int not null default 0,
+  archived boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create unique index departments_name_idx on departments (lower(name));
+insert into departments (name, position) values
+  ('Operations', 1), ('Sales', 2), ('Marketing', 3), ('Content', 4), ('External', 5);
+
+-- People belong to one or more departments.
+create table user_departments (
+  user_id uuid not null references users(id) on delete cascade,
+  department_id uuid not null references departments(id) on delete cascade,
+  primary key (user_id, department_id)
+);
+
+-- A sign-off stage can have one or more named approvers; any one of them can sign it off.
+create table stage_approvers (
+  stage_id uuid not null references stages(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  primary key (stage_id, user_id)
+);
+alter table stages add column department_id uuid references departments(id) on delete set null;
+
+-- Each show records which departments are involved.
+create table event_departments (
+  event_id uuid not null references events(id) on delete cascade,
+  department_id uuid not null references departments(id) on delete cascade,
+  primary key (event_id, department_id)
+);
+
+-- Carry existing data over: the single approver becomes the first named approver.
+insert into stage_approvers (stage_id, user_id)
+  select id, approver_id from stages where approver_id is not null on conflict do nothing;
+-- Map the default stages to departments by name; 'Final sign-off' goes to Operations.
+update stages s set department_id = d.id from departments d
+  where not s.uses_account_manager and lower(s.name) = lower(d.name);
+update stages s set department_id = (select id from departments where lower(name) = 'operations')
+  where s.department_id is null and not s.uses_account_manager and lower(s.name) = 'final sign-off';
+-- Seed membership: approvers join the department of the stage they approve.
+insert into user_departments (user_id, department_id)
+  select distinct sa.user_id, st.department_id from stage_approvers sa
+    join stages st on st.id = sa.stage_id where st.department_id is not null on conflict do nothing;
+-- Involved departments per show, from its stages.
+insert into event_departments (event_id, department_id)
+  select distinct event_id, department_id from stages where department_id is not null on conflict do nothing;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

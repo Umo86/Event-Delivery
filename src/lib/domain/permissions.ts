@@ -13,7 +13,7 @@ export const canEdit = (u: Actor | null | undefined) => u?.role === 'admin' || u
 /** Is this person the named approver for the stage (or the sponsor's account manager for sponsor stages)? */
 export function isStageApprover(u: Actor, stage: StageRow, sponsor: SponsorRow | null): boolean {
   if (stage.uses_account_manager) return !!sponsor?.account_manager_id && sponsor.account_manager_id === u.id;
-  return !!stage.approver_id && stage.approver_id === u.id;
+  return stage.approver_ids.includes(u.id);
 }
 
 /** Admins can record any stage; members only the stages they approve. Viewers never. */

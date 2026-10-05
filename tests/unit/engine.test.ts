@@ -22,10 +22,11 @@ const event: EventRow = {
   art_due_si: '2026-10-01', print_due_si: '2026-10-09', archived: false, created_at: at(-60),
 };
 
-const st = (id: string, position: number, name: string, extra: Partial<StageRow> = {}): StageRow => ({
-  id, event_id: 'ev', position, name, approver_id: null, uses_account_manager: false,
-  applies_os: true, applies_ss: true, applies_si: true, archived: false, ...extra,
-});
+const st = (id: string, position: number, name: string, extra: Partial<StageRow> = {}): StageRow => {
+  const base = { id, event_id: 'ev', position, name, approver_id: null, department_id: null, uses_account_manager: false,
+    applies_os: true, applies_ss: true, applies_si: true, archived: false, ...extra } as StageRow;
+  return { ...base, approver_ids: extra.approver_ids ?? (base.approver_id ? [base.approver_id] : []) };
+};
 const STAGES: StageRow[] = [
   st('s1', 1, 'Operations', { approver_id: USERS.ops }),
   st('s2', 2, 'Marketing', { approver_id: USERS.mkt }),
@@ -41,6 +42,7 @@ function ctx(over: Partial<EngineContext> = {}, ev: Partial<EventRow> = {}): Eng
     stages: STAGES,
     sponsorsById: new Map([[sponsorA.id, sponsorA], [sponsorNoAm.id, sponsorNoAm]]),
     userNames: names,
+    departmentsById: new Map(),
     today: TODAY,
     ...over,
   };

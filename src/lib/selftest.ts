@@ -87,10 +87,11 @@ export async function runSystemCheck(): Promise<{ ok: boolean; steps: CheckStep[
     }
 
     await step('Run artwork through every sign-off stage', async () => {
-      const stages = await sql<StageRow[]>`select * from stages where event_id = ${ev.id} order by position`;
+      const raw = await sql<StageRow[]>`select * from stages where event_id = ${ev.id} order by position`;
+      const stages = raw.map((x) => ({ ...x, approver_ids: [] as string[] }));
       const [v] = await sql<VersionRow[]>`insert into artwork_versions (item_id, event_id, version, file_url, file_pathname, file_name, mime_type, size_bytes)
         values (${item.id}, ${ev.id}, 1, ${fileUrl || 'https://example.invalid/x.png'}, ${pathname || 'none'}, 'selftest.png', 'image/png', ${PNG.length}) returning *`;
-      const ctx = { event: ev, stages, sponsorsById: new Map(), userNames: new Map<string, string>(), today: londonDate() };
+      const ctx = { event: ev, stages, sponsorsById: new Map(), userNames: new Map<string, string>(), departmentsById: new Map(), today: londonDate() };
       const fresh = await sql<ItemRow[]>`select * from items where id = ${item.id}`;
       let state = computeItemState(fresh[0], v, [], ctx);
       if (state.group !== 'in_signoff' || state.currentStage?.name !== stages[0].name) throw new Error(`expected "With ${stages[0].name}", got "${state.statusLabel}"`);

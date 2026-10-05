@@ -75,8 +75,9 @@ async function otherActiveAdmins(sql: Sql, id: string): Promise<number> {
 /** The stages and sponsors (in events that aren't archived) that wait on this person. */
 async function responsibilitiesOf(sql: Sql, userId: string): Promise<string[]> {
   const rows = await sql<{ label: string }[]>`
-    select s.name || ' stage' as label from stages s join events e on e.id = s.event_id
-      where s.approver_id = ${userId} and not s.archived and not s.uses_account_manager and not e.archived
+    select s.name || ' stage' as label from stage_approvers sa
+      join stages s on s.id = sa.stage_id join events e on e.id = s.event_id
+      where sa.user_id = ${userId} and not s.archived and not s.uses_account_manager and not e.archived
     union all
     select sp.name as label from sponsors sp join events e on e.id = sp.event_id
       where sp.account_manager_id = ${userId} and not e.archived`;
@@ -284,16 +285,21 @@ export async function saveSignoffDuties(_prev: ActionResult | null, fd: FormData
     const wantSponsors = new Set(fd.getAll('sponsor_ids').filter(isUuid));
     const changes = await sql.begin(async (tx) => {
       const out: string[] = [];
-      const stages = await tx<{ id: string; name: string; approver_id: string | null }[]>`
-        select id, name, approver_id from stages where event_id = ${eventId} and not archived and not uses_account_manager
-        order by position for update`;
+      const stages = await tx<{ id: string; name: string }[]>`
+        select id, name from stages where event_id = ${eventId} and not archived and not uses_account_manager order by position`;
+      const mine = new Set((await tx<{ stage_id: string }[]>`
+        select sa.stage_id from stage_approvers sa join stages s on s.id = sa.stage_id
+        where sa.user_id = ${p.id} and s.event_id = ${eventId}`).map((r) => r.stage_id));
       for (const s of stages) {
-        const has = s.approver_id === p.id;
+        const has = mine.has(s.id);
         if (wantStages.has(s.id) && !has) {
-          await tx`update stages set approver_id = ${p.id} where id = ${s.id}`;
+          await tx`insert into stage_approvers (stage_id, user_id) values (${s.id}, ${p.id}) on conflict do nothing`;
+          // Keep the legacy single column pointing at an approver so older reads still see one.
+          await tx`update stages set approver_id = coalesce(approver_id, ${p.id}) where id = ${s.id}`;
           out.push(`approver for ${s.name}`);
         } else if (!wantStages.has(s.id) && has) {
-          await tx`update stages set approver_id = null where id = ${s.id}`;
+          await tx`delete from stage_approvers where stage_id = ${s.id} and user_id = ${p.id}`;
+          await tx`update stages set approver_id = (select user_id from stage_approvers where stage_id = ${s.id} limit 1) where id = ${s.id}`;
           out.push(`no longer approver for ${s.name}`);
         }
       }

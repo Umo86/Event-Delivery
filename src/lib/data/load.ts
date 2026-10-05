@@ -6,7 +6,7 @@ import { londonDate } from '@/lib/dates';
 import { computeItemState, type EngineContext, type ItemState } from '@/lib/domain/engine';
 import { itemCode } from '@/lib/domain/labels';
 import type {
-  DecisionRow, EventRow, ItemRow, SponsorRow, StageRow, SupplierRow, UserRow, VersionRow,
+  DecisionRow, DepartmentRow, EventRow, ItemRow, SponsorRow, StageRow, SupplierRow, UserRow, VersionRow,
 } from '@/lib/domain/types';
 
 export const EVENT_COOKIE = 'ed_event';
@@ -39,22 +39,32 @@ export interface Bundle {
   sponsors: SponsorRow[];
   suppliers: SupplierRow[];
   users: UserRow[];
+  departments: DepartmentRow[];
+  /** Departments this show has been assigned (a subset of departments). */
+  eventDepartmentIds: string[];
   lists: Record<string, string[]>;
   ctx: EngineContext;
 }
 
 export const loadBundle = cache(async (eventId: string): Promise<Bundle | null> => {
   const sql = await db();
-  const [events, stages, sponsors, suppliers, users, opts] = await Promise.all([
+  const [events, stageRows, approvers, sponsors, suppliers, users, departments, eventDepts, opts] = await Promise.all([
     sql<EventRow[]>`select * from events where id = ${eventId}`,
     sql<StageRow[]>`select * from stages where event_id = ${eventId} and not archived order by position, created_at`,
+    sql<{ stage_id: string; user_id: string }[]>`select sa.stage_id, sa.user_id from stage_approvers sa
+      join stages s on s.id = sa.stage_id where s.event_id = ${eventId}`,
     sql<SponsorRow[]>`select * from sponsors where event_id = ${eventId} order by lower(name)`,
     sql<SupplierRow[]>`select * from suppliers order by lower(name)`,
     sql<UserRow[]>`select id, email, full_name, job_title, role, active, must_change_password, last_login_at, created_at from users order by lower(full_name)`,
+    sql<DepartmentRow[]>`select id, name, position, archived from departments where not archived order by position, lower(name)`,
+    sql<{ department_id: string }[]>`select department_id from event_departments where event_id = ${eventId}`,
     sql<{ list_key: string; value: string }[]>`select list_key, value from list_options order by list_key, sort, lower(value)`,
   ]);
   const event = events[0];
   if (!event) return null;
+  const byStage = new Map<string, string[]>();
+  for (const a of approvers) (byStage.get(a.stage_id) ?? byStage.set(a.stage_id, []).get(a.stage_id)!).push(a.user_id);
+  const stages = stageRows.map((s) => ({ ...s, approver_ids: byStage.get(s.id) ?? [] }));
   const lists: Record<string, string[]> = {};
   for (const o of opts) (lists[o.list_key] ??= []).push(o.value);
   const ctx: EngineContext = {
@@ -62,9 +72,10 @@ export const loadBundle = cache(async (eventId: string): Promise<Bundle | null> 
     stages,
     sponsorsById: new Map(sponsors.map((s) => [s.id, s])),
     userNames: new Map(users.map((u) => [u.id, u.full_name])),
+    departmentsById: new Map(departments.map((d) => [d.id, d])),
     today: londonDate(),
   };
-  return { event, stages, sponsors, suppliers, users, lists, ctx };
+  return { event, stages, sponsors, suppliers, users, departments, eventDepartmentIds: eventDepts.map((e) => e.department_id), lists, ctx };
 });
 
 export interface ScheduleRow {

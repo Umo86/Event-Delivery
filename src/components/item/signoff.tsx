@@ -12,6 +12,7 @@ export function SignoffRoute({ detail, user, sponsorLinks = true }: { detail: It
   const { row, bundle } = detail;
   const { state, sponsor, item } = row;
   const names = bundle.ctx.userNames;
+  const depts = bundle.ctx.departmentsById;
   let n = 0;
 
   return (
@@ -20,13 +21,21 @@ export function SignoffRoute({ detail, user, sponsorLinks = true }: { detail: It
         const applies = s.applies;
         if (applies) n += 1;
         const last = idx === state.stages.length - 1;
+        const deptName = s.stage.department_id ? depts.get(s.stage.department_id)?.name ?? null : null;
+        const approverNames = s.stage.approver_ids.map((id) => names.get(id) ?? 'Approver');
         const approverText = s.stage.uses_account_manager
           ? sponsor?.account_manager_id ? `${names.get(sponsor.account_manager_id) ?? 'Account manager'} (sponsor’s account manager)` : 'Sponsor’s account manager (not set)'
-          : s.stage.approver_id ? names.get(s.stage.approver_id) ?? 'Approver' : 'No approver set';
+          : approverNames.length
+            ? (deptName ? `${deptName}: ${approverNames.join(', ')}` : approverNames.join(', '))
+            : (deptName ? `${deptName} (no approver set)` : 'No approver set');
+        // Just the people, for the "only … can record" and on-behalf lines (no department prefix)
+        const approverShort = s.stage.uses_account_manager
+          ? (sponsor?.account_manager_id ? names.get(sponsor.account_manager_id) ?? 'the account manager' : 'the account manager')
+          : approverNames.length ? approverNames.join(', ') : 'the approver';
         const allowed = allowedDecisions(state, s.stage.id);
         const mayDecide = allowed.length > 0 && canDecideStage(user, s.stage, sponsor);
         const onBehalf = mayDecide && user.role === 'admin' && !isStageApprover(user, s.stage, sponsor)
-          ? `You’re recording this as an admin on behalf of ${approverText.replace(/ \(.*\)$/, '')}.` : undefined;
+          ? `You’re recording this as an admin on behalf of ${approverShort}.` : undefined;
         const d = s.decision;
         const marker = s.kind === 'approved'
           ? <span className="flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-white"><Check size={16} strokeWidth={3} aria-label="Approved" /></span>
@@ -66,7 +75,7 @@ export function SignoffRoute({ detail, user, sponsorLinks = true }: { detail: It
                   reopen={s.kind === 'approved'} onBehalf={onBehalf} />
               )}
               {!mayDecide && (s.kind === 'current' || s.kind === 'stale') && canEdit(user) && (
-                <p className="mt-1.5 text-[12.5px] text-muted">Only {approverText.replace(/ \(.*\)$/, '')} or an admin can record this stage.</p>
+                <p className="mt-1.5 text-[12.5px] text-muted">Only {approverShort} or an admin can record this stage.</p>
               )}
               {sponsorLinks && (s.kind === 'current' || s.kind === 'stale') && s.stage.uses_account_manager && !item.cancelled && canDecideStage(user, s.stage, sponsor) && (
                 <SharePanel detail={detail} stageId={s.stage.id} />

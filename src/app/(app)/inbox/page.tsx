@@ -23,8 +23,9 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
   const sched = await loadSchedule(event.id);
   if (!sched) return <NoEvent />;
   const today = sched.bundle.ctx.today;
+  const names = sched.bundle.ctx.userNames;
   const open = sched.rows.filter((r) => r.state.group !== 'cancelled' && r.state.waitingOnLabel);
-  const mine = open.filter((r) => r.state.waitingOnUserId === user.id).sort((a, b) => urgencyCompare(a.state, b.state));
+  const mine = open.filter((r) => r.state.waitingOnUserIds.includes(user.id)).sort((a, b) => urgencyCompare(a.state, b.state));
   const team = view === 'team';
 
   const tabs = (
@@ -40,11 +41,15 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
 
   if (team) {
     const byPerson = new Map<string, { label: string; userId: string | null; rows: ScheduleRow[] }>();
-    for (const r of open) {
-      const key = r.state.waitingOnUserId ?? `label:${r.state.waitingOnLabel}`;
-      const entry = byPerson.get(key) ?? { label: r.state.waitingOnLabel, userId: r.state.waitingOnUserId, rows: [] };
+    const add = (key: string, label: string, userId: string | null, r: ScheduleRow) => {
+      const entry = byPerson.get(key) ?? { label, userId, rows: [] };
       entry.rows.push(r);
       byPerson.set(key, entry);
+    };
+    for (const r of open) {
+      const ids = r.state.waitingOnUserIds;
+      if (ids.length === 0) add(`label:${r.state.waitingOnLabel}`, r.state.waitingOnLabel, null, r);
+      else for (const uid of ids) add(uid, names.get(uid) ?? 'Someone', uid, r);
     }
     const people = [...byPerson.values()].sort((a, b) => (a.userId ? 1 : 0) - (b.userId ? 1 : 0) || b.rows.length - a.rows.length);
     return (

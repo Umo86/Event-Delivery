@@ -9,6 +9,7 @@ import { ActionForm, SubmitButton } from '@/components/forms';
 import { Field, inputCls, Notice, Panel, cx } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 import { updateEvent } from '@/app/actions/settings';
+import { setEventDepartments } from '@/app/actions/departments';
 
 export const metadata: Metadata = { title: 'Event settings' };
 
@@ -25,7 +26,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
 
   const steps = [
     { done: bundle.users.length > 1, text: 'Invite your team', href: '/admin' },
-    { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_id), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
+    { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_ids.length > 0), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
     { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles in-house artwork and production (below)', href: '#owners' },
     { done: bundle.sponsors.length > 0, text: 'Add sponsors and their account managers', href: '/sponsors' },
     { done: bundle.suppliers.length > 0, text: 'Add your suppliers', href: '/suppliers' },
@@ -124,6 +125,31 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
         </Panel>
         <SubmitButton>Save event settings</SubmitButton>
       </ActionForm>
+
+      <Panel title="Departments involved">
+        <p className="mb-3 text-[14px] text-muted">
+          Which teams are working on {e.name}. This is who the show involves; set up the teams and their people in{' '}
+          <Link href="/settings/departments" className="font-semibold text-ink underline underline-offset-2">Departments</Link>.
+        </p>
+        {bundle.departments.length === 0 ? (
+          <p className="text-[14px] text-muted">No departments yet. Add them in Settings › Departments.</p>
+        ) : (
+          <ActionForm action={setEventDepartments} className="space-y-3">
+            <input type="hidden" name="event_id" value={e.id} />
+            <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+              {bundle.departments.map((d) => (
+                <li key={d.id}>
+                  <label className="flex items-center gap-2 text-[14.5px] text-ink">
+                    <input type="checkbox" name="department_ids" value={d.id} defaultChecked={bundle.eventDepartmentIds.includes(d.id)} className="h-4 w-4 accent-[#13233b]" />
+                    {d.name}
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <SubmitButton variant="dark" small>Save departments</SubmitButton>
+          </ActionForm>
+        )}
+      </Panel>
     </div>
   );
 }

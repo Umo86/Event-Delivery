@@ -98,7 +98,7 @@ export default async function ItemPage(props: {
             </div>
             <div>
               <dt className="text-[13px] text-muted">Waiting on</dt>
-              <dd className={cx('font-semibold', state.waitingOnLabel && !state.waitingOnUserId ? 'text-red-700' : 'text-ink')}>
+              <dd className={cx('font-semibold', state.waitingOnLabel && state.waitingOnUserIds.length === 0 ? 'text-red-700' : 'text-ink')}>
                 {state.waitingOnLabel || 'Nobody'}
                 {state.daysWaiting !== null && state.waitingOnLabel && (
                   <span className="font-normal text-muted">{state.daysWaiting > 0 ? ` for ${state.daysWaiting} day${state.daysWaiting === 1 ? '' : 's'}` : ' since today'}</span>
