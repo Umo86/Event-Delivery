@@ -40,11 +40,12 @@ The database tables are created automatically the first time the app connects. `
 
 Neon and Blob set `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` for you when you create them from the project's Storage tab.
 
-### Free plan limits worth knowing
+### Plan limits worth knowing
 
-- **Vercel Hobby** is for personal, non-commercial use. For company use, Vercel's terms ask for the Pro plan.
-- **Vercel Blob (Hobby)** includes 1 GB of storage, 10 GB of downloads and 2,000 uploads ("advanced operations") a month. Each artwork upload uses 2 or 3 of those (the file, a thumbnail and, for PDFs and large images, a preview), so roughly 650 or more uploads a month. If a Hobby limit is exceeded, Blob can't be used again until 30 days have passed, so keep an eye on Vercel's usage emails. Uploads are limited to 25 MB each; link to full-size print files with the "Link to full-size files" field. Settings → System shows how much is stored.
-- **Neon (free)** has 1 GB of storage and 100 compute hours a month. It sleeps after 5 minutes without use and wakes by itself on the next request (the first page after a quiet spell can take a moment longer). It never needs restoring by hand and nothing is deleted. Avoid pinging `/api/selftest` every few minutes, as that keeps the database awake and uses compute hours.
+- **Vercel Pro**: Blob storage, uploads and downloads are billed by usage from the plan's monthly credit, so there is no hard stop. A small team's artwork proofs cost very little.
+- **Vercel Hobby (free)**: for personal, non-commercial use. Blob includes 1 GB of storage, 10 GB of downloads and 2,000 uploads ("advanced operations") a month; each artwork upload uses 2 or 3 (the file, a thumbnail and, for PDFs and large images, a preview). If a Hobby limit is passed, Blob can't be used again until 30 days have passed.
+- **Uploads** are limited to 25 MB each; link to full-size print files with the "Link to full-size files" field. Settings → System shows how much is stored.
+- **Neon (free)** has 1 GB of storage and 100 compute hours a month. It sleeps after 5 minutes without use and wakes by itself on the next request (the first page after a quiet spell can take a moment longer). It never needs restoring by hand and nothing is deleted. Avoid pinging `/api/selftest` often, as that keeps the database awake and uses compute hours.
 
 ## Run it locally
 
