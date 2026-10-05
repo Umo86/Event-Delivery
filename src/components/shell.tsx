@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  Gauge, Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, Truck, UserRound, X,
+  CalendarRange, Gauge, Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, Truck, UserRound, X,
 } from 'lucide-react';
 import { Mark } from './brand';
 import { cx } from './ui';
@@ -24,6 +24,7 @@ export interface ShellProps {
 const NAV = [
   { href: '/inbox', label: 'My actions', icon: Inbox, key: 'inbox' },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
+  { href: '/shows', label: 'All shows', icon: CalendarRange, key: 'shows' },
   { href: '/schedule/os', label: 'Organiser signage', icon: Signpost, key: 'os' },
   { href: '/schedule/ss', label: 'Sponsor signage', icon: Flag, key: 'ss' },
   { href: '/schedule/si', label: 'Sponsor items', icon: Package, key: 'si' },
@@ -70,7 +71,7 @@ export function AppShell(p: ShellProps) {
       )}
 
       <ul className="flex-1 space-y-0.5 px-3">
-        {NAV.filter((n) => (n.key !== 'admin' || p.user.role === 'admin') && (n.key !== 'gs' || p.user.superAdmin)).map((n) => {
+        {NAV.filter((n) => ((n.key !== 'admin' && n.key !== 'shows') || p.user.role === 'admin') && (n.key !== 'gs' || p.user.superAdmin)).map((n) => {
           const active = pathname === n.href || pathname.startsWith(n.href + '/');
           const count = n.key === 'inbox' ? p.myCount : n.key === 'os' || n.key === 'ss' || n.key === 'si' ? p.counts[n.key] : null;
           return (

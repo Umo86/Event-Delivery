@@ -53,12 +53,14 @@ test('viewers can look but not change anything', async ({ page }) => {
   await page.goto('/settings/lists');
   await expect(page.locator('#list-zone')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save list' })).toHaveCount(0);
-  for (const path of ['/admin', '/settings/team']) {
+  for (const path of ['/admin', '/shows', '/settings/team']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
     await expect(page.getByText('That page is for admins only.')).toBeVisible();
   }
-  await expect(page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
+  const mainNav = page.getByRole('navigation', { name: 'Main' }).first();
+  await expect(mainNav.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
+  await expect(mainNav.getByRole('link', { name: 'All shows' })).toHaveCount(0);
   await page.goto('/sponsors');
   await expect(page.getByRole('heading', { name: 'Add a sponsor' })).toHaveCount(0);
 
@@ -71,7 +73,7 @@ test('viewers can look but not change anything', async ({ page }) => {
 
 test('members can work on lines but not reach admin settings', async ({ page }) => {
   await loginAs(page, 'mark');
-  for (const path of ['/admin', '/settings/team', '/settings/stages', '/settings/events', '/settings/system']) {
+  for (const path of ['/admin', '/shows', '/settings/team', '/settings/stages', '/settings/events', '/settings/system']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
   }
