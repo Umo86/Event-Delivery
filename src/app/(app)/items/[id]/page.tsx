@@ -1,0 +1,158 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { PencilLine, Printer } from 'lucide-react';
+import { requireUser } from '@/lib/auth/session';
+import { loadItem } from '@/lib/data/load';
+import { fmtDate, fmtDateTime, relativeDue } from '@/lib/dates';
+import { defaultArtworkDue, defaultPrintDeadline } from '@/lib/domain/engine';
+import { artworkByLabel, categoryInfo } from '@/lib/domain/labels';
+import { canEdit, isAdmin } from '@/lib/domain/permissions';
+import { ActionForm, SubmitButton } from '@/components/forms';
+import { ButtonLink, cx, FlagChip, money, Notice, Panel, Plate, StatusChip } from '@/components/ui';
+import { ArtworkPanel } from '@/components/item/artwork-panel';
+import { SignoffRoute } from '@/components/item/signoff';
+import { ProductionPanel } from '@/components/item/production-panel';
+import { ActivityPanel } from '@/components/item/activity-panel';
+import { deleteItem, setCancelled } from '@/app/actions/items';
+
+export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await props.params;
+  const d = await loadItem(id).catch(() => null);
+  return { title: d ? `${d.row.code} ${d.row.item.description}` : 'Line' };
+}
+
+export default async function ItemPage(props: {
+  params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const user = await requireUser();
+  const { id } = await props.params;
+  const sp = await props.searchParams;
+  const detail = await loadItem(id);
+  if (!detail) notFound();
+  const { row, bundle, supplier } = detail;
+  const { item, state, sponsor } = row;
+  const cat = categoryInfo(item.category);
+  const today = bundle.ctx.today;
+  const names = bundle.ctx.userNames;
+  const total = item.unit_cost ? item.unit_cost * (item.qty && item.qty > 0 ? item.qty : 1) : null;
+  const defArt = defaultArtworkDue(bundle.event, item.category);
+  const defPrint = defaultPrintDeadline(bundle.event, item.category);
+  const dateOr = (d: string | null, fallback: string | null) =>
+    d ? fmtDate(d, 'long') : fallback ? <span className="text-muted">{fmtDate(fallback, 'long')} (event default)</span> : <span className="text-muted">Not set</span>;
+
+  const spec: [string, React.ReactNode][] = [
+    ['Sponsor', sponsor ? <>{sponsor.name}{sponsor.account_manager_id ? <span className="text-muted">, managed by {names.get(sponsor.account_manager_id)}</span> : null}</> : <span className="text-muted">None</span>],
+    ['Type', item.item_type],
+    ['Wording / content', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
+    ['Hall', item.hall ? <Plate tone="light">{item.hall}</Plate> : null],
+    ['Zone / area', item.zone],
+    ['Exact location', item.location_detail],
+    ['Position', item.position],
+    ['Size', item.width_mm || item.height_mm ? `${(item.width_mm ?? 0).toLocaleString('en-GB')} × ${(item.height_mm ?? 0).toLocaleString('en-GB')} mm` : null],
+    ['Sides', item.sides === 'double' ? 'Double-sided' : item.sides === 'single' ? 'Single-sided' : null],
+    ['Quantity', item.qty?.toLocaleString('en-GB')],
+    ['Material / spec', item.material],
+    ['Artwork from', artworkByLabel(item.artwork_by)],
+    ['Artwork due', dateOr(item.artwork_due, defArt)],
+    ['Print / order deadline', dateOr(item.print_deadline, defPrint)],
+    ['Supplier', supplier?.name],
+    ['Unit cost', item.unit_cost !== null ? money(item.unit_cost, 2) : null],
+    ['Total cost', total !== null ? money(total, 2) : null],
+    ['Notes', item.notes ? <span className="whitespace-pre-wrap">{item.notes}</span> : null],
+  ];
+
+  return (
+    <>
+      <nav className="mb-3 text-[14px] text-muted" aria-label="Breadcrumb">
+        <Link href={`/schedule/${cat.slug}`} className="font-semibold text-ink-2 hover:text-ink hover:underline">{cat.label}</Link>
+        <span aria-hidden> / </span>{row.code}
+      </nav>
+
+      {sp.created && <div className="mb-4"><Notice tone="ok">Line {row.code} added. Upload the artwork when it’s ready.</Notice></div>}
+      {sp.saved && <div className="mb-4"><Notice tone="ok">Changes saved.</Notice></div>}
+      {item.cancelled && <div className="mb-4"><Notice tone="warn">This line is cancelled. It’s left out of every count and list.</Notice></div>}
+
+      <header className="mb-6 rounded-[10px] border border-line bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Plate className="text-[16px]">{row.code}</Plate>
+              <StatusChip group={state.group} label={state.statusLabel} />
+              <FlagChip flag={state.flag} />
+            </div>
+            <h1 className={cx('mt-2 text-[28px] font-semibold leading-tight text-ink', item.cancelled && 'line-through')}>{item.description}</h1>
+            <p className="mt-1 text-[14px] text-muted">{cat.label}{sponsor ? ` for ${sponsor.name}` : ''}, added {fmtDateTime(item.created_at)}</p>
+          </div>
+          <div className="no-print flex flex-wrap gap-2">
+            {canEdit(user) && <ButtonLink href={`/items/${item.id}/edit`}><PencilLine size={16} aria-hidden /> Edit</ButtonLink>}
+            <ButtonLink href={`/proof/${item.id}`} target="_blank"><Printer size={16} aria-hidden /> Proof sheet</ButtonLink>
+          </div>
+        </div>
+        {state.group !== 'cancelled' && (
+          <dl className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
+            <div>
+              <dt className="text-[13px] text-muted">Next step</dt>
+              <dd className="font-semibold text-ink">{state.action || 'Nothing left to do'}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] text-muted">Waiting on</dt>
+              <dd className={cx('font-semibold', state.waitingOnLabel && !state.waitingOnUserId ? 'text-red-700' : 'text-ink')}>
+                {state.waitingOnLabel || 'Nobody'}
+                {state.daysWaiting !== null && state.waitingOnLabel && (
+                  <span className="font-normal text-muted">{state.daysWaiting > 0 ? ` for ${state.daysWaiting} day${state.daysWaiting === 1 ? '' : 's'}` : ' since today'}</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[13px] text-muted">Next deadline</dt>
+              <dd className="font-semibold text-ink">
+                {state.due ? <>{fmtDate(state.due, 'long')} <span className="font-normal text-muted">({relativeDue(state.due, today)})</span></> : 'None'}
+              </dd>
+            </div>
+          </dl>
+        )}
+      </header>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div className="space-y-6">
+          <ArtworkPanel detail={detail} user={user} viewVersion={sp.v ? Number(sp.v) : undefined} />
+          <Panel title="Sign-off" id="signoff">
+            <SignoffRoute detail={detail} user={user} />
+          </Panel>
+        </div>
+        <div className="space-y-6">
+          <Panel title="Details" actions={canEdit(user) ? <ButtonLink href={`/items/${item.id}/edit`} small variant="ghost">Edit</ButtonLink> : undefined}>
+            <dl className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-4 gap-y-2 text-[14px]">
+              {spec.map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted">{k}</dt>
+                  <dd className="text-ink">{v ?? <span className="text-muted">Not set</span>}</dd>
+                </div>
+              ))}
+            </dl>
+          </Panel>
+          <ProductionPanel detail={detail} user={user} />
+          <ActivityPanel detail={detail} />
+          {canEdit(user) && (
+            <Panel title="Line options">
+              <div className="flex flex-wrap items-start gap-3">
+                <ActionForm action={setCancelled} confirm={item.cancelled ? undefined : 'Cancel this line? It will drop out of all counts. You can restore it later.'}>
+                  <input type="hidden" name="item_id" value={item.id} />
+                  <input type="hidden" name="cancel" value={item.cancelled ? '0' : '1'} />
+                  <SubmitButton variant="secondary" small>{item.cancelled ? 'Restore line' : 'Cancel line'}</SubmitButton>
+                </ActionForm>
+                {isAdmin(user) && (
+                  <ActionForm action={deleteItem} confirm={`Delete ${row.code} permanently, including its artwork and history? This can’t be undone.`}>
+                    <input type="hidden" name="item_id" value={item.id} />
+                    <SubmitButton variant="danger" small pendingText="Deleting…">Delete permanently</SubmitButton>
+                  </ActionForm>
+                )}
+              </div>
+            </Panel>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

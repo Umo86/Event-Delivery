@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local development stack and test output
+/.local/
+.stack.log
+/public/pdf.worker.min.mjs
+/test-results/
+/playwright-report/
+/tests/e2e/.auth/
+.env.test.sh
+
+# logs
+*.log
