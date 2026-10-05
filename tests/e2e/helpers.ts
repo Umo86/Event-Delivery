@@ -69,20 +69,21 @@ export async function expectImagesLoaded(page: Page, selector: string) {
   await expect.poll(async () => imgs.evaluateAll((els) => els.every((e) => (e as HTMLImageElement).complete && (e as HTMLImageElement).naturalWidth > 0))).toBe(true);
 }
 
-// ---- Invites and email -------------------------------------------------------------
-const EMAIL_API = process.env.RESEND_API_URL ?? 'http://127.0.0.1:54500';
-export interface SentEmail { id: string; from: string; to: string[]; subject: string; text: string; html: string; reply_to?: string }
+// ---- Invites ------------------------------------------------------------------------
+export interface EmailToSend { to: string; subject: string; body: string; mailto: string; password: string }
 
-/** Everything the app has emailed, from the local stand-in for the email service. */
-export async function outbox(): Promise<SentEmail[]> {
-  return (await fetch(`${EMAIL_API}/outbox`)).json() as Promise<SentEmail[]>;
-}
-
-/** The most recent email sent to an address. */
-export async function latestEmail(to: string): Promise<SentEmail> {
-  const mail = (await outbox()).reverse().find((e) => e.to.includes(to));
-  if (!mail) throw new Error(`No email was sent to ${to}`);
-  return mail;
+/** The ready-made email the Admin page gives you after an invite or a password reset. */
+export async function emailToSend(scope: Page | Locator): Promise<EmailToSend> {
+  const box = scope.getByRole('region', { name: 'Email to send' });
+  await expect(box).toHaveCount(1);
+  const body = await box.getByLabel('Message', { exact: true }).inputValue();
+  return {
+    to: await box.getByLabel('To', { exact: true }).inputValue(),
+    subject: await box.getByLabel('Subject', { exact: true }).inputValue(),
+    body,
+    mailto: (await box.getByRole('link', { name: 'Open in your email app' }).getAttribute('href'))!,
+    password: tempPasswordFrom(body),
+  };
 }
 
 /** Reads the temporary password out of an invite or reset email. */

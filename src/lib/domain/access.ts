@@ -68,8 +68,8 @@ export const STATUS_INFO: Record<PersonStatus, { label: string; tone: Tone }> = 
   active: { label: 'Active', tone: 'teal' },
   invited: { label: 'Invited', tone: 'blue' },
   invite_expired: { label: 'Invite expired', tone: 'red' },
-  temp_password: { label: 'Password reset', tone: 'amber' },
-  temp_expired: { label: 'Reset expired', tone: 'red' },
+  temp_password: { label: 'Temporary password', tone: 'amber' },
+  temp_expired: { label: 'Temporary password expired', tone: 'red' },
   deactivated: { label: 'Deactivated', tone: 'grey' },
 };
 

@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
-  ADMIN, acceptNextDialog, errorMessage, latestEmail, login, okMessage, openPerson, panel, personRow, readState, saveUser,
-  tempPasswordFrom, user, withDb,
+  ADMIN, acceptNextDialog, emailToSend, errorMessage, login, okMessage, openPerson, panel, personRow, readState, saveUser, user,
 } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -22,31 +21,32 @@ async function stageNames(page: Page) {
   return titles.map((t) => t.replace(/\s+/g, ' ').trim()).filter((t) => /^\d/.test(t)).map((t) => t.replace(/^\d+\s*/, ''));
 }
 
-test('admin invites the team, and each person is emailed a temporary password', async ({ page }) => {
+test('admin invites the team and gets a ready-made email to send each person', async ({ page }) => {
   await asAdmin(page);
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible();
+  const invitePanel = panel(page, 'Invite someone');
   for (const p of PEOPLE) {
+    const level = p.role === 'viewer' ? 'Viewer' : 'Member';
     await page.fill('#inv-name', p.name);
     await page.fill('#inv-email', p.email);
     await page.fill('#inv-title', p.title);
-    await page.getByRole('radio', { name: new RegExp(`^${p.role === 'viewer' ? 'Viewer' : 'Member'}`) }).check();
-    await page.getByRole('button', { name: 'Send invite' }).click();
-    await expect(okMessage(page, `Invite sent to ${p.email}.`)).toBeVisible();
-    const mail = await latestEmail(p.email);
-    expect(mail.subject).toBe(`${ADMIN.name} invited you to Event Delivery`);
-    expect(mail.from).toBe('Event Delivery <invites@ukcw.test>');
-    expect(mail.reply_to).toBe(ADMIN.email); // replies go to the admin who sent it
-    expect(mail.text).toContain(`Hello ${p.name.split(' ')[0]},`);
-    expect(mail.text).toContain('Sign in: http://127.0.0.1:3100/login');
-    expect(mail.text).toContain(`Email: ${p.email}`);
-    expect(mail.text).toContain('you’ll be asked to choose your own password');
-    expect(mail.text).toContain(`Your access: ${p.role === 'viewer' ? 'Viewer' : 'Member'}.`);
-    expect(mail.html).toContain('Sign in to Event Delivery');
-    const pw = tempPasswordFrom(mail.text);
-    expect(pw).toMatch(/^[a-z]+-[a-z]+-[a-z]+-\d{4}$/);
-    expect(mail.html).toContain(pw);
-    saveUser(p.key, { name: p.name, email: p.email, password: pw });
+    await page.getByRole('radio', { name: new RegExp(`^${level}`) }).check();
+    await page.getByRole('button', { name: 'Create invite' }).click();
+    await expect(okMessage(page, `${p.name}’s account is ready. Now send them the invite below from your own email.`)).toBeVisible();
+    const mail = await emailToSend(invitePanel);
+    expect(mail.to).toBe(p.email);
+    expect(mail.subject).toBe('Your Event Delivery invitation');
+    expect(mail.body).toContain(`Hello ${p.name.split(' ')[0]},`);
+    expect(mail.body).toContain('Sign in here: http://127.0.0.1:3100/login');
+    expect(mail.body).toContain(`Email: ${p.email}`);
+    expect(mail.body).toContain('you’ll be asked to choose your own password');
+    expect(mail.body).toContain(`Your access: ${level}.`);
+    expect(mail.body).toMatch(/Thanks,\nUmit$/); // signed by the admin who sends it
+    expect(mail.password).toMatch(/^[a-z]+-[a-z]+-[a-z]+-\d{4}$/);
+    // One click opens it, already filled in, in the admin's own email app
+    expect(mail.mailto).toBe(`mailto:${p.email}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body.replace(/\n/g, '\r\n'))}`);
+    saveUser(p.key, { name: p.name, email: p.email, password: mail.password });
     await expect(page.locator('#inv-name')).toHaveValue(''); // the form clears for the next person
   }
   await expect(page.getByRole('heading', { name: `People (${PEOPLE.length + 1})` })).toBeVisible();
@@ -58,7 +58,7 @@ test('admin invites the team, and each person is emailed a temporary password', 
   // The same email can't be invited twice
   await page.fill('#inv-name', 'Olivia Again');
   await page.fill('#inv-email', 'OLIVIA@ukcw.test');
-  await page.getByRole('button', { name: 'Send invite' }).click();
+  await page.getByRole('button', { name: 'Create invite' }).click();
   await expect(errorMessage(page, 'olivia@ukcw.test already has an account.')).toBeVisible();
   await expect(page.locator('#inv-name')).toHaveValue('Olivia Again'); // what was typed is kept after an error
 
@@ -67,52 +67,21 @@ test('admin invites the team, and each person is emailed a temporary password', 
   await expect(log).toContainText('Invited Olivia Ops (olivia@ukcw.test) as Member');
 });
 
-test('when the invite email can’t be sent, the admin gets the details to pass on', async ({ page }) => {
-  await asAdmin(page);
-  await page.goto('/admin');
-  await page.fill('#inv-name', 'Fay Fail');
-  await page.fill('#inv-email', 'fail@ukcw.test');
-  await page.getByRole('radio', { name: /^Viewer/ }).check();
-  await page.getByRole('button', { name: 'Send invite' }).click();
-  await expect(okMessage(page, 'Fay Fail’s account is ready. The email wasn’t sent: Resend can only send to its account owner')).toBeVisible();
-  const message = page.getByRole('textbox', { name: 'Message with the sign-in details' });
-  await expect(message).toBeVisible();
-  const text = await message.inputValue();
-  expect(text).toContain('Email: fail@ukcw.test');
-  const temp = tempPasswordFrom(text);
-  await expect(page.getByRole('button', { name: 'Copy message' })).toBeVisible();
-
-  // The list and the attention panel show the problem
-  await expect(page.getByText('Fay Fail’s invite email wasn’t sent.')).toBeVisible();
-  const row = await openPerson(page, 'fail@ukcw.test');
-  await expect(row).toContainText('The last email wasn’t sent: Resend can only send to its account owner');
-
-  // The details work, so the person could sign in with them
-  const ctx = await page.context().browser()!.newContext();
-  const fay = await ctx.newPage();
-  await login(fay, 'fail@ukcw.test', temp);
-  await expect(fay).toHaveURL(/\/account\?first=1/);
-  await ctx.close();
-
-  // Cancelling an invite is only offered to people who have never signed in
-  await page.reload();
-  const again = await openPerson(page, 'fail@ukcw.test');
-  await expect(again.getByRole('button', { name: 'Cancel invite' })).toHaveCount(0);
-  await expect(again.getByRole('button', { name: 'Deactivate' })).toBeVisible();
-  await withDb((sql) => sql`delete from users where email = 'fail@ukcw.test'`);
-});
-
-test('an invite can be cancelled before it is used', async ({ page }) => {
+test('an invite can be cancelled before it is used, and its password is never shown again', async ({ page }) => {
   await asAdmin(page);
   await page.goto('/admin');
   await page.fill('#inv-name', 'Temp Person');
   await page.fill('#inv-email', 'temp.person@ukcw.test');
-  await page.getByRole('button', { name: 'Send invite' }).click();
-  await expect(okMessage(page, 'Invite sent to temp.person@ukcw.test.')).toBeVisible();
-  const temp = tempPasswordFrom((await latestEmail('temp.person@ukcw.test')).text);
+  await page.getByRole('button', { name: 'Create invite' }).click();
+  const invitePanel = panel(page, 'Invite someone');
+  const temp = (await emailToSend(invitePanel)).password;
+  await invitePanel.getByRole('button', { name: 'Done' }).click();
+  await expect(invitePanel.getByRole('region', { name: 'Email to send' })).toHaveCount(0);
+
   const row = await openPerson(page, 'temp.person@ukcw.test');
   await expect(row).toContainText(`Invited by ${ADMIN.name}`);
-  await expect(row).toContainText('Invite email sent');
+  await expect(row).toContainText('Their temporary password works until');
+  await expect(page.getByText(temp)).toHaveCount(0); // only a hash is kept, so it can't be shown again
   acceptNextDialog(page);
   await row.getByRole('button', { name: 'Cancel invite' }).click();
   await expect(personRow(page, 'temp.person@ukcw.test')).toHaveCount(0);
@@ -161,20 +130,19 @@ test('new people must choose their own password when they first sign in', async 
   await expect(panel(page, 'Access log')).toContainText('Olivia Ops: Signed in and chose their own password');
 });
 
-test('admin can reset a forgotten password, and the new one is emailed', async ({ page, browser }) => {
+test('admin can reset a forgotten password and send the new one', async ({ page, browser }) => {
   await asAdmin(page);
   await page.goto('/admin');
   const row = await openPerson(page, 'vic@ukcw.test');
   acceptNextDialog(page);
   await row.getByRole('button', { name: 'Reset password' }).click();
-  await expect(okMessage(row, 'Vic Viewer’s password has been reset and they’ve been signed out. The new temporary password has been emailed to vic@ukcw.test.')).toBeVisible();
-  await expect(row.locator('summary').getByText('Password reset', { exact: true })).toBeVisible();
-  const mail = await latestEmail('vic@ukcw.test');
+  await expect(okMessage(row, 'Vic Viewer’s password has been reset and they’ve been signed out. Send them the new temporary password below.')).toBeVisible();
+  await expect(row.locator('summary').getByText('Temporary password', { exact: true })).toBeVisible();
+  const mail = await emailToSend(row);
+  expect(mail.to).toBe('vic@ukcw.test');
   expect(mail.subject).toBe('Your Event Delivery password has been reset');
-  const temp = tempPasswordFrom(mail.text);
-  // The details can also be passed on by hand
-  await row.getByText('Need to pass the details on yourself?').click();
-  await expect(row.getByRole('textbox', { name: 'Message with the sign-in details' })).toHaveValue(new RegExp(temp));
+  expect(mail.body).toContain('I’ve reset your Event Delivery password.');
+  const temp = mail.password;
 
   const ctx = await browser.newContext();
   const vic = await ctx.newPage();

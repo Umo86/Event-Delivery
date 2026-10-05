@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
-  ADMIN, acceptNextDialog, errorMessage, itemId, latestEmail, login, loginAs, okMessage, openPerson, panel, saveUser, signoffStage,
-  tempPasswordFrom, user,
+  ADMIN, acceptNextDialog, emailToSend, errorMessage, itemId, login, loginAs, okMessage, openPerson, panel, saveUser, signoffStage, user,
 } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -172,7 +171,7 @@ test('too many wrong passwords lock the account until it is reset', async ({ pag
   acceptNextDialog(page);
   await row.getByRole('button', { name: 'Reset password' }).click();
   await expect(okMessage(row, 'password has been reset')).toBeVisible();
-  const temp = tempPasswordFrom((await latestEmail(mark.email)).text);
+  const temp = (await emailToSend(row)).password;
 
   await login(page, mark.email, temp);
   await page.fill('#current', temp);

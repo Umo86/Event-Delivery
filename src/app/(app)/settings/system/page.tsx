@@ -4,7 +4,6 @@ import { db } from '@/lib/db';
 import { getAppName } from '@/lib/data/load';
 import { LATEST_VERSION } from '@/lib/db/migrations';
 import { blobAccess, blobSetupProblem, isBlobConfigured } from '@/lib/storage';
-import { currentEmailConfig } from '@/lib/email/send';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { Field, inputCls, Notice, Panel } from '@/components/ui';
 import { runCheck } from '@/app/actions/system';
@@ -24,7 +23,6 @@ export default async function SystemPage() {
            (select count(*)::int from users) as users,
            (select coalesce(max(version), 0)::int from schema_migrations) as v`;
   const appName = await getAppName();
-  const mail = currentEmailConfig();
   const mb = stats.bytes / 1024 / 1024;
   const pct = Math.min(100, (stats.bytes / FREE_BLOB_BYTES) * 100);
   return (
@@ -35,10 +33,6 @@ export default async function SystemPage() {
           <dt className="text-muted">File storage</dt>
           <dd className={isBlobConfigured() ? 'font-semibold text-green-700' : 'font-semibold text-red-700'}>
             {isBlobConfigured() ? `Connected (${blobAccess()} store)` : 'Not connected'}
-          </dd>
-          <dt className="text-muted">Email</dt>
-          <dd className={mail.configured ? 'font-semibold text-green-700' : 'font-semibold text-amber-800'}>
-            {mail.configured ? `Set up (from ${mail.fromAddress})` : 'Not set up: invites are shown to you to send yourself'}
           </dd>
           <dt className="text-muted">Lines</dt><dd>{stats.items}</dd>
           <dt className="text-muted">People</dt><dd>{stats.users}</dd>

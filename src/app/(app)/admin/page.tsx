@@ -5,13 +5,12 @@ import { db } from '@/lib/db';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { fmtDateTime } from '@/lib/dates';
 import { ABILITIES, ACCESS_LEVELS, personStatus, TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
-import { currentEmailConfig } from '@/lib/email/send';
 import { sponsorLinksEnabled } from '@/lib/settings';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { cx, Field, inputCls, PageHeader, Panel } from '@/components/ui';
 import { DetailsForm } from '@/components/admin/details-form';
 import { PersonRow, type AdminPerson } from '@/components/admin/person-row';
-import { invitePerson, sendTestEmail, setSponsorLinks } from '@/app/actions/admin';
+import { invitePerson, setSponsorLinks } from '@/app/actions/admin';
 
 export const metadata: Metadata = { title: 'Admin' };
 
@@ -24,8 +23,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     event ? loadBundle(event.id) : Promise.resolve(null),
     sql<AdminPerson[]>`
       select u.id, u.email, u.full_name, u.job_title, u.role, u.active, u.must_change_password, u.last_login_at, u.created_at,
-             u.invited_at, inv.full_name as invited_by_name, u.temp_password_expires_at,
-             u.invite_email_status, u.invite_email_error, u.invite_email_at, u.locked_until
+             u.invited_at, inv.full_name as invited_by_name, u.temp_password_expires_at, u.locked_until
       from users u left join users inv on inv.id = u.invited_by
       order by lower(u.full_name)`,
     sql<{ id: string; actor_name: string; message: string; created_at: Date }[]>`
@@ -34,7 +32,6 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     sql<{ openLinks: number }[]>`
       select count(*)::int as "openLinks" from share_links where revoked_at is null and used_at is null and expires_at > now()`,
   ]);
-  const mail = currentEmailConfig();
   const names = new Map(people.map((p) => [p.id, p.full_name]));
   const byId = new Map(people.map((p) => [p.id, p]));
   const stages = (bundle?.stages ?? []).filter((s) => !s.uses_account_manager);
@@ -53,10 +50,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
   const personLink = (id: string) => `/admin?person=${id}#person-${id}`;
   for (const p of people) {
     const st = personStatus(p);
-    if (st === 'invite_expired') attention.push({ text: `${p.full_name}’s invite has expired.`, href: personLink(p.id), action: 'Resend' });
-    else if (st === 'invited' && p.invite_email_status === 'failed') {
-      attention.push({ text: `${p.full_name}’s invite email wasn’t sent.`, href: personLink(p.id), action: 'Resend' });
-    }
+    if (st === 'invite_expired') attention.push({ text: `${p.full_name}’s invite has expired.`, href: personLink(p.id), action: 'New invite' });
     if (p.active && p.locked_until && new Date(p.locked_until) > new Date()) {
       attention.push({ text: `${p.full_name} is locked out after too many wrong passwords.`, href: personLink(p.id), action: 'Open' });
     }
@@ -120,11 +114,10 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
                 </div>
               </fieldset>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <SubmitButton pendingText={mail.configured ? 'Sending…' : 'Creating…'}>{mail.configured ? 'Send invite' : 'Create invite'}</SubmitButton>
-                <p className="text-[13.5px] text-muted">
-                  {mail.configured
-                    ? `They’ll get an email with a temporary password that works for ${TEMP_PASSWORD_DAYS} days, and choose their own when they first sign in.`
-                    : `Email isn’t set up yet, so you’ll get a message with a temporary password to send them yourself.`}
+                <SubmitButton pendingText="Creating…">Create invite</SubmitButton>
+                <p className="max-w-[60ch] text-[13.5px] text-muted">
+                  You’ll get an email to send them from your own email, with a temporary password that works for {TEMP_PASSWORD_DAYS} days.
+                  They choose their own password when they first sign in.
                 </p>
               </div>
             </DetailsForm>
@@ -165,29 +158,6 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
                 </tbody>
               </table>
             </div>
-          </Panel>
-
-          <Panel title="Invite emails">
-            {mail.configured ? (
-              <>
-                <p className="text-[14px] text-ink-2">
-                  Invites and password resets are emailed from <b className="break-words text-ink">{mail.fromAddress}</b>.
-                </p>
-                {mail.testSender && (
-                  <p className="mt-2 text-[13.5px] text-amber-800">
-                    That’s Resend’s test address, which only delivers to the Resend account owner. Verify your own domain in Resend and set EMAIL_FROM to send to everyone.
-                  </p>
-                )}
-                <ActionForm action={sendTestEmail} className="mt-3">
-                  <SubmitButton variant="secondary" small pendingText="Sending…">Send me a test email</SubmitButton>
-                </ActionForm>
-              </>
-            ) : (
-              <div className="space-y-2 text-[14px] text-ink-2">
-                <p><b className="text-ink">Not set up yet.</b> Invites still work: you’ll get the sign-in details to send yourself.</p>
-                <p className="text-[13.5px]">To email invites automatically, connect Resend to this project in Vercel, verify your sending domain in Resend, then set EMAIL_FROM (for example “Event Delivery &lt;invites@yourdomain.co.uk&gt;”).</p>
-              </div>
-            )}
           </Panel>
 
           <Panel title="Sponsor approval links">

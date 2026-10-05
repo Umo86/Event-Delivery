@@ -10,7 +10,6 @@ test('the system page shows health and runs a full check', async ({ page }) => {
   await page.goto('/settings/system');
   const health = panel(page, 'Health');
   await expect(health).toContainText('Connected (schema v4, up to date)');
-  await expect(health).toContainText('Set up (from invites@ukcw.test)');
   await expect(health).toContainText('Connected (private store)');
   await expect(health).toContainText(/\d+ versions, [\d.]+ MB of originals/);
 

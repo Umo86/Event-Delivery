@@ -80,11 +80,12 @@ export function SubmitButton({ children, variant = 'primary', small, className, 
   );
 }
 
-export function CopyButton({ text, label = 'Copy link' }: { text: string; label?: string }) {
+export function CopyButton({ text, label = 'Copy link', ariaLabel }: { text: string; label?: string; ariaLabel?: string }) {
   const [done, setDone] = useState(false);
   return (
     <button
       type="button"
+      aria-label={ariaLabel}
       className={cx(btn.base, btn.secondary, btn.small)}
       onClick={async () => {
         try {

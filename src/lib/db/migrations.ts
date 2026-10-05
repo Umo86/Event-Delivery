@@ -278,6 +278,7 @@ update items i set last_version = greatest(
   (select coalesce(max(version), 0) from share_links where item_id = i.id));
 `,
   },
+  // The invite_email_* columns below are unused: invites are sent by the admin from their own email, not by the platform.
   {
     version: 4,
     name: 'invitations',

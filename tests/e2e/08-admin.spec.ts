@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
-  ADMIN, acceptNextDialog, asUser, decide, errorMessage, expectStatus, idFromUrl, latestEmail, login, loginAs, makePng, okMessage,
-  openPerson, panel, signoffStage, tempPasswordFrom, uploadArtwork, withDb,
+  acceptNextDialog, asUser, decide, emailToSend, errorMessage, expectStatus, idFromUrl, login, loginAs, makePng, okMessage,
+  openPerson, panel, signoffStage, uploadArtwork, withDb,
 } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -92,9 +92,8 @@ test('an expired invite is refused at sign-in and can be sent again', async ({ b
   await page.goto('/admin');
   await page.fill('#inv-name', 'Erin Expired');
   await page.fill('#inv-email', 'erin@ukcw.test');
-  await page.getByRole('button', { name: 'Send invite' }).click();
-  await expect(okMessage(page, 'Invite sent to erin@ukcw.test.')).toBeVisible();
-  const first = tempPasswordFrom((await latestEmail('erin@ukcw.test')).text);
+  await page.getByRole('button', { name: 'Create invite' }).click();
+  const first = (await emailToSend(panel(page, 'Invite someone'))).password;
   // A week passes
   await withDb((sql) => sql`update users set temp_password_expires_at = now() - interval '1 minute' where email = 'erin@ukcw.test'`);
 
@@ -113,9 +112,11 @@ test('an expired invite is refused at sign-in and can be sent again', async ({ b
   await expect(page.getByText('Erin Expired’s invite has expired.')).toBeVisible();
   const row = await openPerson(page, 'erin@ukcw.test');
   await expect(row.locator('summary').getByText('Invite expired', { exact: true })).toBeVisible();
-  await row.getByRole('button', { name: 'Resend invite' }).click();
+  await row.getByRole('button', { name: 'New invite' }).click();
   await expect(okMessage(row, 'New invite for Erin Expired. The old temporary password no longer works.')).toBeVisible();
-  const second = tempPasswordFrom((await latestEmail('erin@ukcw.test')).text);
+  const resent = await emailToSend(row);
+  expect(resent.subject).toBe('Your Event Delivery invitation');
+  const second = resent.password;
   expect(second).not.toBe(first);
   await login(erin, 'erin@ukcw.test', second);
   await expect(erin).toHaveURL(/\/account\?first=1/);
@@ -176,16 +177,15 @@ test('sponsor approval links can be switched off and back on', async ({ browser,
   await expect(page).toHaveURL(/\/schedule\/ss\?deleted=1/);
 });
 
-test('the admin can send themselves a test email', async ({ page }) => {
+test('the admin page, with an invite ready to send', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/admin');
-  const email = panel(page, 'Invite emails');
-  await expect(email).toContainText('emailed from invites@ukcw.test');
-  await email.getByRole('button', { name: 'Send me a test email' }).click();
-  await expect(okMessage(email, `Test email sent to ${ADMIN.email}.`)).toBeVisible();
-  expect((await latestEmail(ADMIN.email)).subject).toBe('Event Delivery: test email');
-
-  await page.goto('/admin');
+  await page.fill('#inv-name', 'Sam Supplier');
+  await page.fill('#inv-email', 'sam@ukcw.test');
+  await page.fill('#inv-title', 'Print Manager');
+  await page.getByRole('radio', { name: /^Viewer/ }).check();
+  await page.getByRole('button', { name: 'Create invite' }).click();
+  await expect(panel(page, 'Invite someone').getByRole('region', { name: 'Email to send' })).toBeVisible();
   await openPerson(page, 'mark@ukcw.test');
   await page.screenshot({ path: test.info().outputPath('admin-page.png'), fullPage: true });
 });

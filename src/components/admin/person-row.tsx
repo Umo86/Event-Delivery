@@ -23,9 +23,6 @@ export interface AdminPerson {
   invited_at: Date | null;
   invited_by_name: string | null;
   temp_password_expires_at: Date | null;
-  invite_email_status: 'sent' | 'failed' | 'not_set_up' | null;
-  invite_email_error: string | null;
-  invite_email_at: Date | null;
   locked_until: Date | null;
 }
 
@@ -79,19 +76,10 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
               {u.invited_at && (
                 <p>Invited by {u.invited_by_name ?? 'an admin'} on {fmtDateTime(u.invited_at)}.</p>
               )}
-              {u.invite_email_status === 'sent' && u.invite_email_at && u.must_change_password && (
-                <p>{neverSignedIn ? 'Invite' : 'Password'} email sent {fmtDateTime(u.invite_email_at)}.</p>
-              )}
-              {u.invite_email_status === 'failed' && u.must_change_password && (
-                <p className="text-red-700">The last email wasn’t sent: {u.invite_email_error}</p>
-              )}
-              {u.invite_email_status === 'not_set_up' && u.must_change_password && (
-                <p>The sign-in details weren’t emailed, because email isn’t set up.</p>
-              )}
               {u.must_change_password && u.temp_password_expires_at && (
                 new Date(u.temp_password_expires_at) < new Date()
-                  ? <p className="font-semibold text-red-700">The temporary password expired on {fmtDateTime(u.temp_password_expires_at)}. Send a new one.</p>
-                  : <p>The temporary password works until {fmtDateTime(u.temp_password_expires_at)}, until {first} chooses their own.</p>
+                  ? <p className="font-semibold text-red-700">Their temporary password expired on {fmtDateTime(u.temp_password_expires_at)}. Make a new one below.</p>
+                  : <p>Their temporary password works until {fmtDateTime(u.temp_password_expires_at)}. They choose their own when they sign in.</p>
               )}
               {locked && <p className="font-semibold text-red-700">Locked out after too many wrong passwords. A new password unlocks the account.</p>}
               {!u.active && <p>Deactivated: {first} can’t sign in.</p>}
@@ -102,11 +90,13 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
               <div className="mt-3 space-y-3">
                 {u.active && (
                   <DetailsForm action={sendNewPassword}
-                    confirm={neverSignedIn ? undefined : `Reset ${u.full_name}’s password? They’ll be signed out and sent a new temporary password.`}>
+                    confirm={neverSignedIn ? undefined : `Reset ${u.full_name}’s password? They’ll be signed out, and you’ll get a temporary password to send them.`}>
                     <input type="hidden" name="user_id" value={u.id} />
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <SubmitButton variant="secondary" small pendingText="Sending…">{neverSignedIn ? 'Resend invite' : 'Reset password'}</SubmitButton>
-                      <span className={help}>{neverSignedIn ? 'Sends a new temporary password. The old one stops working.' : 'Signs them out and sends a temporary password.'}</span>
+                      <SubmitButton variant="secondary" small pendingText="Working…">{neverSignedIn ? 'New invite' : 'Reset password'}</SubmitButton>
+                      <span className={help}>{neverSignedIn
+                        ? 'Gives you a new invite email with a new temporary password. The old one stops working.'
+                        : 'Signs them out and gives you an email with a temporary password to send them.'}</span>
                     </div>
                   </DetailsForm>
                 )}

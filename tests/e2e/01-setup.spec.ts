@@ -12,7 +12,6 @@ test('health check reports the database and file storage', async ({ request }) =
   expect(body.ok).toBe(true);
   expect(body.database).toMatchObject({ configured: true, ok: true, schemaUpToDate: true, setupComplete: false });
   expect(body.fileStorage).toMatchObject({ configured: true, access: 'private' });
-  expect(body.email).toMatchObject({ configured: true, testSender: false });
 });
 
 test('search engines are told not to index the platform', async ({ request }) => {

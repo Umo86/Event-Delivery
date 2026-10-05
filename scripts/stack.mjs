@@ -1,4 +1,4 @@
-// Starts a local Postgres, a fake Vercel Blob API and a fake email API for development and automated tests.
+// Starts a local Postgres + fake Vercel Blob API for development and automated tests.
 // Usage: node scripts/stack.mjs [--reset]
 //   --reset  drops and recreates the "eventdeliver" database first (clean slate for tests)
 import EmbeddedPostgres from 'embedded-postgres';
@@ -6,7 +6,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { startFakeBlob } from './fake-blob.mjs';
-import { startFakeEmail } from './fake-email.mjs';
 
 export const STACK = {
   pgPort: 54329,
@@ -15,8 +14,6 @@ export const STACK = {
   user: 'postgres',
   password: 'localdev',
   rwToken: 'vercel_blob_rw_localstore_localsecret0123456789',
-  emailPort: 54500,
-  emailKey: 're_local_test_key',
 };
 
 export function stackEnv() {
@@ -26,10 +23,6 @@ export function stackEnv() {
     VERCEL_BLOB_API_URL: `http://127.0.0.1:${STACK.blobPort}/api/blob`,
     NEXT_PUBLIC_VERCEL_BLOB_API_URL: `http://127.0.0.1:${STACK.blobPort}/api/blob`,
     BLOB_ACCESS: 'private',
-    // Emails go to a local outbox: http://127.0.0.1:54500/outbox
-    RESEND_API_KEY: STACK.emailKey,
-    RESEND_API_URL: `http://127.0.0.1:${STACK.emailPort}`,
-    EMAIL_FROM: 'Event Delivery <invites@ukcw.test>',
   };
 }
 
@@ -65,11 +58,9 @@ export async function startStack({ reset = false, root = process.cwd() } = {}) {
   const blobDir = path.join(root, '.local', 'blob');
   if (reset) fs.rmSync(blobDir, { recursive: true, force: true });
   const blobServer = await startFakeBlob({ port: STACK.blobPort, dir: blobDir, rwToken: STACK.rwToken });
-  const emailServer = await startFakeEmail({ port: STACK.emailPort, apiKey: STACK.emailKey });
   return {
     async stop() {
       await new Promise((r) => blobServer.close(() => r()));
-      await new Promise((r) => emailServer.close(() => r()));
       await pg.stop();
     },
   };

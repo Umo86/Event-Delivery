@@ -9,13 +9,13 @@ import { logActivity } from '@/lib/activity';
 import { getAppName } from '@/lib/data/load';
 import { ACCESS_LEVELS, accessLevel, personStatus, TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
 import type { Role } from '@/lib/domain/types';
-import { accessEmail, escapeHtml, firstName, type AccessEmailKind } from '@/lib/email/message';
-import { sendEmail } from '@/lib/email/send';
+import { firstName, inviteMessage, type InviteKind } from '@/lib/invite-message';
 import { SETTING, writeSetting } from '@/lib/settings';
 import { appOrigin } from '@/lib/url';
 
 // Everything on the Admin page: invitations, access levels, sign-off responsibilities and platform switches.
-// Every change is written to the access log.
+// Every change is written to the access log. The platform doesn't send email: an invite or reset gives the admin
+// a ready-made message with the temporary password to send from their own mailbox.
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const refresh = () => revalidatePath('/', 'layout');
@@ -84,25 +84,14 @@ async function newTempPassword() {
   return { password, hash: await hashPassword(password), expiresAt: new Date(Date.now() + TEMP_PASSWORD_DAYS * 86400000) };
 }
 
-/** Emails a temporary password and records whether it was sent. Returns the copy-ready message for the admin too. */
-async function deliver(sql: Sql, me: CurrentUser, p: Pick<Person, 'id' | 'email' | 'full_name' | 'role'>, kind: AccessEmailKind,
-  password: string, expiresAt: Date) {
-  const appName = await getAppName();
+/** The message the admin sends, with the temporary password. The password is only ever shown this once. */
+async function messageFor(me: CurrentUser, p: Pick<Person, 'email' | 'full_name' | 'role'>, kind: InviteKind, password: string, expiresAt: Date) {
   const lvl = accessLevel(p.role);
-  const content = accessEmail({
-    kind, appName, name: p.full_name, email: p.email, tempPassword: password, senderName: me.full_name,
+  const msg = inviteMessage({
+    kind, appName: await getAppName(), name: p.full_name, email: p.email, tempPassword: password, senderName: me.full_name,
     roleLabel: lvl.label, roleHelp: lvl.email, signInUrl: `${await appOrigin()}/login`, expiresAt,
   });
-  const sent = await sendEmail(p.email, content, { fromName: appName, replyTo: me.email });
-  await sql`update users set invite_email_status = ${sent.ok ? 'sent' : sent.status}, invite_email_error = ${sent.ok ? null : sent.error},
-              invite_email_at = now() where id = ${p.id}`;
-  return { sent, data: { emailed: sent.ok, manual: content.text, password, to: p.email } };
-}
-
-function notSentMessage(name: string, sent: { ok: false; status: 'not_set_up' | 'failed'; error: string }, what: string): string {
-  return sent.status === 'not_set_up'
-    ? `${what} Email isn’t set up yet, so copy the message below and send it to ${firstName(name)} yourself.`
-    : `${what} The email wasn’t sent: ${sent.error} Copy the message below and send it to ${firstName(name)} yourself.`;
+  return { invite: { ...msg, name: p.full_name } };
 }
 
 // ---- Invitations --------------------------------------------------------------------
@@ -126,20 +115,17 @@ export async function invitePerson(_prev: ActionResult | null, fd: FormData): Pr
       insert into users (email, full_name, job_title, role, password_hash, must_change_password, temp_password_expires_at, invited_by, invited_at)
       values (${email}, ${name}, ${title}, ${role}, ${hash}, true, ${expiresAt}, ${me.id}, now())
       returning id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at`;
-    const { sent, data } = await deliver(sql, me, p, 'invite', password, expiresAt);
-    await audit(sql, me, `Invited ${name} (${email}) as ${accessLevel(role).label}${sent.ok ? '' : ', email not sent'}`);
+    await audit(sql, me, `Invited ${name} (${email}) as ${accessLevel(role).label}`);
     refresh();
     return {
       ok: true,
-      message: sent.ok
-        ? `Invite sent to ${email}. ${firstName(name)} will choose their own password when they first sign in.`
-        : notSentMessage(name, sent, `${name}’s account is ready.`),
-      data,
+      message: `${name}’s account is ready. Now send them the invite below from your own email.`,
+      data: await messageFor(me, p, 'invite', password, expiresAt),
     };
   });
 }
 
-/** Resends the invite to someone who hasn't signed in yet, or resets the password of someone who has. */
+/** A new invite for someone who hasn't signed in yet, or a password reset for someone who has. */
 export async function sendNewPassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const me = await actor('admin');
@@ -147,21 +133,19 @@ export async function sendNewPassword(_prev: ActionResult | null, fd: FormData):
     const p = await findPerson(sql, fd);
     if (p.id === me.id) throw new UserError('Change your own password on the Your account page.');
     if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
-    const kind: AccessEmailKind = p.last_login_at ? 'reset' : 'invite';
+    const kind: InviteKind = p.last_login_at ? 'reset' : 'invite';
     const { password, hash, expiresAt } = await newTempPassword();
     await sql`update users set password_hash = ${hash}, must_change_password = true, temp_password_expires_at = ${expiresAt},
                 failed_logins = 0, locked_until = null where id = ${p.id}`;
     await sql`delete from sessions where user_id = ${p.id}`;
-    const { sent, data } = await deliver(sql, me, p, kind, password, expiresAt);
-    await audit(sql, me, `${kind === 'invite' ? 'Resent the invite to' : 'Reset the password for'} ${p.full_name}${sent.ok ? '' : ', email not sent'}`);
+    await audit(sql, me, `${kind === 'invite' ? 'Made a new invite for' : 'Reset the password for'} ${p.full_name}`);
     refresh();
-    const done = kind === 'invite'
-      ? `New invite for ${p.full_name}. The old temporary password no longer works.`
-      : `${p.full_name}’s password has been reset and they’ve been signed out.`;
     return {
       ok: true,
-      message: sent.ok ? `${done} The new temporary password has been emailed to ${p.email}.` : notSentMessage(p.full_name, sent, done),
-      data,
+      message: kind === 'invite'
+        ? `New invite for ${p.full_name}. The old temporary password no longer works. Send them the new invite below.`
+        : `${p.full_name}’s password has been reset and they’ve been signed out. Send them the new temporary password below.`,
+      data: await messageFor(me, p, kind, password, expiresAt),
     };
   });
 }
@@ -322,20 +306,5 @@ export async function setSponsorLinks(_prev: ActionResult | null, fd: FormData):
         ? 'Sponsor approval links are on. Links that haven’t expired work again.'
         : 'Sponsor approval links are off. Every existing link has stopped working.',
     };
-  });
-}
-
-export async function sendTestEmail(_prev: ActionResult | null, _fd: FormData): Promise<ActionResult> {
-  return run(async () => {
-    const me = await actor('admin');
-    const appName = await getAppName();
-    const text = `This is a test email from ${appName}, sent by ${me.full_name}. Invitations and password resets will arrive from the same address.`;
-    const sent = await sendEmail(me.email, {
-      subject: `${appName}: test email`,
-      text,
-      html: `<p style="font-family:Arial,sans-serif;font-size:15px;color:#13233b;">${escapeHtml(text)}</p>`,
-    }, { fromName: appName });
-    if (!sent.ok) throw new UserError(sent.error);
-    return { ok: true, message: `Test email sent to ${me.email}. If it isn’t there in a few minutes, check the junk folder.` };
   });
 }
