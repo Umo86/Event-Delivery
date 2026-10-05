@@ -53,16 +53,34 @@ test('a new event copies stages and sponsors, and people can switch between even
   await page.goto('/settings/events');
   await page.fill('#ne-name', 'UKCW Birmingham 2027');
   await page.selectOption('#ne-venue', 'NEC Birmingham');
+  await page.fill('#ne-build', '2027-09-25');
   await page.fill('#ne-open', '2027-09-28');
   await page.fill('#ne-close', '2027-09-30');
+  await page.fill('#ne-breakdown', '2027-10-01');
   await expect(page.locator('#ne-copy option:checked')).toHaveText('UKCW London 2027');
   await page.getByLabel('Also copy the sponsor list').check();
+  // Breakdown can't be before the closing day
+  await page.fill('#ne-breakdown', '2027-09-29');
+  await page.getByRole('button', { name: 'Create event' }).click();
+  await expect(errorMessage(page, 'Breakdown must end on or after the closing day.')).toBeVisible();
+  await page.fill('#ne-breakdown', '2027-10-01');
   await page.getByRole('button', { name: 'Create event' }).click();
   await expect(page).toHaveURL(/\/settings\?created=1/);
   await expect(page.getByText('Event created. Check its dates and deadlines below.')).toBeVisible();
   await expect(page.locator('#name')).toHaveValue('UKCW Birmingham 2027');
+  await expect(page.locator('#build_start')).toHaveValue('2027-09-25');
+  await expect(page.locator('#breakdown_end')).toHaveValue('2027-10-01');
   await expect(page.getByLabel('Organiser signage artwork due')).toHaveValue('2027-08-17');
   await expect(page.locator('#budget')).toHaveValue('25000');
+
+  // The events list shows the run of dates
+  await page.goto('/settings/events');
+  await expect(page.locator('li').filter({ hasText: 'UKCW Birmingham 2027' }))
+    .toContainText('Build-up from 25 Sep 2027 · Open 28–30 Sep 2027 · Breakdown to 1 Oct 2027');
+  await page.screenshot({ path: test.info().outputPath('events.png'), fullPage: true });
+  await page.goto('/suppliers');
+  await page.locator('aside').first().screenshot({ path: test.info().outputPath('sidebar.png') });
+  await page.goto('/settings/events'); // back for the rest of the test
 
   const switcher = page.locator('#event-switch');
   await expect(switcher.locator('option:checked')).toHaveText('UKCW Birmingham 2027');
@@ -132,7 +150,7 @@ test.describe('on a phone', () => {
     await loginAs(page, 'admin');
     const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/schedule/ss/new', '/sponsors',
       `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/admin',
-      '/settings/suppliers', '/settings/lists', '/settings/events', '/settings/system', '/account', '/gs'];
+      '/suppliers', '/settings/lists', '/settings/events', '/settings/system', '/account', '/gs'];
     const wide: string[] = [];
     for (const p of pages) {
       await page.goto(p);

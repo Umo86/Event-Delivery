@@ -155,14 +155,14 @@ test('a line shows its supplier’s scope of work and suggests the right supplie
   await expect(prod.getByText('Promo Direct isn’t set up to work on organiser signage.')).toHaveCount(0);
 
   // The supplier list links to their lines
-  await page.goto('/settings/suppliers');
+  await page.goto('/suppliers');
   await page.locator('li[id^="supplier-"]').filter({ hasText: 'Signs Express' }).getByRole('link', { name: 'View lines' }).click();
   await expect(page).toHaveURL(/\/schedule\/all\?supplier=[0-9a-f-]{36}$/);
   await expect(page.getByRole('combobox', { name: 'Supplier' }).locator('option:checked')).toHaveText('Signs Express');
   await expect(page.locator('table tbody')).toContainText('Hall S1 entrance banner');
   await expect(page.locator('table tbody')).not.toContainText('BuildCo branded lanyards');
 
-  await page.goto('/settings/suppliers');
+  await page.goto('/suppliers');
   await page.screenshot({ path: test.info().outputPath('suppliers.png'), fullPage: true });
   await page.goto(`/items/${itemId('os1')}`);
   await panel(page, 'Production').getByText('Signs Express’s scope of work').click();

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  Gauge, Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, UserRound, X,
+  Gauge, Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, Truck, UserRound, X,
 } from 'lucide-react';
 import { Mark } from './brand';
 import { cx } from './ui';
@@ -28,6 +28,7 @@ const NAV = [
   { href: '/schedule/ss', label: 'Sponsor signage', icon: Flag, key: 'ss' },
   { href: '/schedule/si', label: 'Sponsor items', icon: Package, key: 'si' },
   { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
+  { href: '/suppliers', label: 'Suppliers', icon: Truck, key: 'suppliers' },
   { href: '/settings', label: 'Settings', icon: Settings, key: 'settings' },
   { href: '/admin', label: 'Admin', icon: ShieldCheck, key: 'admin' },
   { href: '/gs', label: 'Super admin', icon: Gauge, key: 'gs' },

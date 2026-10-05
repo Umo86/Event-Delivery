@@ -69,8 +69,13 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
     const me = await actor('admin');
     const name = required(fd, 'name', 'Event name', 120);
     const venue = required(fd, 'venue', 'Venue', 80);
+    const buildStart = date(fd, 'build_start', 'Build-up start');
     const showOpen = date(fd, 'show_open', 'Opening day');
     const showClose = date(fd, 'show_close', 'Closing day');
+    const breakdownEnd = date(fd, 'breakdown_end', 'Breakdown end');
+    if (showOpen && showClose && showClose < showOpen) throw new UserError('The closing day must be on or after the opening day.');
+    if (buildStart && showOpen && buildStart > showOpen) throw new UserError('Build-up must start on or before the opening day.');
+    if (breakdownEnd && (showClose || showOpen) && breakdownEnd < (showClose ?? showOpen)!) throw new UserError('Breakdown must end on or after the closing day.');
     const copyFrom = uuidOrNull(fd, 'copy_from');
     const copySponsors = bool(fd, 'copy_sponsors');
     const sql = await db();
@@ -82,7 +87,7 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
         if (src) base = src;
       }
       const [ev] = await tx<{ id: string }[]>`
-        insert into events ${tx({ name, venue, show_open: showOpen, show_close: showClose, ...base, ...d } as never)} returning id`;
+        insert into events ${tx({ name, venue, build_start: buildStart, show_open: showOpen, show_close: showClose, breakdown_end: breakdownEnd, ...base, ...d } as never)} returning id`;
       if (copyFrom) {
         await tx`insert into stages (event_id, position, name, approver_id, uses_account_manager, applies_os, applies_ss, applies_si)
                  select ${ev.id}, position, name, approver_id, uses_account_manager, applies_os, applies_ss, applies_si

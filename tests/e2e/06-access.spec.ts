@@ -43,10 +43,13 @@ test('viewers can look but not change anything', async ({ page }) => {
   await expect(page.locator('#signoff textarea')).toHaveCount(0);
   await expect(page.locator('#production_status')).toBeDisabled();
 
-  await page.goto('/settings');
-  await expect(page).toHaveURL(/\/settings\/suppliers$/);
-  expect(await settingsTabs(page)).toEqual(['Suppliers', 'Dropdown lists']);
+  await page.goto('/suppliers'); // suppliers has its own tab now, read-only for viewers
+  await expect(page.getByRole('heading', { name: 'Suppliers', level: 1 })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add supplier' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+  await page.goto('/settings');
+  await expect(page).toHaveURL(/\/settings\/lists$/);
+  expect(await settingsTabs(page)).toEqual(['Dropdown lists']);
   await page.goto('/settings/lists');
   await expect(page.locator('#list-zone')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save list' })).toHaveCount(0);
@@ -72,9 +75,11 @@ test('members can work on lines but not reach admin settings', async ({ page }) 
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
   }
-  await page.goto('/settings/suppliers');
-  expect(await settingsTabs(page)).toEqual(['Suppliers', 'Dropdown lists']);
+  await page.goto('/settings');
+  expect(await settingsTabs(page)).toEqual(['Dropdown lists']);
+  await page.goto('/suppliers'); // members can add and edit suppliers, but not remove them
   await expect(page.getByRole('button', { name: 'Add supplier' })).toBeVisible();
+  await page.locator('li[id^="supplier-"]').first().getByText('Edit', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Remove' })).toHaveCount(0); // removing suppliers is for admins
 
   await page.goto(`/items/${itemId('os4')}`);

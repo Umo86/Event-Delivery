@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Event settings' };
 
 export default async function EventSettingsPage(props: { searchParams: Promise<{ welcome?: string; created?: string }> }) {
   const user = await requireUser();
-  if (user.role !== 'admin') redirect('/settings/suppliers');
+  if (user.role !== 'admin') redirect('/settings/lists');
   const sp = await props.searchParams;
   const event = await getCurrentEvent();
   if (!event) return <NoEvent />;
@@ -28,7 +28,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
     { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_id), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
     { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles in-house artwork and production (below)', href: '#owners' },
     { done: bundle.sponsors.length > 0, text: 'Add sponsors and their account managers', href: '/sponsors' },
-    { done: bundle.suppliers.length > 0, text: 'Add your suppliers', href: '/settings/suppliers' },
+    { done: bundle.suppliers.length > 0, text: 'Add your suppliers', href: '/suppliers' },
   ];
   const showSteps = !!sp.welcome || steps.some((s) => !s.done);
 

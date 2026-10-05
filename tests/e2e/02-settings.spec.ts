@@ -237,7 +237,7 @@ test('event settings: owners, budget and suggested deadlines', async ({ page }) 
 
 test('suppliers are added with their scope of work, and edited', async ({ page }) => {
   await asAdmin(page);
-  await page.goto('/settings/suppliers');
+  await page.goto('/suppliers');
   await expect(page.getByText('No suppliers yet')).toBeVisible();
   const add = panel(page, 'Add a supplier');
 

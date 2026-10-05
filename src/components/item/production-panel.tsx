@@ -60,7 +60,7 @@ export function ProductionPanel({ detail, user }: { detail: ItemDetail; user: Cu
             <summary className="cursor-pointer text-[14px] font-semibold text-ink">{supplier.name}’s scope of work</summary>
             {supplier.scope_of_work
               ? <p className="mt-1.5 whitespace-pre-wrap text-[14px] text-ink-2">{supplier.scope_of_work}</p>
-              : <p className="mt-1.5 text-[14px] text-muted">No scope of work recorded. Add it in Settings › Suppliers.</p>}
+              : <p className="mt-1.5 text-[14px] text-muted">No scope of work recorded. Add it on the Suppliers page.</p>}
             {supplier.scope_link && (
               <a href={supplier.scope_link} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-[14px] font-semibold text-ink underline underline-offset-2">
                 Signed scope of work
