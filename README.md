@@ -43,6 +43,7 @@ The database tables are created automatically the first time the app connects. `
 | `BLOB_ACCESS` | `public` if your Blob store was created with public access |
 | `APP_URL` | The address used in invite emails and sponsor links, if not the project's production domain |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_TITLE`, `BOOTSTRAP_ADMIN_PASSWORD_HASH` | Create the first admin without the setup page (see step 5) |
+| `DEMO_ACCOUNT_EMAIL`, `DEMO_ACCOUNT_NAME`, `DEMO_ACCOUNT_ROLE`, `DEMO_ACCOUNT_PASSWORD_HASH` | Create one demo login (a member unless the role says otherwise). It works like an invite: the password is temporary and must be changed at first sign-in. Created once per address and never recreated after it's removed |
 
 Neon and Blob set `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` for you when you create them from the project's Storage tab.
 

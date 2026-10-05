@@ -2,6 +2,7 @@ import 'server-only';
 import type { Sql } from '@/lib/db';
 import { createDefaultEvent } from '@/lib/data/seed';
 import { logActivity } from '@/lib/activity';
+import { TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
 
 const SCRYPT_HASH = /^scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9+/]+={0,2}\$[A-Za-z0-9+/]+={0,2}$/;
 
@@ -38,4 +39,44 @@ export async function bootstrapAdmin(sql: Sql): Promise<void> {
       message: `Created the first admin account for ${name} (${email})` });
   });
   console.log('Bootstrap admin created');
+}
+
+const ROLES = ['admin', 'member', 'viewer'] as const;
+
+/**
+ * Creates one extra account from the deployment settings, such as a demo login for trying the platform:
+ *   DEMO_ACCOUNT_EMAIL, DEMO_ACCOUNT_PASSWORD_HASH (a scrypt hash), DEMO_ACCOUNT_NAME, DEMO_ACCOUNT_ROLE (member by default).
+ * It works like an invite: the password is temporary, has to be changed at first sign-in and stops working after
+ * TEMP_PASSWORD_DAYS. It runs once per address (so a removed demo account doesn't come back), only once the platform
+ * has its first admin, and it never changes an account that already exists.
+ */
+export async function ensureDemoAccount(sql: Sql): Promise<void> {
+  const email = process.env.DEMO_ACCOUNT_EMAIL?.trim().toLowerCase();
+  const hash = process.env.DEMO_ACCOUNT_PASSWORD_HASH?.trim();
+  if (!email || !hash) return;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !SCRYPT_HASH.test(hash)) {
+    if (hash !== 'used') console.error('Demo account skipped: DEMO_ACCOUNT_EMAIL or DEMO_ACCOUNT_PASSWORD_HASH is not valid.');
+    return;
+  }
+  const flag = `demo_account:${email}`;
+  if ((await sql`select 1 from app_settings where key = ${flag}`).length) return;
+  const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users`;
+  if (n === 0) return; // not before the platform has been set up
+  const wanted = process.env.DEMO_ACCOUNT_ROLE?.trim().toLowerCase();
+  const role = ROLES.find((r) => r === wanted) ?? 'member';
+  const name = process.env.DEMO_ACCOUNT_NAME?.trim().slice(0, 120) || 'Demo User';
+  const expires = new Date(Date.now() + TEMP_PASSWORD_DAYS * 86400000);
+  await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(4242003)`;
+    if ((await tx`select 1 from app_settings where key = ${flag}`).length) return; // another server instance did it
+    const exists = (await tx`select 1 from users where lower(email) = ${email}`).length > 0;
+    if (!exists) {
+      const [u] = await tx<{ id: string }[]>`
+        insert into users (email, full_name, job_title, role, password_hash, must_change_password, temp_password_expires_at, invited_at)
+        values (${email}, ${name}, 'Demo account', ${role}, ${hash}, true, ${expires}, now()) returning id`;
+      await logActivity(tx as unknown as Sql, { eventId: null, itemId: null, userId: u.id, actorName: 'Deployment settings', kind: 'access',
+        message: `Created the demo account ${name} (${email}) as ${role[0].toUpperCase()}${role.slice(1)}` });
+    }
+    await tx`insert into app_settings (key, value) values (${flag}, ${exists ? 'account already existed' : 'created'})`;
+  });
 }

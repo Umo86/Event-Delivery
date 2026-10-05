@@ -1,7 +1,7 @@
 import 'server-only';
 import postgres from 'postgres';
 import { MIGRATIONS, LATEST_VERSION } from './migrations';
-import { bootstrapAdmin } from '@/lib/bootstrap';
+import { bootstrapAdmin, ensureDemoAccount } from '@/lib/bootstrap';
 
 export type Sql = postgres.Sql<Record<string, never>>;
 
@@ -94,13 +94,14 @@ async function migrate(): Promise<void> {
 
 /**
  * Returns the database client, applying any pending migrations first (once per server instance).
- * Then creates the first admin from the deployment settings if there are no accounts yet (see bootstrap.ts).
+ * Then creates the first admin, and a demo account if one is configured, from the deployment settings (see bootstrap.ts).
  */
 export async function db(): Promise<Sql> {
   const sql = getSql();
   if (!g.__edMigrated) {
     g.__edMigrated = migrate()
       .then(() => bootstrapAdmin(sql).catch((e) => console.error('Bootstrap admin failed', e)))
+      .then(() => ensureDemoAccount(sql).catch((e) => console.error('Demo account failed', e)))
       .catch((e) => {
         g.__edMigrated = null;
         throw e;
