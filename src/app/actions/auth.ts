@@ -47,7 +47,8 @@ async function authenticate(fd: FormData, opts: { superOnly?: boolean } = {}) {
     await verifyPassword(password, DUMMY_HASH); // keep timing similar
     throw new UserError('That email and password don’t match an account.');
   }
-  if (u.locked_until && new Date(u.locked_until) > new Date()) {
+  // The demo login can't be locked: its password is public, so locking it would only shut everyone out
+  if (!u.is_demo && u.locked_until && new Date(u.locked_until) > new Date()) {
     throw new UserError('Too many attempts. Try again in 15 minutes, or ask an admin to reset your password.');
   }
   if (!(await verifyPassword(password, u.password_hash))) {

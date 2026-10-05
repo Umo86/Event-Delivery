@@ -1,2 +1,3 @@
 User-Agent: *
+Allow: /api/health
 Disallow: /

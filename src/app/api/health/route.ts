@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db, isDatabaseConfigured } from '@/lib/db';
 import { LATEST_VERSION } from '@/lib/db/migrations';
 import { blobAccess, blobSetupProblem, isBlobConfigured } from '@/lib/storage';
+import { demoStatus } from '@/lib/demo';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,13 @@ export async function GET() {
   }
   out.database = dbInfo;
   out.fileStorage = { configured: isBlobConfigured(), access: blobAccess(), ...(blobSetupProblem() ? { problem: blobSetupProblem() } : {}) };
+  if (dbInfo.ok) {
+    try {
+      out.demoLogin = await demoStatus();
+    } catch (e) {
+      out.demoLogin = { error: (e as Error).message };
+    }
+  }
   const ok = dbInfo.ok === true && isBlobConfigured();
   return NextResponse.json({ ok, ...out }, { status: ok ? 200 : 503, headers: { 'cache-control': 'no-store' } });
 }

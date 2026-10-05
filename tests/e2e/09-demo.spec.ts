@@ -7,6 +7,11 @@ test.describe.configure({ mode: 'serial' });
 const DEMO = { email: process.env.DEMO_ACCOUNT_EMAIL ?? 'demo@ukcw.test', password: process.env.DEMO_ACCOUNT_PASSWORD ?? 'demo-pass-2027' };
 
 test.describe('shared demo login @demo', () => {
+  test('the health check confirms the demo login works', async ({ request }) => {
+    const health = await (await request.get('/api/health')).json();
+    expect(health.demoLogin).toEqual({ configured: true, account: 'on', signInWorks: true });
+  });
+
   test('the sign-in page shows the demo login, which goes straight in', async ({ page }) => {
     await page.goto('/login');
     const box = page.getByRole('region', { name: 'Trying it out?' });
@@ -56,6 +61,7 @@ test.describe('shared demo login @demo', () => {
     await g.goto('/login');
     await expect(g.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     await expect(g.getByRole('region', { name: 'Trying it out?' })).toHaveCount(0);
+    expect((await (await g.request.get('/api/health')).json()).demoLogin).toEqual({ configured: true, account: 'off', signInWorks: false });
 
     await row.getByRole('button', { name: 'Reactivate' }).click();
     await expect(okMessage(row, 'The demo login is back on the sign-in page.')).toBeVisible();
