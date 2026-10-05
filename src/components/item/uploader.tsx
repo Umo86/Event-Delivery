@@ -52,7 +52,9 @@ async function makeDerived(file: File): Promise<Derived> {
     return result;
   }
   const bmp = await createImageBitmap(file);
-  const preview = await canvasToJpeg(drawScaled(bmp, bmp.width, bmp.height, 1600), 0.85);
+  // A small image is its own preview, which saves an upload (Vercel's free plan counts uploads).
+  const smallEnough = file.size <= 1.5 * 1024 * 1024 && Math.max(bmp.width, bmp.height) <= 2400;
+  const preview = smallEnough ? null : await canvasToJpeg(drawScaled(bmp, bmp.width, bmp.height, 1600), 0.85);
   const thumb = await canvasToJpeg(drawScaled(bmp, bmp.width, bmp.height, 300), 0.8);
   const r = { preview, thumb, width: bmp.width, height: bmp.height, pages: null };
   bmp.close();
@@ -93,11 +95,10 @@ export function ArtworkUploader({ itemId, eventId, access, nextVersion, hasArtwo
       const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(-80) || 'artwork';
       const opts = (kind: string) => ({ access, handleUploadUrl: '/api/upload', clientPayload: JSON.stringify({ itemId, kind }) });
       setBusy('Uploading…');
+      // One request per file (files are at most 25 MB): multipart would count extra billed operations.
       // No upload-progress callback on purpose: with one, Chrome streams the request body, which needs
       // HTTP/2 end to end and fails behind proxies that only speak HTTP/1.1.
-      const original = await upload(`${base}/original-${safeName}`, file, {
-        ...opts('original'), contentType: file.type, multipart: file.size > 8 * 1024 * 1024,
-      });
+      const original = await upload(`${base}/original-${safeName}`, file, { ...opts('original'), contentType: file.type });
       const preview = derived.preview ? await upload(`${base}/preview.jpg`, derived.preview, { ...opts('preview'), contentType: 'image/jpeg' }) : null;
       const thumb = derived.thumb ? await upload(`${base}/thumb.jpg`, derived.thumb, { ...opts('thumb'), contentType: 'image/jpeg' }) : null;
       setBusy('Saving…');

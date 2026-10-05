@@ -117,7 +117,13 @@ export async function updateItem(_prev: ActionResult | null, fd: FormData): Prom
     });
     if (!changed.length) redirect(`/items/${itemId}`);
     const sql = await db();
+    const sponsorChanged = changed.includes('sponsor_id');
+    if (sponsorChanged && me.role !== 'admin' && detail.decisions.length > 0) {
+      throw new UserError('Sign-off has started on this line, so only an admin can move it to another sponsor.');
+    }
     await sql`update items set ${sql(f as never, ...(changed as never[]))} where id = ${itemId}`;
+    // Approval links belong to the old sponsor
+    if (sponsorChanged) await sql`update share_links set revoked_at = now() where item_id = ${itemId} and revoked_at is null`;
     await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'updated',
       message: `Edited ${changed.map((k) => FIELD_LABELS[k] ?? k).join(', ')}` });
     refresh(itemId);
@@ -271,8 +277,10 @@ export async function commitArtwork(input: {
     const files = [input.original, input.preview, input.thumb].filter((f): f is UploadedFile => !!f);
     for (const f of files) {
       if (typeof f.pathname !== 'string' || !f.pathname.startsWith(prefix)) throw new UserError('Upload didn’t match this line. Please try again.');
-      const found = await blobExists(f.url);
+      // Trust only what the store itself reports (address, size and type), never what the browser sent.
+      const found = await blobExists(String(f.url));
       if (!found || found.pathname !== f.pathname) throw new UserError('The upload didn’t finish. Please try again.');
+      f.url = found.url;
       f.size = found.size;
       f.contentType = found.contentType;
     }
@@ -283,8 +291,13 @@ export async function commitArtwork(input: {
     const note = input.note ? String(input.note).slice(0, 1000) : null;
     let version = 0;
     await sql.begin(async (tx) => {
-      const [{ v }] = await tx<{ v: number }[]>`select coalesce(max(version), 0)::int as v from artwork_versions where item_id = ${item.id}`;
-      version = v + 1;
+      // Take the next number from the line's counter. The update locks the line, so two uploads at once get
+      // different numbers, and numbers are never reused, so old decisions and links can't attach to new artwork.
+      const [{ v }] = await tx<{ v: number }[]>`
+        update items set last_version = greatest(last_version,
+          (select coalesce(max(version), 0) from artwork_versions where item_id = ${item.id})) + 1
+        where id = ${item.id} returning last_version as v`;
+      version = v;
       await tx`insert into artwork_versions (item_id, event_id, version, file_url, file_pathname, preview_url, preview_pathname,
           thumb_url, thumb_pathname, file_name, mime_type, size_bytes, width_px, height_px, page_count, note, uploaded_by)
         values (${item.id}, ${item.event_id}, ${version}, ${input.original.url}, ${input.original.pathname},
@@ -314,7 +327,10 @@ export async function deleteVersion(_prev: ActionResult | null, fd: FormData): P
     const [v] = await sql<{ item_id: string; event_id: string; version: number; file_url: string; preview_url: string | null; thumb_url: string | null }[]>`
       select item_id, event_id, version, file_url, preview_url, thumb_url from artwork_versions where id = ${versionId}`;
     if (!v) throw new UserError('That version no longer exists.');
-    await sql`delete from artwork_versions where id = ${versionId}`;
+    await sql.begin(async (tx) => {
+      await tx`delete from artwork_versions where id = ${versionId}`;
+      await tx`update share_links set revoked_at = now() where item_id = ${v.item_id} and version = ${v.version} and revoked_at is null`;
+    });
     await logActivity(sql, { eventId: v.event_id, itemId: v.item_id, userId: me.id, actorName: me.full_name, kind: 'artwork', message: `Removed artwork v${v.version}` });
     await deleteBlobs([v.file_url, v.preview_url, v.thumb_url]);
     refresh(v.item_id);
@@ -340,10 +356,11 @@ export async function createShareLink(_prev: ActionResult | null, fd: FormData):
     if (!detail) throw new UserError('That line no longer exists.');
     const { item, state, sponsor } = detail.row;
     const stage = state.currentStage;
-    if (!stage || !stage.uses_account_manager || !state.artIn) {
+    if (!stage || !stage.uses_account_manager || !state.artIn || item.cancelled) {
       throw new UserError('A sponsor link can be sent when the line is at the sponsor sign-off stage.');
     }
     if (!sponsor) throw new UserError('Choose the sponsor for this line first.');
+    if (!canDecideStage(me, stage, sponsor)) throw new UserError('Only the sponsor’s account manager (or an admin) can send an approval link.');
     const token = randomToken(24);
     const expires = new Date(Date.now() + 30 * 86400000);
     const recipient = str(fd, 'recipient_name', 120);

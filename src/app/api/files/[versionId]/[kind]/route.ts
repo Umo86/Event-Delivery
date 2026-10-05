@@ -10,16 +10,17 @@ export async function GET(request: Request, ctx: { params: Promise<{ versionId: 
   if (!/^[0-9a-f-]{36}$/i.test(versionId) || !['original', 'preview', 'thumb'].includes(kind)) return notFound();
   const url = new URL(request.url);
   const sql = await db();
-  const [v] = await sql<{ item_id: string; file_url: string; preview_url: string | null; thumb_url: string | null; file_name: string; mime_type: string }[]>`
-    select item_id, file_url, preview_url, thumb_url, file_name, mime_type from artwork_versions where id = ${versionId}`;
+  const [v] = await sql<{ item_id: string; version: number; file_url: string; preview_url: string | null; thumb_url: string | null; file_name: string; mime_type: string }[]>`
+    select item_id, version, file_url, preview_url, thumb_url, file_name, mime_type from artwork_versions where id = ${versionId}`;
   if (!v) return notFound();
 
   let allowed = !!(await getCurrentUser());
   const share = url.searchParams.get('s');
   if (!allowed && share) {
-    const [l] = await sql<{ item_id: string }[]>`
-      select item_id from share_links where token_hash = ${sha256(share)} and revoked_at is null and expires_at > now()`;
-    allowed = l?.item_id === v.item_id;
+    // A sponsor link opens only the artwork version it was sent for.
+    const [l] = await sql<{ item_id: string; version: number }[]>`
+      select item_id, version from share_links where token_hash = ${sha256(share.slice(0, 200))} and revoked_at is null and expires_at > now()`;
+    allowed = !!l && l.item_id === v.item_id && l.version === v.version;
   }
   if (!allowed) return notFound();
 

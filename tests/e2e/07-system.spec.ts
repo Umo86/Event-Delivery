@@ -9,7 +9,7 @@ test('the system page shows health and runs a full check', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/settings/system');
   const health = panel(page, 'Health');
-  await expect(health).toContainText('Connected (schema v2, up to date)');
+  await expect(health).toContainText('Connected (schema v3, up to date)');
   await expect(health).toContainText('Connected (private store)');
   await expect(health).toContainText(/\d+ versions, [\d.]+ MB of originals/);
 
@@ -30,6 +30,9 @@ test('the self-test endpoint runs the same check for monitoring', async ({ reque
   // The temporary event it creates is cleaned up afterwards
   const health = await (await request.get('/api/health')).json();
   expect(health.ok).toBe(true);
+  // One run every few minutes, so it can't be used to run down the free file-storage allowance
+  const again = await request.get(`/api/selftest?token=${SELFTEST_TOKEN}`);
+  expect(again.status()).toBe(429);
 });
 
 test('the platform can be renamed', async ({ page }) => {

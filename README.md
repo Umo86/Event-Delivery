@@ -17,7 +17,7 @@ Built with Next.js, a Neon Postgres database and Vercel Blob for artwork files. 
 
 1. **Import the repository** at [vercel.com/new](https://vercel.com/new) and deploy it. The first deployment will show "Almost there" until storage is connected.
 2. **Add the database**: in the project, open **Storage → Create Database → Neon** (free plan). Pick the London region (`aws-eu-west-2`) and connect it to the project for all environments.
-3. **Add file storage**: **Storage → Create → Blob**, choose **Private** access, and connect it to the project. (If you choose Public instead, add an environment variable `BLOB_ACCESS=public`.)
+3. **Add file storage**: still in this project's **Storage** tab, **Create → Blob**, choose **Private** access and select this project. Creating the store from the project adds the `BLOB_READ_WRITE_TOKEN` the app needs for uploads. (If you choose Public access instead, also add an environment variable `BLOB_ACCESS=public`.)
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the new settings are picked up.
 5. Open `/setup` on your site and create the first admin account with the setup code you were given. The code stops working once the first account exists.
 6. Follow the checklist on the Settings page: add your team, choose approvers, add sponsors and suppliers.
@@ -38,13 +38,13 @@ The database tables are created automatically the first time the app connects. `
 | `SELFTEST_TOKEN` | Replaces the built-in token for `/api/selftest` |
 | `BLOB_ACCESS` | `public` if your Blob store was created with public access |
 
-Neon and Blob set `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` for you when you connect them.
+Neon and Blob set `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` for you when you create them from the project's Storage tab.
 
 ### Free plan limits worth knowing
 
 - **Vercel Hobby** is for personal, non-commercial use. For company use, Vercel's terms ask for the Pro plan.
-- **Vercel Blob (Hobby)** includes 1 GB of storage. Uploads are limited to 25 MB each; link to full-size print files with the "Link to full-size files" field. Settings → System shows how much is used.
-- **Neon (free)** suspends the database after a few minutes without use and wakes it automatically on the next request (the first page load after a quiet spell can take a second or two longer). Nothing is deleted.
+- **Vercel Blob (Hobby)** includes 1 GB of storage, 10 GB of downloads and 2,000 uploads ("advanced operations") a month. Each artwork upload uses 2 or 3 of those (the file, a thumbnail and, for PDFs and large images, a preview), so roughly 650 or more uploads a month. If a Hobby limit is exceeded, Blob can't be used again until 30 days have passed, so keep an eye on Vercel's usage emails. Uploads are limited to 25 MB each; link to full-size print files with the "Link to full-size files" field. Settings → System shows how much is stored.
+- **Neon (free)** has 1 GB of storage and 100 compute hours a month. It sleeps after 5 minutes without use and wakes by itself on the next request (the first page after a quiet spell can take a moment longer). It never needs restoring by hand and nothing is deleted. Avoid pinging `/api/selftest` every few minutes, as that keeps the database awake and uses compute hours.
 
 ## Run it locally
 

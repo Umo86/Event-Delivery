@@ -33,6 +33,8 @@ export async function POST(request: Request): Promise<NextResponse> {
           allowedContentTypes: original ? ALLOWED_UPLOAD_TYPES : ['image/jpeg'],
           maximumSizeInBytes: original ? MAX_ORIGINAL_BYTES : MAX_DERIVED_BYTES,
           addRandomSuffix: true,
+          // Paths are unique and never overwritten, so let Vercel's cache keep them for a year (fewer billed reads).
+          cacheControlMaxAge: 60 * 60 * 24 * 365,
           tokenPayload: JSON.stringify({ userId: me.id, itemId: item.id }),
         };
       },

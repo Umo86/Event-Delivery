@@ -265,6 +265,19 @@ select k, v, ord from (values
 on conflict do nothing;
 `,
   },
+  {
+    version: 3,
+    name: 'artwork version counter',
+    sql: /* sql */ `
+-- Artwork version numbers are never reused, even after a version is removed, so old decisions
+-- and sponsor links can't attach to new artwork.
+alter table items add column last_version int not null default 0;
+update items i set last_version = greatest(
+  (select coalesce(max(version), 0) from artwork_versions where item_id = i.id),
+  (select coalesce(max(version), 0) from decisions where item_id = i.id),
+  (select coalesce(max(version), 0) from share_links where item_id = i.id));
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -5,12 +5,13 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { run, required, str, UserError, type ActionResult } from '@/lib/action';
-import { hashPassword, verifyPassword, PASSWORD_MIN } from '@/lib/auth/password';
-import { actor, createSession, destroySession, getCurrentUser } from '@/lib/auth/session';
+import { hashPassword, sha256, verifyPassword, PASSWORD_MIN } from '@/lib/auth/password';
+import { actor, createSession, destroySession, getCurrentUser, SESSION_COOKIE } from '@/lib/auth/session';
 import { checkSetupCode } from '@/lib/setup';
 import { EVENT_COOKIE } from '@/lib/data/load';
 import { createDefaultEvent } from '@/lib/data/seed';
 
+const MAX_FAILED_LOGINS = 8;
 const DUMMY_HASH = 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$' + 'A'.repeat(86) + '==';
 
 /** Only same-site paths such as "/items/…", never "//host" or "/\host". */
@@ -40,9 +41,10 @@ export async function login(_prev: ActionResult | null, fd: FormData): Promise<A
       throw new UserError('Too many attempts. Try again in 15 minutes, or ask an admin to reset your password.');
     }
     if (!(await verifyPassword(password, u.password_hash))) {
-      const fails = u.failed_logins + 1;
-      const lock = fails >= 8;
-      await sql`update users set failed_logins = ${lock ? 0 : fails}, locked_until = ${lock ? new Date(Date.now() + 15 * 60000) : null} where id = ${u.id}`;
+      // Counted in one statement so guesses sent at the same time are all counted, and a lock is never undone here.
+      await sql`update users set failed_logins = failed_logins + 1,
+                  locked_until = case when failed_logins + 1 >= ${MAX_FAILED_LOGINS} then now() + interval '15 minutes' else locked_until end
+                where id = ${u.id}`;
       throw new UserError('That email and password don’t match an account.');
     }
     await sql`update users set failed_logins = 0, locked_until = null, last_login_at = now() where id = ${u.id}`;
@@ -87,7 +89,7 @@ export async function setupFirstAdmin(_prev: ActionResult | null, fd: FormData):
 
 export async function changePassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('viewer', { allowPasswordChange: true });
     const current = String(fd.get('current') ?? '');
     const next = String(fd.get('password') ?? '');
     if (next.length < PASSWORD_MIN) throw new UserError(`Choose a password of at least ${PASSWORD_MIN} characters.`);
@@ -97,6 +99,10 @@ export async function changePassword(_prev: ActionResult | null, fd: FormData): 
     if (!(await verifyPassword(current, u.password_hash))) throw new UserError('Your current password isn’t right.');
     if (current === next) throw new UserError('Choose a new password that is different from the current one.');
     await sql`update users set password_hash = ${await hashPassword(next)}, must_change_password = false where id = ${me.id}`;
+    // Sign out everywhere else
+    const jar = await cookies();
+    const keep = jar.get(SESSION_COOKIE)?.value;
+    await sql`delete from sessions where user_id = ${me.id} and token_hash <> ${keep ? sha256(keep) : ''}`;
     if (u.must_change_password) redirect('/inbox');
     return { ok: true, message: 'Password changed.' };
   });

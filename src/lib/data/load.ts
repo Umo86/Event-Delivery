@@ -109,6 +109,8 @@ export interface ItemDetail {
   activity: { id: string; actor_name: string; kind: string; message: string; created_at: Date }[];
   supplier: SupplierRow | null;
   shareLinks: { id: string; stage_id: string; version: number; recipient_name: string | null; created_at: Date; expires_at: Date; used_at: Date | null; revoked_at: Date | null }[];
+  /** The number the next upload will get. Never reused, even after a version is removed. */
+  nextVersion: number;
 }
 
 export async function loadItem(itemId: string): Promise<ItemDetail | null> {
@@ -134,7 +136,8 @@ export async function loadItem(itemId: string): Promise<ItemDetail | null> {
     sponsor: item.sponsor_id ? bundle.ctx.sponsorsById.get(item.sponsor_id) ?? null : null,
   };
   const supplier = item.supplier_id ? bundle.suppliers.find((s) => s.id === item.supplier_id) ?? null : null;
-  return { bundle, row, versions, decisions, activity, supplier, shareLinks };
+  const nextVersion = Math.max(item.last_version ?? 0, ...versions.map((v) => v.version)) + 1;
+  return { bundle, row, versions, decisions, activity, supplier, shareLinks, nextVersion };
 }
 
 export const getAppName = cache(async (): Promise<string> => {

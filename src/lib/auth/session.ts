@@ -73,9 +73,10 @@ export async function requireAdminPage(): Promise<CurrentUser> {
 export class AuthError extends Error {}
 
 /** For server actions: throws instead of redirecting. */
-export async function actor(level: 'viewer' | 'member' | 'admin' = 'member'): Promise<CurrentUser> {
+export async function actor(level: 'viewer' | 'member' | 'admin' = 'member', opts: { allowPasswordChange?: boolean } = {}): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new AuthError('Your session has ended. Please sign in again.');
+  if (user.must_change_password && !opts.allowPasswordChange) throw new AuthError('Choose your own password first, on the Your account page.');
   if (level === 'member' && user.role === 'viewer') throw new AuthError('Your account is read-only.');
   if (level === 'admin' && user.role !== 'admin') throw new AuthError('Only admins can do that.');
   return user;

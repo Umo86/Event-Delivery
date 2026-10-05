@@ -93,7 +93,7 @@ export function ArtworkPanel({ detail, user, viewVersion }: { detail: ItemDetail
       {editable && (
         <div className="mt-4">
           <ArtworkUploader itemId={item.id} eventId={item.event_id} access={blobAccess()}
-            nextVersion={(current?.version ?? 0) + 1} hasArtwork={!!current} compact={!!current} />
+            nextVersion={detail.nextVersion} hasArtwork={!!current} compact={!!current} />
         </div>
       )}
     </Panel>

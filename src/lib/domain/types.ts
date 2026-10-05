@@ -87,6 +87,8 @@ export interface ItemRow {
   event_id: string;
   category: Category;
   ref_no: number;
+  /** Highest artwork version number ever given out for this line. */
+  last_version?: number;
   description: string;
   sponsor_id: string | null;
   item_type: string | null;

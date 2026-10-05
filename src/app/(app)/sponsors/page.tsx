@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/session';
 import { getCurrentEvent, loadSchedule } from '@/lib/data/load';
-import { canEdit } from '@/lib/domain/permissions';
+import { canEdit, isAdmin } from '@/lib/domain/permissions';
 import { cx, Empty, PageHeader, Panel } from '@/components/ui';
 import { SponsorForm } from '@/components/sponsor-form';
 import { NoEvent } from '@/components/no-event';
@@ -79,7 +79,7 @@ export default async function SponsorsPage() {
       )}
       {canEdit(user) && (
         <Panel title="Add a sponsor">
-          <SponsorForm eventId={event.id} users={bundle.users} />
+          <SponsorForm eventId={event.id} users={bundle.users} canChooseManager={isAdmin(user)} />
         </Panel>
       )}
     </>

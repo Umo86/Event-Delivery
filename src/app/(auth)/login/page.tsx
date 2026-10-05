@@ -40,8 +40,8 @@ function NotConnected() {
     <div className="space-y-4">
       <h1 className="text-[28px] font-semibold text-ink">Almost there</h1>
       <Notice tone="warn">
-        No database is connected yet. In Vercel, open this project’s <b>Storage</b> tab, create a <b>Neon</b> database and
-        a <b>Blob</b> store (Private), connect both to this project, then redeploy.
+        No database is connected yet. In Vercel, open this project’s <b>Storage</b> tab and create a <b>Neon</b> database and
+        a <b>Blob</b> store (Private access) for this project, then redeploy.
       </Notice>
     </div>
   );

@@ -39,12 +39,15 @@ export function randomToken(bytes = 32): string {
   return crypto.randomBytes(bytes).toString('base64url');
 }
 
-/** Readable temporary password, e.g. "plum-raft-7342". */
+const WORDS = ['amber', 'birch', 'cedar', 'delta', 'ember', 'flint', 'grove', 'harbor', 'ivory', 'jade', 'kite',
+  'lemon', 'maple', 'north', 'olive', 'pearl', 'quartz', 'river', 'slate', 'tiger', 'umber', 'violet', 'willow', 'zephyr',
+  'anchor', 'beacon', 'canyon', 'dune', 'falcon', 'glacier', 'heron', 'island', 'juniper', 'lagoon', 'meadow', 'nectar',
+  'orchid', 'pepper', 'raven', 'saffron', 'thistle', 'walnut', 'yarrow', 'copper', 'marble', 'cobalt', 'linen', 'summit'];
+
+/** Readable temporary password, e.g. "plum-raft-cobalt-7342" (about 30 bits, plus the sign-in lockout). */
 export function tempPassword(): string {
-  const words = ['amber', 'birch', 'cedar', 'delta', 'ember', 'flint', 'grove', 'harbor', 'ivory', 'jade', 'kite',
-    'lemon', 'maple', 'north', 'olive', 'pearl', 'quartz', 'river', 'slate', 'tiger', 'umber', 'violet', 'willow', 'zephyr'];
-  const pick = () => words[crypto.randomInt(words.length)];
-  return `${pick()}-${pick()}-${crypto.randomInt(1000, 9999)}`;
+  const pick = () => WORDS[crypto.randomInt(WORDS.length)];
+  return `${pick()}-${pick()}-${pick()}-${crypto.randomInt(1000, 10000)}`;
 }
 
 export const PASSWORD_MIN = 8;

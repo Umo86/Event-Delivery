@@ -217,6 +217,13 @@ test('a sponsor approves through a private link', async ({ browser, page }) => {
   await decideAs(browser, 'olivia', 'ss1', 'Operations', 'Approve');
   await decideAs(browser, 'mark', 'ss1', 'Marketing', 'Approve');
 
+  // Only the account manager (or an admin) can sign off or send the sponsor a link
+  const pete = await asUser(browser, 'pete');
+  await pete.page.goto(`/items/${itemId('ss1')}`);
+  await expect(signoffStage(pete.page, 'Sponsor')).toContainText('Only Amy Account or an admin can record this stage.');
+  await expect(pete.page.getByRole('button', { name: 'Create approval link' })).toHaveCount(0);
+  await pete.ctx.close();
+
   await a.reload();
   await expectStatus(a, 'With Sponsor');
   await expect(waitingOn(a)).toContainText('Amy Account');
@@ -297,10 +304,24 @@ test('an admin can delete a line, its artwork files and keep the number retired'
   await expect(page.getByText('Line OS-003 added.')).toBeVisible();
   const id = idFromUrl(page);
   await uploadArtwork(page, { name: 'temp.png', mimeType: 'image/png', buffer: makePng(200, 200) });
+  await decide(page, 'Operations', 'Reject', 'Not this one');
+  await expectStatus(page, 'Rejected · Operations');
+
+  // Removing a version never frees its number, so old decisions can't attach to new artwork
+  await uploadArtwork(page, { name: 'temp-2.png', mimeType: 'image/png', buffer: makePng(220, 200) });
+  await expectStatus(page, 'With Operations · v2');
+  acceptNextDialog(page);
+  await page.getByRole('button', { name: 'Remove this version' }).click();
+  await expectStatus(page, 'Rejected · Operations'); // back to v1 and its decision
+  const v = await uploadArtwork(page, { name: 'temp-3.png', mimeType: 'image/png', buffer: makePng(240, 200) });
+  expect(v).toBe('v3');
+  await expectStatus(page, 'With Operations · v3');
+  await expect(signoffStage(page, 'Operations')).toContainText('Waiting for a decision');
+
   const versionHref = (await page.getByRole('link', { name: 'Open', exact: true }).getAttribute('href'))!;
   const blobDir = path.join(__dirname, '..', '..', '.local', 'blob');
   const filesFor = () => fs.readdirSync(blobDir).filter((f) => decodeURIComponent(f).includes(id));
-  expect(filesFor().length).toBe(3); // original, preview and thumbnail
+  expect(filesFor().length).toBe(4); // v1 and v3: original and thumbnail each (a small image is its own preview)
 
   acceptNextDialog(page);
   await page.getByRole('button', { name: 'Delete permanently' }).click();

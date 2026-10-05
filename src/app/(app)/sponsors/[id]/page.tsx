@@ -46,7 +46,7 @@ export default async function SponsorPage(props: { params: Promise<{ id: string 
       </section>
       {canEdit(user) && (
         <Panel title="Sponsor details">
-          <SponsorForm eventId={sp.event_id} users={sched.bundle.users} sponsor={sponsor} />
+          <SponsorForm eventId={sp.event_id} users={sched.bundle.users} sponsor={sponsor} canChooseManager={isAdmin(user)} />
           {isAdmin(user) && (
             <div className="mt-4 border-t border-line pt-4">
               <ActionForm action={deleteSponsor} confirm={`Remove ${sponsor.name}?`}>

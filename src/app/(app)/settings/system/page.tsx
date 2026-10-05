@@ -3,7 +3,7 @@ import { requireAdminPage } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getAppName } from '@/lib/data/load';
 import { LATEST_VERSION } from '@/lib/db/migrations';
-import { blobAccess, isBlobConfigured } from '@/lib/storage';
+import { blobAccess, blobSetupProblem, isBlobConfigured } from '@/lib/storage';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { Field, inputCls, Notice, Panel } from '@/components/ui';
 import { runCheck } from '@/app/actions/system';
@@ -42,7 +42,7 @@ export default async function SystemPage() {
           <div className="h-2.5 w-full rounded-full bg-paper"><div className="h-2.5 rounded-full bg-ink" style={{ width: `${pct}%` }} /></div>
           <p className="mt-1 text-[13px] text-muted">{pct.toFixed(0)}% of the 1 GB included in Vercel’s free plan (previews add a little more).</p>
         </div>
-        {!isBlobConfigured() && <div className="mt-3"><Notice tone="error">Create a Blob store in Vercel (Storage tab, access Private), connect it to this project and redeploy.</Notice></div>}
+        {blobSetupProblem() && <div className="mt-3"><Notice tone="error">{blobSetupProblem()}</Notice></div>}
       </Panel>
       <Panel title="System check">
         <p className="mb-3 text-[14px] text-ink-2">Runs a test line through the database, file storage and every sign-off stage, then deletes it. Takes a few seconds.</p>

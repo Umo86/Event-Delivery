@@ -11,7 +11,8 @@ async function readSponsor(fd: FormData) {
   const am = uuidOrNull(fd, 'account_manager_id');
   if (am) {
     const sql = await db();
-    if (!(await sql`select 1 from users where id = ${am}`).length) throw new UserError('Choose an account manager from the team.');
+    const ok = await sql`select 1 from users where id = ${am} and active and role <> 'viewer'`;
+    if (!ok.length) throw new UserError('Choose an account manager from the team.');
   }
   const email = str(fd, 'contact_email', 200);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserError('Enter a valid contact email.');
@@ -31,6 +32,8 @@ export async function createSponsor(_prev: ActionResult | null, fd: FormData): P
     const eventId = uuidOrNull(fd, 'event_id');
     if (!eventId) throw new UserError('Missing event.');
     const s = await readSponsor(fd);
+    // The account manager signs off for the sponsor, so only admins choose who that is.
+    if (me.role !== 'admin') s.account_manager_id = null;
     const sql = await db();
     const dup = await sql`select 1 from sponsors where event_id = ${eventId} and lower(name) = lower(${s.name})`;
     if (dup.length) throw new UserError(`${s.name} is already on the list.`);
@@ -48,8 +51,10 @@ export async function updateSponsor(_prev: ActionResult | null, fd: FormData): P
     if (!id) throw new UserError('Missing sponsor.');
     const s = await readSponsor(fd);
     const sql = await db();
-    const [cur] = await sql<{ event_id: string }[]>`select event_id from sponsors where id = ${id}`;
+    const [cur] = await sql<{ event_id: string; account_manager_id: string | null }[]>`select event_id, account_manager_id from sponsors where id = ${id}`;
     if (!cur) throw new UserError('That sponsor no longer exists.');
+    // The account manager signs off for the sponsor, so only admins choose who that is.
+    if (me.role !== 'admin') s.account_manager_id = cur.account_manager_id;
     const dup = await sql`select 1 from sponsors where event_id = ${cur.event_id} and lower(name) = lower(${s.name}) and id <> ${id}`;
     if (dup.length) throw new UserError(`Another sponsor is already called ${s.name}.`);
     await sql`update sponsors set ${sql(s as never)} where id = ${id}`;

@@ -31,7 +31,7 @@ test('admin adds the team and gets a temporary password for each person', async 
     const msg = okMessage(page, `Account created for ${p.name}.`);
     await expect(msg).toBeVisible();
     const pw = (await msg.innerText()).match(/temporary password is (\S+)\./)?.[1];
-    expect(pw).toMatch(/^[a-z]+-[a-z]+-\d{4}$/);
+    expect(pw).toMatch(/^[a-z]+-[a-z]+-[a-z]+-\d{4}$/);
     saveUser(p.key, { name: p.name, email: p.email, password: pw! });
     await expect(page.locator('#nu-name')).toHaveValue(''); // form clears for the next person
   }

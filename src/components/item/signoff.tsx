@@ -68,7 +68,7 @@ export function SignoffRoute({ detail, user }: { detail: ItemDetail; user: Curre
               {!mayDecide && (s.kind === 'current' || s.kind === 'stale') && canEdit(user) && (
                 <p className="mt-1.5 text-[12.5px] text-muted">Only {approverText.replace(/ \(.*\)$/, '')} or an admin can record this stage.</p>
               )}
-              {(s.kind === 'current' || s.kind === 'stale') && s.stage.uses_account_manager && canEdit(user) && (
+              {(s.kind === 'current' || s.kind === 'stale') && s.stage.uses_account_manager && !item.cancelled && canDecideStage(user, s.stage, sponsor) && (
                 <SharePanel detail={detail} stageId={s.stage.id} />
               )}
             </div>
