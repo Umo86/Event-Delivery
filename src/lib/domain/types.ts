@@ -80,6 +80,13 @@ export interface SupplierRow {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  /** What they're contracted to do for the event. */
+  scope_of_work: string | null;
+  /** Link to the signed scope of work or contract (SharePoint, Drive…). */
+  scope_link: string | null;
+  works_on_os: boolean;
+  works_on_ss: boolean;
+  works_on_si: boolean;
 }
 
 export interface ItemRow {

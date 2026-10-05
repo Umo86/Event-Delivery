@@ -6,6 +6,7 @@ import type { Category, ItemRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from './forms';
 import { ButtonLink, Field, inputCls, textareaCls } from './ui';
 import { createItem, updateItem } from '@/app/actions/items';
+import { SupplierOptions } from './supplier-options';
 
 function hallList(bundle: Bundle) {
   const v = bundle.event.venue;
@@ -101,7 +102,7 @@ export function ItemForm({ bundle, category, item, cancelHref, defaultSponsorId 
           <Field label="Supplier" htmlFor="supplier_id">
             <select id="supplier_id" name="supplier_id" defaultValue={v('supplier_id')} className={inputCls}>
               <option value="">Not chosen</option>
-              {bundle.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <SupplierOptions suppliers={bundle.suppliers} category={category} />
             </select>
           </Field>
           <Field label="Print / order deadline" htmlFor="print_deadline" help={defPrint ? `Blank uses ${fmtDate(defPrint, 'long')}.` : undefined}>

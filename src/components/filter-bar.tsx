@@ -7,8 +7,8 @@ import { cx } from './ui';
 
 type Opt = { value: string; label: string };
 
-export function FilterBar({ statuses, people, sponsors, halls, showSponsor = true }: {
-  statuses: Opt[]; people: Opt[]; sponsors: Opt[]; halls: string[]; showSponsor?: boolean;
+export function FilterBar({ statuses, people, sponsors, halls, suppliers = [], showSponsor = true }: {
+  statuses: Opt[]; people: Opt[]; sponsors: Opt[]; halls: string[]; suppliers?: Opt[]; showSponsor?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,7 +41,7 @@ export function FilterBar({ statuses, people, sponsors, halls, showSponsor = tru
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const sel = 'h-9 rounded-md border border-line-strong bg-white px-2.5 text-[14px] text-ink focus:border-ink focus:outline-none';
-  const active = ['status', 'waiting', 'sponsor', 'flag', 'hall', 'q', 'cancelled', 'sort'].some((k) => current.get(k));
+  const active = ['status', 'waiting', 'sponsor', 'supplier', 'flag', 'hall', 'q', 'cancelled', 'sort'].some((k) => current.get(k));
 
   return (
     <div className={cx('mb-4 flex flex-wrap items-center gap-2', pending && 'opacity-70')} role="search">
@@ -74,6 +74,13 @@ export function FilterBar({ statuses, people, sponsors, halls, showSponsor = tru
         <select aria-label="Sponsor" className={sel} value={current.get('sponsor') ?? ''} onChange={(e) => set('sponsor', e.target.value)}>
           <option value="">All sponsors</option>
           {sponsors.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+      )}
+      {suppliers.length > 0 && (
+        <select aria-label="Supplier" className={sel} value={current.get('supplier') ?? ''} onChange={(e) => set('supplier', e.target.value)}>
+          <option value="">All suppliers</option>
+          <option value="none">No supplier yet</option>
+          {suppliers.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       )}
       <select aria-label="Flag" className={sel} value={current.get('flag') ?? ''} onChange={(e) => set('flag', e.target.value)}>

@@ -1,6 +1,8 @@
 import type { ItemDetail } from '@/lib/data/load';
 import type { CurrentUser } from '@/lib/auth/session';
-import { PRODUCTION } from '@/lib/domain/labels';
+import { categoryInfo, PRODUCTION } from '@/lib/domain/labels';
+import { worksOn } from '@/lib/domain/suppliers';
+import { SupplierOptions } from '../supplier-options';
 import { canEdit } from '@/lib/domain/permissions';
 import { ActionForm, SubmitButton } from '../forms';
 import { Field, inputCls, money, Notice, Panel } from '../ui';
@@ -8,6 +10,7 @@ import { updateProduction } from '@/app/actions/items';
 
 export function ProductionPanel({ detail, user }: { detail: ItemDetail; user: CurrentUser }) {
   const { item, state } = detail.row;
+  const supplier = detail.supplier;
   const editable = canEdit(user) && !item.cancelled;
   const total = item.unit_cost ? item.unit_cost * (item.qty && item.qty > 0 ? item.qty : 1) : null;
   return (
@@ -33,7 +36,7 @@ export function ProductionPanel({ detail, user }: { detail: ItemDetail; user: Cu
           <Field label="Supplier" htmlFor="p_supplier">
             <select id="p_supplier" name="supplier_id" defaultValue={item.supplier_id ?? ''} className={inputCls}>
               <option value="">Not chosen</option>
-              {detail.bundle.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <SupplierOptions suppliers={detail.bundle.suppliers} category={item.category} />
             </select>
           </Field>
           <Field label="PO number" htmlFor="p_po"><input id="p_po" name="po_number" defaultValue={item.po_number ?? ''} className={inputCls} /></Field>
@@ -48,6 +51,24 @@ export function ProductionPanel({ detail, user }: { detail: ItemDetail; user: Cu
         </fieldset>
         {editable && <SubmitButton variant="dark" small>Save production</SubmitButton>}
       </ActionForm>
+      {supplier && (
+        <div className="mt-4 border-t border-line pt-3">
+          {!worksOn(supplier, item.category) && (
+            <div className="mb-2"><Notice tone="warn">{supplier.name} isn’t set up to work on {categoryInfo(item.category).label.toLowerCase()}. Check their scope of work.</Notice></div>
+          )}
+          <details open={!!supplier.scope_of_work && !worksOn(supplier, item.category)}>
+            <summary className="cursor-pointer text-[14px] font-semibold text-ink">{supplier.name}’s scope of work</summary>
+            {supplier.scope_of_work
+              ? <p className="mt-1.5 whitespace-pre-wrap text-[14px] text-ink-2">{supplier.scope_of_work}</p>
+              : <p className="mt-1.5 text-[14px] text-muted">No scope of work recorded. Add it in Settings › Suppliers.</p>}
+            {supplier.scope_link && (
+              <a href={supplier.scope_link} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-[14px] font-semibold text-ink underline underline-offset-2">
+                Signed scope of work
+              </a>
+            )}
+          </details>
+        </div>
+      )}
     </Panel>
   );
 }

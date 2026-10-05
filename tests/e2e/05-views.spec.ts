@@ -133,3 +133,38 @@ test('my actions updates when a sponsor gets an account manager', async ({ page 
   await expect(page.locator('main')).toContainText('BuildCo branded lanyards');
   await expect(page.locator('main')).toContainText('Chase artwork from BuildCo');
 });
+
+test('a line shows its supplier’s scope of work and suggests the right suppliers', async ({ page }) => {
+  await loginAs(page, 'pete');
+  await page.goto(`/items/${itemId('os1')}`);
+  const prod = panel(page, 'Production');
+  await prod.getByText('Signs Express’s scope of work').click();
+  await expect(prod).toContainText('Print and install all hall entrance and hanging banners.');
+  await expect(prod.getByRole('link', { name: 'Signed scope of work' })).toHaveAttribute('href', 'https://sharepoint.example/sow/signs-express.pdf');
+  // Suppliers who work on organiser signage come first
+  const groups = await prod.locator('#p_supplier optgroup').evaluateAll((els) =>
+    els.map((g) => [(g as HTMLOptGroupElement).label, [...g.children].map((o) => o.textContent)]));
+  expect(groups).toEqual([['Work on organiser signage', ['Signs Express']], ['Other suppliers', ['Promo Direct']]]);
+
+  // Choosing a supplier outside their scope is flagged
+  await prod.locator('#p_supplier').selectOption({ label: 'Promo Direct' });
+  await prod.getByRole('button', { name: 'Save production' }).click();
+  await expect(prod.getByText('Promo Direct isn’t set up to work on organiser signage. Check their scope of work.')).toBeVisible();
+  await prod.locator('#p_supplier').selectOption({ label: 'Signs Express' });
+  await prod.getByRole('button', { name: 'Save production' }).click();
+  await expect(prod.getByText('Promo Direct isn’t set up to work on organiser signage.')).toHaveCount(0);
+
+  // The supplier list links to their lines
+  await page.goto('/settings/suppliers');
+  await page.locator('li[id^="supplier-"]').filter({ hasText: 'Signs Express' }).getByRole('link', { name: 'View lines' }).click();
+  await expect(page).toHaveURL(/\/schedule\/all\?supplier=[0-9a-f-]{36}$/);
+  await expect(page.getByRole('combobox', { name: 'Supplier' }).locator('option:checked')).toHaveText('Signs Express');
+  await expect(page.locator('table tbody')).toContainText('Hall S1 entrance banner');
+  await expect(page.locator('table tbody')).not.toContainText('BuildCo branded lanyards');
+
+  await page.goto('/settings/suppliers');
+  await page.screenshot({ path: test.info().outputPath('suppliers.png'), fullPage: true });
+  await page.goto(`/items/${itemId('os1')}`);
+  await panel(page, 'Production').getByText('Signs Express’s scope of work').click();
+  await panel(page, 'Production').screenshot({ path: test.info().outputPath('production-scope.png') });
+});

@@ -6,6 +6,7 @@ export interface Filters {
   status?: string; // group key, 'attention', 'open'
   waiting?: string; // user id, 'me', 'unassigned'
   sponsor?: string; // sponsor id or 'none'
+  supplier?: string; // supplier id or 'none'
   flag?: string; // flag key or 'any'
   hall?: string;
   cancelled?: string; // '1' to include cancelled lines
@@ -18,7 +19,7 @@ export function readFilters(sp: Record<string, string | string[] | undefined>): 
     return typeof v === 'string' && v.trim() ? v.trim().slice(0, 200) : undefined;
   };
   return {
-    q: one('q'), status: one('status'), waiting: one('waiting'), sponsor: one('sponsor'),
+    q: one('q'), status: one('status'), waiting: one('waiting'), sponsor: one('sponsor'), supplier: one('supplier'),
     flag: one('flag'), hall: one('hall'), cancelled: one('cancelled'), sort: one('sort'),
   };
 }
@@ -41,6 +42,9 @@ export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string): Sch
     }
     if (f.sponsor) {
       if (f.sponsor === 'none' ? r.item.sponsor_id : r.item.sponsor_id !== f.sponsor) return false;
+    }
+    if (f.supplier) {
+      if (f.supplier === 'none' ? r.item.supplier_id : r.item.supplier_id !== f.supplier) return false;
     }
     if (f.flag) {
       if (f.flag === 'any') { if (!s.flag) return false; }

@@ -212,19 +212,41 @@ export async function removeStage(_prev: ActionResult | null, fd: FormData): Pro
 async function readSupplier(fd: FormData) {
   const email = str(fd, 'email', 200);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserError('Enter a valid email address.');
-  return { name: required(fd, 'name', 'Supplier name', 120), contact_name: str(fd, 'contact_name', 120), email, phone: str(fd, 'phone', 40), notes: str(fd, 'notes', 1000) };
+  const scopeLink = str(fd, 'scope_link', 1000);
+  if (scopeLink && !/^https?:\/\//i.test(scopeLink)) throw new UserError('The link to the scope of work must start with https://');
+  const works = { works_on_os: bool(fd, 'works_on_os'), works_on_ss: bool(fd, 'works_on_ss'), works_on_si: bool(fd, 'works_on_si') };
+  if (!works.works_on_os && !works.works_on_ss && !works.works_on_si) throw new UserError('Tick at least one list they work on.');
+  return {
+    name: required(fd, 'name', 'Supplier name', 120),
+    contact_name: str(fd, 'contact_name', 120),
+    email,
+    phone: str(fd, 'phone', 40),
+    scope_of_work: str(fd, 'scope_of_work', 4000),
+    scope_link: scopeLink,
+    ...works,
+    notes: str(fd, 'notes', 1000),
+  };
 }
 
 export async function saveSupplier(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('member');
+    const me = await actor('member');
     const id = uuidOrNull(fd, 'supplier_id');
     const s = await readSupplier(fd);
     const sql = await db();
     const dup = await sql`select 1 from suppliers where lower(name) = lower(${s.name}) and id is distinct from ${id}`;
     if (dup.length) throw new UserError(`${s.name} is already on the list.`);
-    if (id) await sql`update suppliers set ${sql(s as never)} where id = ${id}`;
-    else await sql`insert into suppliers ${sql(s as never)}`;
+    let message: string;
+    if (id) {
+      const [before] = await sql<{ scope_of_work: string | null }[]>`select scope_of_work from suppliers where id = ${id}`;
+      if (!before) throw new UserError('That supplier no longer exists. Reload the page.');
+      await sql`update suppliers set ${sql(s as never)} where id = ${id}`;
+      message = (before.scope_of_work ?? '') !== (s.scope_of_work ?? '') ? `Updated ${s.name}’s scope of work` : `Updated supplier ${s.name}`;
+    } else {
+      await sql`insert into suppliers ${sql(s as never)}`;
+      message = `Added supplier ${s.name}${s.scope_of_work ? ' with a scope of work' : ''}`;
+    }
+    await logActivity(sql, { eventId: null, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message });
     refresh();
     return { ok: true, message: id ? 'Saved.' : `${s.name} added.` };
   });
@@ -232,13 +254,14 @@ export async function saveSupplier(_prev: ActionResult | null, fd: FormData): Pr
 
 export async function deleteSupplier(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('admin');
+    const me = await actor('admin');
     const id = uuidOrNull(fd, 'supplier_id');
     if (!id) throw new UserError('Missing supplier.');
     const sql = await db();
     const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from items where supplier_id = ${id}`;
     if (n > 0) throw new UserError(`This supplier is on ${n} line${n === 1 ? '' : 's'}. Change those first.`);
-    await sql`delete from suppliers where id = ${id}`;
+    const [gone] = await sql<{ name: string }[]>`delete from suppliers where id = ${id} returning name`;
+    if (gone) await logActivity(sql, { eventId: null, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Removed supplier ${gone.name}` });
     refresh();
     return { ok: true, message: 'Supplier removed.' };
   });

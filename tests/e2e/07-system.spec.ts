@@ -9,7 +9,7 @@ test('the system page shows health and runs a full check', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/settings/system');
   const health = panel(page, 'Health');
-  await expect(health).toContainText('Connected (schema v5, up to date)');
+  await expect(health).toContainText('Connected (schema v6, up to date)');
   await expect(health).toContainText('Connected (private store)');
   await expect(health).toContainText(/\d+ versions, [\d.]+ MB of originals/);
 

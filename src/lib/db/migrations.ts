@@ -310,6 +310,19 @@ alter table users add constraint users_super_admin_is_admin check (not is_super_
 alter table users add column is_demo boolean not null default false;
 `,
   },
+  {
+    version: 6,
+    name: 'supplier scope of work',
+    sql: /* sql */ `
+-- What each supplier is contracted to do, which lists they work on, and a link to the signed scope of work.
+alter table suppliers
+  add column scope_of_work text,
+  add column scope_link text,
+  add column works_on_os boolean not null default true,
+  add column works_on_ss boolean not null default true,
+  add column works_on_si boolean not null default true;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

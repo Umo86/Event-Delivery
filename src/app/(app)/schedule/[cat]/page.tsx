@@ -102,6 +102,7 @@ export default async function SchedulePage(props: {
         people={people}
         sponsors={sched.bundle.sponsors.map((s) => ({ value: s.id, label: s.name }))}
         halls={halls}
+        suppliers={sched.bundle.suppliers.map((s) => ({ value: s.id, label: s.name }))}
         showSponsor={category?.key !== 'organiser_signage' || all.some((r) => r.item.sponsor_id)}
       />
 

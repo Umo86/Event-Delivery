@@ -235,31 +235,60 @@ test('event settings: owners, budget and suggested deadlines', async ({ page }) 
   await expect(page.getByLabel('Sponsor items print deadline')).toHaveValue('2027-03-16');
 });
 
-test('suppliers can be added, edited and checked for duplicates', async ({ page }) => {
+test('suppliers are added with their scope of work, and edited', async ({ page }) => {
   await asAdmin(page);
   await page.goto('/settings/suppliers');
   await expect(page.getByText('No suppliers yet')).toBeVisible();
-  const add = async (name: string, contact: string, email: string) => {
-    await page.fill('#sp-new-name', name);
-    await page.fill('#sp-new-contact', contact);
-    await page.fill('#sp-new-email', email);
-    await page.getByRole('button', { name: 'Add supplier' }).click();
-    await expect(okMessage(page, `${name} added.`)).toBeVisible();
-  };
-  await add('Signs Express', 'Sam Print', 'sam@signsexpress.test');
-  await add('Promo Direct', 'Pat Promo', 'pat@promodirect.test');
+  const add = panel(page, 'Add a supplier');
+
+  await page.fill('#sp-new-name', 'Signs Express');
+  await page.fill('#sp-new-contact', 'Sam Print');
+  await page.fill('#sp-new-email', 'sam@signsexpress.test');
+  await add.getByLabel('Sponsor items').uncheck();
+  await page.fill('#sp-new-scope', 'Print and install all hall entrance and hanging banners.\nRemove everything at breakdown.');
+  await page.fill('#sp-new-link', 'https://sharepoint.example/sow/signs-express.pdf');
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(okMessage(page, 'Signs Express added.')).toBeVisible();
+  await expect(add.getByLabel('Sponsor items')).toBeChecked(); // the form resets for the next supplier
+
+  await page.fill('#sp-new-name', 'Promo Direct');
+  await page.fill('#sp-new-contact', 'Pat Promo');
+  await page.fill('#sp-new-email', 'pat@promodirect.test');
+  await add.getByLabel('Organiser signage').uncheck();
+  await add.getByLabel('Sponsor signage').uncheck();
+  await page.fill('#sp-new-scope', 'Supply branded lanyards and show bags.');
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(okMessage(page, 'Promo Direct added.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Suppliers (2)' })).toBeVisible();
 
+  // Each supplier shows what it's contracted to do and which lists it works on
+  const signs = page.locator('li[id^="supplier-"]').filter({ hasText: 'Signs Express' });
+  await expect(signs).toContainText('Print and install all hall entrance and hanging banners.');
+  await expect(signs.getByRole('list', { name: 'Works on' }).getByRole('listitem')).toHaveText(['Organiser signage', 'Sponsor signage']);
+  await expect(signs.getByRole('link', { name: 'Signed scope of work' })).toHaveAttribute('href', 'https://sharepoint.example/sow/signs-express.pdf');
+  await expect(page.locator('li[id^="supplier-"]').filter({ hasText: 'Promo Direct' }).getByRole('list', { name: 'Works on' }).getByRole('listitem'))
+    .toHaveText(['Sponsor items']);
+
+  // A supplier must work on at least one list, and names can't be used twice
   await page.fill('#sp-new-name', 'signs express');
+  for (const l of ['Organiser signage', 'Sponsor signage', 'Sponsor items']) await add.getByLabel(l).uncheck();
+  await page.getByRole('button', { name: 'Add supplier' }).click();
+  await expect(errorMessage(page, 'Tick at least one list they work on.')).toBeVisible();
+  await add.getByLabel('Sponsor items').check();
   await page.getByRole('button', { name: 'Add supplier' }).click();
   await expect(errorMessage(page, 'signs express is already on the list.')).toBeVisible();
 
-  const promo = page.locator('li').filter({ has: page.locator('input[value="Promo Direct"]') });
+  // Editing: open a supplier's edit panel
+  const promo = page.locator('li[id^="supplier-"]').filter({ hasText: 'Promo Direct' });
+  await promo.locator('summary', { hasText: 'Edit' }).click();
   await promo.getByLabel('Phone').fill('0121 496 0000');
+  await promo.getByLabel('Scope of work', { exact: true }).fill('Supply branded lanyards, show bags and water bottles.');
   await promo.getByRole('button', { name: 'Save' }).click();
   await expect(okMessage(promo, 'Saved.')).toBeVisible();
   await page.reload();
-  await expect(page.locator('li').filter({ has: page.locator('input[value="Promo Direct"]') }).getByLabel('Phone')).toHaveValue('0121 496 0000');
+  const saved = page.locator('li[id^="supplier-"]').filter({ hasText: 'Promo Direct' });
+  await expect(saved).toContainText('Supply branded lanyards, show bags and water bottles.');
+  await expect(saved).toContainText('Pat Promo, 0121 496 0000');
 });
 
 test('dropdown lists can be edited', async ({ page }) => {

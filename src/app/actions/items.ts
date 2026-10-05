@@ -162,7 +162,10 @@ export async function updateProduction(_prev: ActionResult | null, fd: FormData)
     if (next.po_number !== item.po_number && next.po_number) msgs.push(`PO ${next.po_number}`);
     if (next.delivery_date !== item.delivery_date) msgs.push(next.delivery_date ? `Delivery date ${fmtDate(next.delivery_date, 'long')}` : 'Cleared delivery date');
     if (next.install_date !== item.install_date) msgs.push(next.install_date ? `Install date ${fmtDate(next.install_date, 'long')}` : 'Cleared install date');
-    if (next.supplier_id !== item.supplier_id) msgs.push('Changed supplier');
+    if (next.supplier_id !== item.supplier_id) {
+      const name = detail.bundle.suppliers.find((s) => s.id === next.supplier_id)?.name;
+      msgs.push(name ? `Supplier: ${name}` : 'Cleared the supplier');
+    }
     if (msgs.length) {
       await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'production', message: msgs.join('; ') });
     }
