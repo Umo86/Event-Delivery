@@ -9,7 +9,8 @@ test('the system page shows health and runs a full check', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/settings/system');
   const health = panel(page, 'Health');
-  await expect(health).toContainText('Connected (schema v3, up to date)');
+  await expect(health).toContainText('Connected (schema v4, up to date)');
+  await expect(health).toContainText('Set up (from invites@ukcw.test)');
   await expect(health).toContainText('Connected (private store)');
   await expect(health).toContainText(/\d+ versions, [\d.]+ MB of originals/);
 
@@ -131,7 +132,7 @@ test.describe('on a phone', () => {
   test('no page scrolls sideways on a phone', async ({ page }) => {
     await loginAs(page, 'admin');
     const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/schedule/ss/new', '/sponsors',
-      `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/settings/team',
+      `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/admin',
       '/settings/suppliers', '/settings/lists', '/settings/events', '/settings/system', '/account'];
     const wide: string[] = [];
     for (const p of pages) {

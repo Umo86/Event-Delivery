@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
 import { sha256 } from '@/lib/auth/password';
 import { readBlob } from '@/lib/storage';
+import { sponsorLinksEnabled } from '@/lib/settings';
 
 // Serves artwork files to signed-in users, or to a sponsor holding a valid approval link (?s=token).
 export async function GET(request: Request, ctx: { params: Promise<{ versionId: string; kind: string }> }) {
@@ -16,7 +17,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ versionId: 
 
   let allowed = !!(await getCurrentUser());
   const share = url.searchParams.get('s');
-  if (!allowed && share) {
+  if (!allowed && share && (await sponsorLinksEnabled())) {
     // A sponsor link opens only the artwork version it was sent for.
     const [l] = await sql<{ item_id: string; version: number }[]>`
       select item_id, version from share_links where token_hash = ${sha256(share.slice(0, 200))} and revoked_at is null and expires_at > now()`;

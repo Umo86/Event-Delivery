@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { PencilLine, Printer } from 'lucide-react';
 import { requireUser } from '@/lib/auth/session';
 import { loadItem } from '@/lib/data/load';
+import { sponsorLinksEnabled } from '@/lib/settings';
 import { fmtDate, fmtDateTime, relativeDue } from '@/lib/dates';
 import { defaultArtworkDue, defaultPrintDeadline } from '@/lib/domain/engine';
 import { artworkByLabel, categoryInfo } from '@/lib/domain/labels';
@@ -118,7 +119,7 @@ export default async function ItemPage(props: {
         <div className="space-y-6">
           <ArtworkPanel detail={detail} user={user} viewVersion={sp.v ? Number(sp.v) : undefined} />
           <Panel title="Sign-off" id="signoff">
-            <SignoffRoute detail={detail} user={user} />
+            <SignoffRoute detail={detail} user={user} sponsorLinks={await sponsorLinksEnabled()} />
           </Panel>
         </div>
         <div className="space-y-6">

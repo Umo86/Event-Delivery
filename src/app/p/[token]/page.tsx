@@ -7,14 +7,16 @@ import { SponsorDecisionForm } from '@/components/sponsor-decision-form';
 import { Mark } from '@/components/brand';
 import { Notice } from '@/components/ui';
 import { shareLinkStatus, type ShareLinkRow } from '@/lib/domain/share-link';
+import { sponsorLinksEnabled } from '@/lib/settings';
 
 export const metadata: Metadata = { title: 'Artwork approval', robots: { index: false, follow: false } };
 
 export default async function SponsorProofPage(props: { params: Promise<{ token: string }> }) {
   const { token } = await props.params;
   const appName = await getAppName();
+  const linksOn = await sponsorLinksEnabled();
   const sql = await db();
-  const [link] = await sql<(ShareLinkRow & { item_id: string; recipient_name: string | null })[]>`
+  const [link] = !linksOn ? [] : await sql<(ShareLinkRow & { item_id: string; recipient_name: string | null })[]>`
     select item_id, stage_id, version, expires_at, revoked_at, used_at, recipient_name from share_links where token_hash = ${sha256(token.slice(0, 200))}`;
   const detail = link ? await loadItem(link.item_id) : null;
 
@@ -27,6 +29,7 @@ export default async function SponsorProofPage(props: { params: Promise<{ token:
     </div>
   );
 
+  if (!linksOn) return shell(<Notice tone="warn">Approval links are switched off at the moment. Ask your contact for help.</Notice>);
   if (!link || !detail) return shell(<Notice tone="warn">This approval link isn’t valid. Check you copied all of it, or ask your contact for a new one.</Notice>);
   if (link.revoked_at || new Date(link.expires_at) < new Date()) return shell(<Notice tone="warn">This approval link has expired or been turned off. Ask your contact for a new one.</Notice>);
 

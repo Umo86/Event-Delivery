@@ -7,7 +7,6 @@ import { cx } from './ui';
 const ITEMS = [
   { href: '/settings', label: 'Event', admin: true },
   { href: '/settings/stages', label: 'Sign-off stages', admin: true },
-  { href: '/settings/team', label: 'Team', admin: true },
   { href: '/settings/suppliers', label: 'Suppliers', admin: false },
   { href: '/settings/lists', label: 'Dropdown lists', admin: false },
   { href: '/settings/events', label: 'Events', admin: true },

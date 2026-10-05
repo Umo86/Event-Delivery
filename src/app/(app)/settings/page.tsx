@@ -24,7 +24,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
   const e = event;
 
   const steps = [
-    { done: bundle.users.length > 1, text: 'Add your team', href: '/settings/team' },
+    { done: bundle.users.length > 1, text: 'Invite your team', href: '/admin' },
     { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_id), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
     { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles in-house artwork and production (below)', href: '#owners' },
     { done: bundle.sponsors.length > 0, text: 'Add sponsors and their account managers', href: '/sponsors' },

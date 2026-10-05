@@ -7,8 +7,10 @@ import { sha256 } from '@/lib/auth/password';
 import { loadItem } from '@/lib/data/load';
 import { logActivity } from '@/lib/activity';
 import { shareLinkStatus, type ShareLinkRow } from '@/lib/domain/share-link';
+import { sponsorLinksEnabled } from '@/lib/settings';
 
 const REFUSED: Record<string, string> = {
+  off: 'Approval links are switched off at the moment. Ask your contact for help.',
   closed: 'This link is no longer active. Ask your contact for a new one.',
   stale: 'A newer version of this artwork has been uploaded. Ask your contact for a new link.',
   done: 'Your response has already been recorded. Thank you.',
@@ -24,6 +26,7 @@ export async function submitSponsorDecision(_prev: ActionResult | null, fd: Form
     const name = required(fd, 'name', 'Your name', 120);
     const comment = str(fd, 'comment', 2000);
     if (decision === 'changes_requested' && !comment) throw new UserError('Tell us what needs to change.');
+    if (!(await sponsorLinksEnabled())) throw new UserError(REFUSED.off);
     const sql = await db();
     const [link] = await sql<(ShareLinkRow & { id: string; item_id: string })[]>`
       select id, item_id, stage_id, version, expires_at, revoked_at, used_at from share_links where token_hash = ${sha256(token)}`;

@@ -2,12 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
 import { db } from '@/lib/db';
 import { bool, date, int, isUuid, num, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor } from '@/lib/auth/session';
 import { randomToken, sha256 } from '@/lib/auth/password';
 import { loadItem } from '@/lib/data/load';
+import { sponsorLinksEnabled } from '@/lib/settings';
+import { appOrigin } from '@/lib/url';
 import { logActivity } from '@/lib/activity';
 import { fmtDate } from '@/lib/dates';
 import { categoryInfo, decisionLabel, itemCode, productionLabel } from '@/lib/domain/labels';
@@ -340,13 +341,6 @@ export async function deleteVersion(_prev: ActionResult | null, fd: FormData): P
 
 // ---- Sponsor approval links -------------------------------------------------------
 
-async function origin(): Promise<string> {
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
-  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https');
-  return `${proto}://${host}`;
-}
-
 export async function createShareLink(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const me = await actor('member');
@@ -361,6 +355,7 @@ export async function createShareLink(_prev: ActionResult | null, fd: FormData):
     }
     if (!sponsor) throw new UserError('Choose the sponsor for this line first.');
     if (!canDecideStage(me, stage, sponsor)) throw new UserError('Only the sponsor’s account manager (or an admin) can send an approval link.');
+    if (!(await sponsorLinksEnabled())) throw new UserError('Sponsor approval links are turned off. An admin can turn them back on in Admin.');
     const token = randomToken(24);
     const expires = new Date(Date.now() + 30 * 86400000);
     const recipient = str(fd, 'recipient_name', 120);
@@ -370,7 +365,7 @@ export async function createShareLink(_prev: ActionResult | null, fd: FormData):
     await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'share_link',
       message: `Created a sponsor approval link${recipient ? ` for ${recipient}` : ''} (v${state.version})` });
     refresh(itemId);
-    return { ok: true, message: 'Link created. Copy it and send it to the sponsor.', data: { url: `${await origin()}/p/${token}` } };
+    return { ok: true, message: 'Link created. Copy it and send it to the sponsor.', data: { url: `${await appOrigin()}/p/${token}` } };
   });
 }
 

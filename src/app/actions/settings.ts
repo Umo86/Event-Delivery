@@ -6,14 +6,11 @@ import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { bool, date, int, num, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor } from '@/lib/auth/session';
-import { hashPassword, tempPassword } from '@/lib/auth/password';
 import { logActivity } from '@/lib/activity';
 import { EVENT_COOKIE } from '@/lib/data/load';
 import { DEFAULT_STAGES, suggestedDeadlines } from '@/lib/data/seed';
-import type { Role } from '@/lib/domain/types';
 
 const refresh = () => revalidatePath('/', 'layout');
-const ROLES: Role[] = ['admin', 'member', 'viewer'];
 const LIST_KEYS = ['sign_type', 'item_type', 'material', 'position', 'zone', 'hall_nec', 'hall_excel', 'hall_other'];
 
 async function userExists(id: string | null) {
@@ -208,66 +205,6 @@ export async function removeStage(_prev: ActionResult | null, fd: FormData): Pro
     await logActivity(sql, { eventId: s.event_id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Removed sign-off stage ${s.name}` });
     refresh();
     return { ok: true, message: `${s.name} removed. Its past decisions stay in each line’s history.` };
-  });
-}
-
-// ---- Team ---------------------------------------------------------------------
-export async function createUser(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
-  return run(async () => {
-    await actor('admin');
-    const name = required(fd, 'full_name', 'Name', 120);
-    const email = required(fd, 'email', 'Email', 200).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserError('Enter a valid email address.');
-    const role = (str(fd, 'role', 10) ?? 'member') as Role;
-    if (!ROLES.includes(role)) throw new UserError('Choose a role.');
-    const sql = await db();
-    if ((await sql`select 1 from users where lower(email) = ${email}`).length) throw new UserError(`${email} already has an account.`);
-    const pw = tempPassword();
-    await sql`insert into users (email, full_name, job_title, role, password_hash, must_change_password)
-              values (${email}, ${name}, ${str(fd, 'job_title', 120)}, ${role}, ${await hashPassword(pw)}, true)`;
-    refresh();
-    return { ok: true, message: `Account created for ${name}. Their temporary password is ${pw}. They’ll choose their own when they first sign in.`, data: { password: pw } };
-  });
-}
-
-export async function updateUser(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
-  return run(async () => {
-    const me = await actor('admin');
-    const id = uuidOrNull(fd, 'user_id');
-    if (!id) throw new UserError('Missing person.');
-    const role = (str(fd, 'role', 10) ?? 'member') as Role;
-    if (!ROLES.includes(role)) throw new UserError('Choose a role.');
-    const active = bool(fd, 'active');
-    const email = required(fd, 'email', 'Email', 200).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserError('Enter a valid email address.');
-    const sql = await db();
-    if (id === me.id && (role !== 'admin' || !active)) throw new UserError('You can’t remove your own admin access. Ask another admin.');
-    if (role !== 'admin' || !active) {
-      const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users where role = 'admin' and active and id <> ${id}`;
-      if (n === 0) throw new UserError('There must always be at least one active admin.');
-    }
-    if ((await sql`select 1 from users where lower(email) = ${email} and id <> ${id}`).length) throw new UserError(`${email} is used by another account.`);
-    await sql`update users set full_name = ${required(fd, 'full_name', 'Name', 120)}, job_title = ${str(fd, 'job_title', 120)},
-              email = ${email}, role = ${role}, active = ${active} where id = ${id}`;
-    if (!active) await sql`delete from sessions where user_id = ${id}`;
-    refresh();
-    return { ok: true, message: 'Saved.' };
-  });
-}
-
-export async function resetPassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
-  return run(async () => {
-    await actor('admin');
-    const id = uuidOrNull(fd, 'user_id');
-    if (!id) throw new UserError('Missing person.');
-    const pw = tempPassword();
-    const sql = await db();
-    const [u] = await sql<{ full_name: string }[]>`
-      update users set password_hash = ${await hashPassword(pw)}, must_change_password = true, failed_logins = 0, locked_until = null
-      where id = ${id} returning full_name`;
-    if (!u) throw new UserError('That person no longer exists.');
-    await sql`delete from sessions where user_id = ${id}`;
-    return { ok: true, message: `New temporary password for ${u.full_name}: ${pw}`, data: { password: pw } };
   });
 }
 

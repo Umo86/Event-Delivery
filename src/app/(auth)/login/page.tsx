@@ -19,7 +19,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
   return (
     <>
       <h1 className="text-[30px] font-semibold text-ink">Sign in</h1>
-      <p className="mt-1 text-muted">Use the email your admin set up for you.</p>
+      <p className="mt-1 text-muted">For invited people only. Use the email address your invite was sent to.</p>
       <ActionForm action={login} className="mt-6 space-y-4">
         <input type="hidden" name="next" value={sp.next ?? ''} />
         <Field label="Email" htmlFor="email">
@@ -30,7 +30,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
         </Field>
         <SubmitButton className="w-full" pendingText="Signing in…">Sign in</SubmitButton>
       </ActionForm>
-      <p className="mt-6 text-[13.5px] text-muted">Forgotten your password? Ask an admin to reset it from Settings › Team.</p>
+      <p className="mt-6 text-[13.5px] text-muted">Forgotten your password, or your invite has expired? Ask an admin to send you a new one.</p>
     </>
   );
 }

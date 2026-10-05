@@ -2,6 +2,7 @@ import { expect, type Browser, type Locator, type Page } from '@playwright/test'
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import postgres from 'postgres';
 
 export const SETUP_CODE = process.env.SETUP_CODE ?? 'ED-TEST-0000-0001';
 export const ADMIN = { name: 'Umit Admin', email: 'admin@ukcw.test', password: 'Admin-pass-123' };
@@ -66,6 +67,53 @@ export async function expectImagesLoaded(page: Page, selector: string) {
   const imgs = page.locator(selector);
   await expect(imgs.first()).toBeVisible();
   await expect.poll(async () => imgs.evaluateAll((els) => els.every((e) => (e as HTMLImageElement).complete && (e as HTMLImageElement).naturalWidth > 0))).toBe(true);
+}
+
+// ---- Invites and email -------------------------------------------------------------
+const EMAIL_API = process.env.RESEND_API_URL ?? 'http://127.0.0.1:54500';
+export interface SentEmail { id: string; from: string; to: string[]; subject: string; text: string; html: string; reply_to?: string }
+
+/** Everything the app has emailed, from the local stand-in for the email service. */
+export async function outbox(): Promise<SentEmail[]> {
+  return (await fetch(`${EMAIL_API}/outbox`)).json() as Promise<SentEmail[]>;
+}
+
+/** The most recent email sent to an address. */
+export async function latestEmail(to: string): Promise<SentEmail> {
+  const mail = (await outbox()).reverse().find((e) => e.to.includes(to));
+  if (!mail) throw new Error(`No email was sent to ${to}`);
+  return mail;
+}
+
+/** Reads the temporary password out of an invite or reset email. */
+export function tempPasswordFrom(text: string): string {
+  const m = text.match(/Temporary password: (\S+)/);
+  if (!m) throw new Error('No temporary password in the message');
+  return m[1];
+}
+
+/** A person's row on the Admin page. */
+export function personRow(page: Page, email: string) {
+  return page.locator('li[id^="person-"]').filter({ has: page.locator('summary', { hasText: email }) });
+}
+
+/** Opens a person's row on the Admin page (if it isn't open already) and returns it. */
+export async function openPerson(page: Page, email: string) {
+  const row = personRow(page, email);
+  await expect(row).toHaveCount(1);
+  if ((await row.locator('details[open]').count()) === 0) await row.locator('summary').click();
+  await expect(row.locator('details[open]')).toHaveCount(1);
+  return row;
+}
+
+/** Runs a query against the local test database (for things a test can't wait for, like an invite expiring). */
+export async function withDb<T>(fn: (sql: postgres.Sql) => Promise<T>): Promise<T> {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+  try {
+    return await fn(sql);
+  } finally {
+    await sql.end();
+  }
 }
 
 export async function login(page: Page, email: string, password: string) {

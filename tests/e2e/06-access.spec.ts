@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, acceptNextDialog, errorMessage, itemId, login, loginAs, okMessage, saveUser, signoffStage, user } from './helpers';
+import {
+  ADMIN, acceptNextDialog, errorMessage, itemId, latestEmail, login, loginAs, okMessage, openPerson, panel, saveUser, signoffStage,
+  tempPasswordFrom, user,
+} from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -48,9 +51,12 @@ test('viewers can look but not change anything', async ({ page }) => {
   await page.goto('/settings/lists');
   await expect(page.locator('#list-zone')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save list' })).toHaveCount(0);
-  await page.goto('/settings/team');
-  await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
-  await expect(page.getByText('That page is for admins only.')).toBeVisible();
+  for (const path of ['/admin', '/settings/team']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
+    await expect(page.getByText('That page is for admins only.')).toBeVisible();
+  }
+  await expect(page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
   await page.goto('/sponsors');
   await expect(page.getByRole('heading', { name: 'Add a sponsor' })).toHaveCount(0);
 
@@ -63,7 +69,7 @@ test('viewers can look but not change anything', async ({ page }) => {
 
 test('members can work on lines but not reach admin settings', async ({ page }) => {
   await loginAs(page, 'mark');
-  for (const path of ['/settings/team', '/settings/stages', '/settings/events', '/settings/system']) {
+  for (const path of ['/admin', '/settings/team', '/settings/stages', '/settings/events', '/settings/system']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
   }
@@ -108,20 +114,20 @@ test('deactivated people are signed out and cannot sign back in', async ({ brows
   await expect(vic.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
   await login(page, ADMIN.email, ADMIN.password);
-  await page.goto('/settings/team');
+  await page.goto('/admin');
   // Admins can't lock themselves out
-  const me = page.locator('li').filter({ hasText: `${ADMIN.name} (you)` });
-  await me.locator('summary').click();
-  await me.getByLabel('Can sign in').uncheck();
-  await me.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(errorMessage(me, 'You can’t remove your own admin access.')).toBeVisible();
+  const me = await openPerson(page, ADMIN.email);
+  await expect(me.locator('summary')).toContainText(`${ADMIN.name} (you)`);
+  await expect(me).toContainText('This is you.');
+  await expect(me.getByRole('button', { name: 'Deactivate' })).toHaveCount(0);
+  await expect(me.getByRole('button', { name: 'Save access' })).toHaveCount(0);
 
-  const row = page.locator('li').filter({ hasText: 'vic@ukcw.test' });
-  await row.locator('summary').click();
-  await row.getByLabel('Can sign in').uncheck();
-  await row.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(okMessage(row, 'Saved.')).toBeVisible();
-  await expect(page.locator('li').filter({ hasText: 'vic@ukcw.test' }).getByText('Deactivated')).toBeVisible();
+  const row = await openPerson(page, 'vic@ukcw.test');
+  acceptNextDialog(page);
+  await row.getByRole('button', { name: 'Deactivate' }).click();
+  await expect(okMessage(row, 'Vic Viewer can no longer sign in and has been signed out.')).toBeVisible();
+  await expect(row.locator('summary').getByText('Deactivated', { exact: true })).toBeVisible();
+  await expect(panel(page, 'Access log')).toContainText('Deactivated Vic Viewer');
 
   await vic.reload();
   await expect(vic).toHaveURL(/\/login/);
@@ -130,11 +136,9 @@ test('deactivated people are signed out and cannot sign back in', async ({ brows
   await vic.getByRole('button', { name: 'Sign in' }).click();
   await expect(errorMessage(vic, 'don’t match an account')).toBeVisible();
 
-  const again = page.locator('li').filter({ hasText: 'vic@ukcw.test' });
-  if (!(await again.getByLabel('Can sign in').isVisible())) await again.locator('summary').click();
-  await again.getByLabel('Can sign in').check();
-  await again.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(okMessage(again, 'Saved.')).toBeVisible();
+  await row.getByRole('button', { name: 'Reactivate' }).click();
+  await expect(okMessage(row, 'Vic Viewer can sign in again.')).toBeVisible();
+  await expect(row.locator('summary').getByText('Deactivated', { exact: true })).toHaveCount(0);
   await login(vic, user('vic').email, user('vic').password);
   await expect(vic).toHaveURL(/\/inbox$/);
   await vicCtx.close();
@@ -160,12 +164,15 @@ test('too many wrong passwords lock the account until it is reset', async ({ pag
   await expect(errorMessage(page, 'Too many attempts.')).toBeVisible();
 
   await login(page, ADMIN.email, ADMIN.password);
-  await page.goto('/settings/team');
-  const row = page.locator('li').filter({ hasText: mark.email });
-  await row.locator('summary').click();
+  await page.goto('/admin');
+  await expect(page.getByText('Mark Marketing is locked out after too many wrong passwords.')).toBeVisible();
+  await expect(panel(page, 'Access log')).toContainText('Locked Mark Marketing’s account for 15 minutes after 8 wrong passwords');
+  const row = await openPerson(page, mark.email);
+  await expect(row.locator('summary').getByText('Locked out')).toBeVisible();
   acceptNextDialog(page);
   await row.getByRole('button', { name: 'Reset password' }).click();
-  const temp = (await okMessage(row, 'New temporary password').innerText()).split(': ').pop()!.trim();
+  await expect(okMessage(row, 'password has been reset')).toBeVisible();
+  const temp = tempPasswordFrom((await latestEmail(mark.email)).text);
 
   await login(page, mark.email, temp);
   await page.fill('#current', temp);

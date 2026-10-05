@@ -14,7 +14,7 @@ export default async function AccountPage(props: { searchParams: Promise<{ first
     <>
       <PageHeader title="Your account" subtitle={user.email} />
       {(forced || sp.first) && (
-        <div className="mb-5"><Notice tone="warn">Welcome. Choose your own password before you carry on.</Notice></div>
+        <div className="mb-5"><Notice tone="warn">Welcome. Choose your own password before you carry on. Enter the temporary password from your email, then your new one.</Notice></div>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Change password">

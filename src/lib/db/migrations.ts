@@ -278,6 +278,23 @@ update items i set last_version = greatest(
   (select coalesce(max(version), 0) from share_links where item_id = i.id));
 `,
   },
+  {
+    version: 4,
+    name: 'invitations',
+    sql: /* sql */ `
+-- People join by invitation: an admin creates the account, a temporary password is emailed to them,
+-- and they choose their own at first sign-in. Temporary passwords stop working after a few days.
+alter table users
+  add column invited_by uuid references users(id) on delete set null,
+  add column invited_at timestamptz,
+  add column temp_password_expires_at timestamptz,
+  add column invite_email_status text check (invite_email_status is null or invite_email_status in ('sent', 'failed', 'not_set_up')),
+  add column invite_email_error text,
+  add column invite_email_at timestamptz;
+update users set temp_password_expires_at = now() + interval '7 days' where must_change_password;
+create index activity_kind_idx on activity (kind, created_at desc);
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

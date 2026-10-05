@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db, isDatabaseConfigured } from '@/lib/db';
 import { LATEST_VERSION } from '@/lib/db/migrations';
 import { blobAccess, blobSetupProblem, isBlobConfigured } from '@/lib/storage';
+import { currentEmailConfig } from '@/lib/email/send';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,8 @@ export async function GET() {
   }
   out.database = dbInfo;
   out.fileStorage = { configured: isBlobConfigured(), access: blobAccess(), ...(blobSetupProblem() ? { problem: blobSetupProblem() } : {}) };
+  const mail = currentEmailConfig();
+  out.email = { configured: mail.configured, testSender: mail.testSender };
   const ok = dbInfo.ok === true && isBlobConfigured();
   return NextResponse.json({ ok, ...out }, { status: ok ? 200 : 503, headers: { 'cache-control': 'no-store' } });
 }

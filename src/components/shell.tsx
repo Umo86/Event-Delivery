@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, Signpost, Flag, UserRound, X,
+  Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, UserRound, X,
 } from 'lucide-react';
 import { Mark } from './brand';
 import { cx } from './ui';
@@ -29,6 +29,7 @@ const NAV = [
   { href: '/schedule/si', label: 'Sponsor items', icon: Package, key: 'si' },
   { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
   { href: '/settings', label: 'Settings', icon: Settings, key: 'settings' },
+  { href: '/admin', label: 'Admin', icon: ShieldCheck, key: 'admin' },
 ] as const;
 
 export function AppShell(p: ShellProps) {
@@ -67,7 +68,7 @@ export function AppShell(p: ShellProps) {
       )}
 
       <ul className="flex-1 space-y-0.5 px-3">
-        {NAV.map((n) => {
+        {NAV.filter((n) => n.key !== 'admin' || p.user.role === 'admin').map((n) => {
           const active = pathname === n.href || pathname.startsWith(n.href + '/');
           const count = n.key === 'inbox' ? p.myCount : n.key === 'os' || n.key === 'ss' || n.key === 'si' ? p.counts[n.key] : null;
           return (

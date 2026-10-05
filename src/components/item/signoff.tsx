@@ -8,7 +8,7 @@ import { cx } from '../ui';
 import { DecisionForm } from './decision-form';
 import { SharePanel } from './share-panel';
 
-export function SignoffRoute({ detail, user }: { detail: ItemDetail; user: CurrentUser }) {
+export function SignoffRoute({ detail, user, sponsorLinks = true }: { detail: ItemDetail; user: CurrentUser; sponsorLinks?: boolean }) {
   const { row, bundle } = detail;
   const { state, sponsor, item } = row;
   const names = bundle.ctx.userNames;
@@ -68,7 +68,7 @@ export function SignoffRoute({ detail, user }: { detail: ItemDetail; user: Curre
               {!mayDecide && (s.kind === 'current' || s.kind === 'stale') && canEdit(user) && (
                 <p className="mt-1.5 text-[12.5px] text-muted">Only {approverText.replace(/ \(.*\)$/, '')} or an admin can record this stage.</p>
               )}
-              {(s.kind === 'current' || s.kind === 'stale') && s.stage.uses_account_manager && !item.cancelled && canDecideStage(user, s.stage, sponsor) && (
+              {sponsorLinks && (s.kind === 'current' || s.kind === 'stale') && s.stage.uses_account_manager && !item.cancelled && canDecideStage(user, s.stage, sponsor) && (
                 <SharePanel detail={detail} stageId={s.stage.id} />
               )}
             </div>
