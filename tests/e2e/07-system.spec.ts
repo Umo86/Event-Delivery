@@ -43,9 +43,9 @@ test('the platform can be renamed', async ({ page }) => {
   await expect(okMessage(page, 'Saved.')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Main' }).first();
   await expect(nav.getByText('UKCW Signage')).toBeVisible();
-  await page.fill('#app_name', 'Event Deliver');
+  await page.fill('#app_name', 'Event Delivery');
   await panel(page, 'Platform name').getByRole('button', { name: 'Save' }).click();
-  await expect(nav.getByText('Event Deliver')).toBeVisible();
+  await expect(nav.getByText('Event Delivery')).toBeVisible();
 });
 
 test('a new event copies stages and sponsors, and people can switch between events', async ({ page }) => {

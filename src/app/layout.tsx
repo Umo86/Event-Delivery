@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Event Deliver', template: '%s · Event Deliver' },
+  title: { default: 'Event Delivery', template: '%s · Event Delivery' },
   description: 'Signage and sponsorship delivery for UK Construction Week: schedule, artwork sign-off and production tracking.',
   robots: { index: false, follow: false },
 };

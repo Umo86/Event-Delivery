@@ -7,7 +7,7 @@
 @import "@fontsource/barlow-semi-condensed/600.css";
 @import "@fontsource/barlow-semi-condensed/700.css";
 
-/* Event Deliver design tokens: a signage system. Navy ink, site-safety yellow, status colour-coding. */
+/* Event Delivery design tokens: a signage system. Navy ink, site-safety yellow, status colour-coding. */
 @theme {
   --font-sans: "Barlow", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   --font-display: "Barlow Semi Condensed", "Barlow", ui-sans-serif, system-ui, sans-serif;

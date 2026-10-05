@@ -1,6 +1,6 @@
 import type { ArtworkBy, Category, DecisionValue, Flag, Group, ProductionStatus, Role } from './types';
 
-export const APP_NAME = 'Event Deliver';
+export const APP_NAME = 'Event Delivery';
 
 export const CATEGORIES: { key: Category; slug: 'os' | 'ss' | 'si'; label: string; short: string; prefix: string }[] = [
   { key: 'organiser_signage', slug: 'os', label: 'Organiser signage', short: 'Organiser', prefix: 'OS' },

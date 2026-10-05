@@ -6,7 +6,7 @@ import { blobAccess, blobSetupProblem, isBlobConfigured } from '@/lib/storage';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const out: Record<string, unknown> = { app: 'Event Deliver', time: new Date().toISOString() };
+  const out: Record<string, unknown> = { app: 'Event Delivery', time: new Date().toISOString() };
   const dbInfo: Record<string, unknown> = { configured: isDatabaseConfigured() };
   if (dbInfo.configured) {
     const t = Date.now();

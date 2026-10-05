@@ -144,8 +144,8 @@ export const getAppName = cache(async (): Promise<string> => {
   try {
     const sql = await db();
     const r = await sql<{ value: string }[]>`select value from app_settings where key = 'app_name'`;
-    return r[0]?.value || 'Event Deliver';
+    return r[0]?.value || 'Event Delivery';
   } catch {
-    return 'Event Deliver';
+    return 'Event Delivery';
   }
 });

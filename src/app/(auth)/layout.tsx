@@ -3,7 +3,7 @@ import { getAppName } from '@/lib/data/load';
 import { isDatabaseConfigured } from '@/lib/db';
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-  const appName = isDatabaseConfigured() ? await getAppName() : 'Event Deliver';
+  const appName = isDatabaseConfigured() ? await getAppName() : 'Event Delivery';
   return (
     <div className="grid min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <aside className="relative hidden overflow-hidden bg-ink text-white lg:flex lg:flex-col lg:justify-between lg:p-12">

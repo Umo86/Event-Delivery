@@ -61,7 +61,7 @@ test('setup creates the admin and the first event', async ({ page }) => {
   await expect(page.locator('#show_open')).toHaveValue('2027-05-11');
   // Sidebar shows the platform name, the event and the signed-in person
   const nav = page.getByRole('navigation', { name: 'Main' }).first();
-  await expect(nav.getByText('Event Deliver')).toBeVisible();
+  await expect(nav.getByText('Event Delivery')).toBeVisible();
   await expect(nav.locator('#event-switch')).toHaveValue(/[0-9a-f-]{36}/);
   await expect(nav.getByText(ADMIN.name)).toBeVisible();
 });

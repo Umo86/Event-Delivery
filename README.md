@@ -1,4 +1,4 @@
-# Event Deliver
+# Event Delivery
 
 Signage and sponsorship delivery for UK Construction Week: organiser signage, sponsor signage and sponsor items in one schedule, with artwork proofs, a sign-off route (Operations → Marketing → Sponsor → Final sign-off), sponsor approval links and production tracking.
 
