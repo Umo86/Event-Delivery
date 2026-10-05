@@ -11,6 +11,7 @@ import { checkSetupCode } from '@/lib/setup';
 import { EVENT_COOKIE } from '@/lib/data/load';
 import { createDefaultEvent } from '@/lib/data/seed';
 import { logActivity } from '@/lib/activity';
+import { maintenanceOn } from '@/lib/settings';
 
 const MAX_FAILED_LOGINS = 8;
 const DUMMY_HASH = 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$' + 'A'.repeat(86) + '==';
@@ -25,45 +26,80 @@ function safeNext(v: FormDataEntryValue | null): string {
   return isLocalPath(s) && !s.startsWith('/login') ? s : '/inbox';
 }
 
+/**
+ * Checks an email and password (with lockout and expiry rules) and returns the account, or throws a message to show.
+ * With superOnly, only super admins get through: used by the super admin sign-in at /gs.
+ */
+async function authenticate(fd: FormData, opts: { superOnly?: boolean } = {}) {
+  const email = required(fd, 'email', 'Email', 200).toLowerCase();
+  const password = String(fd.get('password') ?? '');
+  if (!password) throw new UserError('Password is required.');
+  const sql = await db();
+  const rows = await sql<{
+    id: string; full_name: string; password_hash: string; active: boolean; failed_logins: number; locked_until: Date | null;
+    must_change_password: boolean; temp_password_expires_at: Date | null; is_demo: boolean; is_super_admin: boolean;
+  }[]>`
+    select id, full_name, password_hash, active, failed_logins, locked_until, must_change_password, temp_password_expires_at,
+           is_demo, is_super_admin
+    from users where lower(email) = ${email}`;
+  const u = rows[0];
+  if (!u || !u.active) {
+    await verifyPassword(password, DUMMY_HASH); // keep timing similar
+    throw new UserError('That email and password don’t match an account.');
+  }
+  if (u.locked_until && new Date(u.locked_until) > new Date()) {
+    throw new UserError('Too many attempts. Try again in 15 minutes, or ask an admin to reset your password.');
+  }
+  if (!(await verifyPassword(password, u.password_hash))) {
+    // The demo login's password is public, so guessing it is pointless; not counting stops anyone locking it for everyone.
+    if (u.is_demo) throw new UserError('That email and password don’t match an account.');
+    // Counted in one statement so guesses sent at the same time are all counted, and a lock is never undone here.
+    const [f] = await sql<{ failed_logins: number }[]>`update users set failed_logins = failed_logins + 1,
+                locked_until = case when failed_logins + 1 >= ${MAX_FAILED_LOGINS} then now() + interval '15 minutes' else locked_until end
+              where id = ${u.id} returning failed_logins`;
+    if (f && f.failed_logins >= MAX_FAILED_LOGINS) {
+      await logActivity(sql, { eventId: null, itemId: null, userId: u.id, actorName: 'Sign-in protection', kind: 'access',
+        message: `Locked ${u.full_name}’s account for 15 minutes after ${f.failed_logins} wrong passwords` });
+    }
+    throw new UserError('That email and password don’t match an account.');
+  }
+  // Checked only after the password matches, so they say nothing about the account to anyone else.
+  if (u.must_change_password && u.temp_password_expires_at && new Date(u.temp_password_expires_at) < new Date()) {
+    throw new UserError('That temporary password has expired. Ask an admin to send you a new invite.');
+  }
+  if (opts.superOnly && !u.is_super_admin) {
+    throw new UserError('That account isn’t a super admin. Use the normal sign-in page instead.');
+  }
+  if (!u.is_super_admin && (await maintenanceOn())) {
+    throw new UserError('Event Delivery is closed for maintenance, so only super admins can sign in right now. Try again later.');
+  }
+  await sql`update users set failed_logins = 0, locked_until = null, last_login_at = now() where id = ${u.id}`;
+  return u;
+}
+
 export async function login(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const email = required(fd, 'email', 'Email', 200).toLowerCase();
-    const password = String(fd.get('password') ?? '');
-    if (!password) throw new UserError('Password is required.');
-    const sql = await db();
-    const rows = await sql<{
-      id: string; full_name: string; password_hash: string; active: boolean; failed_logins: number; locked_until: Date | null;
-      must_change_password: boolean; temp_password_expires_at: Date | null;
-    }[]>`
-      select id, full_name, password_hash, active, failed_logins, locked_until, must_change_password, temp_password_expires_at
-      from users where lower(email) = ${email}`;
-    const u = rows[0];
-    if (!u || !u.active) {
-      await verifyPassword(password, DUMMY_HASH); // keep timing similar
-      throw new UserError('That email and password don’t match an account.');
-    }
-    if (u.locked_until && new Date(u.locked_until) > new Date()) {
-      throw new UserError('Too many attempts. Try again in 15 minutes, or ask an admin to reset your password.');
-    }
-    if (!(await verifyPassword(password, u.password_hash))) {
-      // Counted in one statement so guesses sent at the same time are all counted, and a lock is never undone here.
-      const [f] = await sql<{ failed_logins: number }[]>`update users set failed_logins = failed_logins + 1,
-                  locked_until = case when failed_logins + 1 >= ${MAX_FAILED_LOGINS} then now() + interval '15 minutes' else locked_until end
-                where id = ${u.id} returning failed_logins`;
-      if (f && f.failed_logins >= MAX_FAILED_LOGINS) {
-        await logActivity(sql, { eventId: null, itemId: null, userId: u.id, actorName: 'Sign-in protection', kind: 'access',
-          message: `Locked ${u.full_name}’s account for 15 minutes after ${f.failed_logins} wrong passwords` });
-      }
-      throw new UserError('That email and password don’t match an account.');
-    }
-    // Checked only after the password matches, so it says nothing about the account to anyone else.
-    if (u.must_change_password && u.temp_password_expires_at && new Date(u.temp_password_expires_at) < new Date()) {
-      throw new UserError('That temporary password has expired. Ask an admin to send you a new invite.');
-    }
-    await sql`update users set failed_logins = 0, locked_until = null, last_login_at = now() where id = ${u.id}`;
+    const u = await authenticate(fd);
     await createSession(u.id);
     redirect(safeNext(fd.get('next')));
   });
+}
+
+/** The sign-in on the super admin page (/gs): super admins only. */
+export async function superAdminLogin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const u = await authenticate(fd, { superOnly: true });
+    await destroySession(); // replaces whoever was signed in on this browser
+    await createSession(u.id);
+    const sql = await db();
+    await logActivity(sql, { eventId: null, itemId: null, userId: u.id, actorName: u.full_name, kind: 'access', message: 'Signed in to the super admin panel' });
+    redirect('/gs');
+  });
+}
+
+export async function superAdminLogout(): Promise<void> {
+  await destroySession();
+  redirect('/gs');
 }
 
 export async function logout(): Promise<void> {
@@ -89,13 +125,13 @@ export async function setupFirstAdmin(_prev: ActionResult | null, fd: FormData):
       const [{ c }] = await tx<{ c: number }[]>`select count(*)::int as c from users`;
       if (c > 0) throw new UserError('Setup is already complete. Sign in instead.');
       const [u] = await tx<{ id: string }[]>`
-        insert into users (email, full_name, job_title, role, password_hash)
-        values (${email}, ${name}, ${str(fd, 'job_title', 120)}, 'admin', ${hash}) returning id`;
+        insert into users (email, full_name, job_title, role, password_hash, is_super_admin)
+        values (${email}, ${name}, ${str(fd, 'job_title', 120)}, 'admin', ${hash}, true) returning id`;
       return u.id;
     });
     const [{ e }] = await sql<{ e: number }[]>`select count(*)::int as e from events`;
     if (e === 0) await createDefaultEvent(sql, id);
-    await logActivity(sql, { eventId: null, itemId: null, userId: id, actorName: name, kind: 'access', message: 'Created the first admin account with the setup code' });
+    await logActivity(sql, { eventId: null, itemId: null, userId: id, actorName: name, kind: 'access', message: 'Created the first admin account (a super admin) with the setup code' });
     await createSession(id);
     redirect('/settings?welcome=1');
   });
@@ -104,6 +140,7 @@ export async function setupFirstAdmin(_prev: ActionResult | null, fd: FormData):
 export async function changePassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const me = await actor('viewer', { allowPasswordChange: true });
+    if (me.is_demo) throw new UserError('The demo account’s password can’t be changed.');
     const current = String(fd.get('current') ?? '');
     const next = String(fd.get('password') ?? '');
     if (next.length < PASSWORD_MIN) throw new UserError(`Choose a password of at least ${PASSWORD_MIN} characters.`);
@@ -128,6 +165,7 @@ export async function changePassword(_prev: ActionResult | null, fd: FormData): 
 export async function updateProfile(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const me = await actor('viewer');
+    if (me.is_demo) throw new UserError('The demo account’s details can’t be changed.');
     const name = required(fd, 'full_name', 'Your name', 120);
     const sql = await db();
     await sql`update users set full_name = ${name}, job_title = ${str(fd, 'job_title', 120)} where id = ${me.id}`;

@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <AppShell
       appName={appName}
-      user={{ name: user.full_name, role: user.role }}
+      user={{ name: user.full_name, role: user.role, superAdmin: user.is_super_admin }}
       events={events.map((e) => ({ id: e.id, name: e.name, archived: e.archived }))}
       currentEvent={current ? { id: current.id, name: current.name, detail } : null}
       myCount={myCount}

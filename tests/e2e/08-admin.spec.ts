@@ -102,10 +102,10 @@ test('an expired invite is refused at sign-in and can be sent again', async ({ b
   await erin.goto('/login');
   await erin.fill('#email', 'erin@ukcw.test');
   await erin.fill('#password', 'not-it');
-  await erin.getByRole('button', { name: 'Sign in' }).click();
+  await erin.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(errorMessage(erin, 'don’t match an account')).toBeVisible(); // nothing about the invite is given away
   await erin.fill('#password', first);
-  await erin.getByRole('button', { name: 'Sign in' }).click();
+  await erin.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(errorMessage(erin, 'That temporary password has expired. Ask an admin to send you a new invite.')).toBeVisible();
 
   await page.reload();

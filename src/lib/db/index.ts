@@ -51,7 +51,7 @@ function makeClient(url: string, max: number) {
   }) as unknown as Sql;
 }
 
-type GlobalWithDb = typeof globalThis & { __edSql?: Sql; __edMigrated?: Promise<void> | null };
+type GlobalWithDb = typeof globalThis & { __edSql?: Sql; __edMigrated?: Promise<void> | null; __edDemoReady?: boolean };
 const g = globalThis as GlobalWithDb;
 
 export class DatabaseNotConfiguredError extends Error {
@@ -94,14 +94,14 @@ async function migrate(): Promise<void> {
 
 /**
  * Returns the database client, applying any pending migrations first (once per server instance).
- * Then creates the first admin, and a demo account if one is configured, from the deployment settings (see bootstrap.ts).
+ * Then creates the first admin, and the shared demo login if one is configured, from the deployment settings (see bootstrap.ts).
  */
 export async function db(): Promise<Sql> {
   const sql = getSql();
   if (!g.__edMigrated) {
     g.__edMigrated = migrate()
       .then(() => bootstrapAdmin(sql).catch((e) => console.error('Bootstrap admin failed', e)))
-      .then(() => ensureDemoAccount(sql).catch((e) => console.error('Demo account failed', e)))
+      .then(() => ensureDemoAccount(sql).then((ready) => { g.__edDemoReady = ready; }).catch((e) => console.error('Demo account failed', e)))
       .catch((e) => {
         g.__edMigrated = null;
         throw e;
@@ -113,4 +113,14 @@ export async function db(): Promise<Sql> {
 
 export function isDatabaseConfigured(): boolean {
   return resolveDatabaseUrl() !== null;
+}
+
+/**
+ * For the sign-in page: makes sure the demo login is in place. It's normally done when the server starts, but on a
+ * brand-new platform it has to wait until the first admin exists, so it's retried here until it has happened.
+ */
+export async function ensureDemoReady(): Promise<void> {
+  const sql = await db();
+  if (g.__edDemoReady) return;
+  g.__edDemoReady = await ensureDemoAccount(sql);
 }

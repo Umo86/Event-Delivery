@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, UserRound, X,
+  Gauge, Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, UserRound, X,
 } from 'lucide-react';
 import { Mark } from './brand';
 import { cx } from './ui';
 
 export interface ShellProps {
   appName: string;
-  user: { name: string; role: string };
+  user: { name: string; role: string; superAdmin: boolean };
   events: { id: string; name: string; archived: boolean }[];
   currentEvent: { id: string; name: string; detail: string } | null;
   myCount: number;
@@ -30,6 +30,7 @@ const NAV = [
   { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
   { href: '/settings', label: 'Settings', icon: Settings, key: 'settings' },
   { href: '/admin', label: 'Admin', icon: ShieldCheck, key: 'admin' },
+  { href: '/gs', label: 'Super admin', icon: Gauge, key: 'gs' },
 ] as const;
 
 export function AppShell(p: ShellProps) {
@@ -68,7 +69,7 @@ export function AppShell(p: ShellProps) {
       )}
 
       <ul className="flex-1 space-y-0.5 px-3">
-        {NAV.filter((n) => n.key !== 'admin' || p.user.role === 'admin').map((n) => {
+        {NAV.filter((n) => (n.key !== 'admin' || p.user.role === 'admin') && (n.key !== 'gs' || p.user.superAdmin)).map((n) => {
           const active = pathname === n.href || pathname.startsWith(n.href + '/');
           const count = n.key === 'inbox' ? p.myCount : n.key === 'os' || n.key === 'ss' || n.key === 'si' ? p.counts[n.key] : null;
           return (
@@ -102,7 +103,7 @@ export function AppShell(p: ShellProps) {
           <UserRound size={18} aria-hidden />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[14.5px] font-semibold">{p.user.name}</span>
-            <span className="block text-[12px] capitalize text-white/55">{p.user.role}</span>
+            <span className="block text-[12px] capitalize text-white/55">{p.user.superAdmin ? 'Super admin' : p.user.role}</span>
           </span>
         </Link>
         <form action={p.logout}>

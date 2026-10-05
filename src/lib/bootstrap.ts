@@ -2,7 +2,8 @@ import 'server-only';
 import type { Sql } from '@/lib/db';
 import { createDefaultEvent } from '@/lib/data/seed';
 import { logActivity } from '@/lib/activity';
-import { TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
+import { hashPassword, verifyPassword } from '@/lib/auth/password';
+import { demoSettings } from '@/lib/demo-settings';
 
 const SCRYPT_HASH = /^scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9+/]+={0,2}\$[A-Za-z0-9+/]+={0,2}$/;
 
@@ -30,8 +31,8 @@ export async function bootstrapAdmin(sql: Sql): Promise<void> {
     const [{ c }] = await tx<{ c: number }[]>`select count(*)::int as c from users`;
     if (c > 0) return; // another server instance got there first
     const [u] = await tx<{ id: string }[]>`
-      insert into users (email, full_name, job_title, role, password_hash, must_change_password)
-      values (${email}, ${name}, ${title}, 'admin', ${hash}, false) returning id`;
+      insert into users (email, full_name, job_title, role, password_hash, must_change_password, is_super_admin)
+      values (${email}, ${name}, ${title}, 'admin', ${hash}, false, true) returning id`;
     const t = tx as unknown as Sql;
     const [{ e }] = await t<{ e: number }[]>`select count(*)::int as e from events`;
     if (e === 0) await createDefaultEvent(t, u.id);
@@ -41,42 +42,49 @@ export async function bootstrapAdmin(sql: Sql): Promise<void> {
   console.log('Bootstrap admin created');
 }
 
-const ROLES = ['admin', 'member', 'viewer'] as const;
-
 /**
- * Creates one extra account from the deployment settings, such as a demo login for trying the platform:
- *   DEMO_ACCOUNT_EMAIL, DEMO_ACCOUNT_PASSWORD_HASH (a scrypt hash), DEMO_ACCOUNT_NAME, DEMO_ACCOUNT_ROLE (member by default).
- * It works like an invite: the password is temporary, has to be changed at first sign-in and stops working after
- * TEMP_PASSWORD_DAYS. It runs once per address (so a removed demo account doesn't come back), only once the platform
- * has its first admin, and it never changes an account that already exists.
+ * Makes sure the shared demo login exists and matches the deployment settings (see demo-settings.ts):
+ * DEMO_ACCOUNT_EMAIL, DEMO_ACCOUNT_PASSWORD, and optionally DEMO_ACCOUNT_NAME and DEMO_ACCOUNT_ROLE.
+ * - Created once, only after the first admin exists. If an admin later removes it, it isn't recreated.
+ * - Its password always matches the one shown on the sign-in page, and never has to be changed.
+ * - An admin controls the rest: deactivating it takes the login off the sign-in page.
+ * - It never takes over an account that belongs to a real person.
+ * Returns false while the platform isn't set up yet, so the caller can try again later.
  */
-export async function ensureDemoAccount(sql: Sql): Promise<void> {
-  const email = process.env.DEMO_ACCOUNT_EMAIL?.trim().toLowerCase();
-  const hash = process.env.DEMO_ACCOUNT_PASSWORD_HASH?.trim();
-  if (!email || !hash) return;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !SCRYPT_HASH.test(hash)) {
-    if (hash !== 'used') console.error('Demo account skipped: DEMO_ACCOUNT_EMAIL or DEMO_ACCOUNT_PASSWORD_HASH is not valid.');
-    return;
-  }
-  const flag = `demo_account:${email}`;
-  if ((await sql`select 1 from app_settings where key = ${flag}`).length) return;
+export async function ensureDemoAccount(sql: Sql): Promise<boolean> {
+  const d = demoSettings(process.env);
+  if (!d) return true;
   const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users`;
-  if (n === 0) return; // not before the platform has been set up
-  const wanted = process.env.DEMO_ACCOUNT_ROLE?.trim().toLowerCase();
-  const role = ROLES.find((r) => r === wanted) ?? 'member';
-  const name = process.env.DEMO_ACCOUNT_NAME?.trim().slice(0, 120) || 'Demo User';
-  const expires = new Date(Date.now() + TEMP_PASSWORD_DAYS * 86400000);
+  if (n === 0) return false;
+  const flag = `demo_account:${d.email}`;
   await sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(4242003)`;
-    if ((await tx`select 1 from app_settings where key = ${flag}`).length) return; // another server instance did it
-    const exists = (await tx`select 1 from users where lower(email) = ${email}`).length > 0;
-    if (!exists) {
-      const [u] = await tx<{ id: string }[]>`
-        insert into users (email, full_name, job_title, role, password_hash, must_change_password, temp_password_expires_at, invited_at)
-        values (${email}, ${name}, 'Demo account', ${role}, ${hash}, true, ${expires}, now()) returning id`;
-      await logActivity(tx as unknown as Sql, { eventId: null, itemId: null, userId: u.id, actorName: 'Deployment settings', kind: 'access',
-        message: `Created the demo account ${name} (${email}) as ${role[0].toUpperCase()}${role.slice(1)}` });
+    const [f] = await tx<{ value: string }[]>`select value from app_settings where key = ${flag}`;
+    const [u] = await tx<{ id: string; is_demo: boolean; password_hash: string; must_change_password: boolean }[]>`
+      select id, is_demo, password_hash, must_change_password from users where lower(email) = ${d.email}`;
+    if (!u) {
+      if (f) return; // an admin removed it: don't bring it back
+      const [created] = await tx<{ id: string }[]>`
+        insert into users (email, full_name, job_title, role, password_hash, must_change_password, is_demo, invited_at)
+        values (${d.email}, ${d.name}, 'Demo account', ${d.role}, ${await hashPassword(d.password)}, false, true, now()) returning id`;
+      await tx`insert into app_settings (key, value) values (${flag}, 'created')
+               on conflict (key) do update set value = excluded.value, updated_at = now()`;
+      await logActivity(tx as unknown as Sql, { eventId: null, itemId: null, userId: created.id, actorName: 'Deployment settings', kind: 'access',
+        message: `Created the shared demo login ${d.name} (${d.email}) as ${d.role === 'viewer' ? 'Viewer' : 'Member'}` });
+      return;
     }
-    await tx`insert into app_settings (key, value) values (${flag}, ${exists ? 'account already existed' : 'created'})`;
+    if (!u.is_demo) {
+      // Only adopt an account this mechanism made itself, never a real person's
+      if (f?.value !== 'created') {
+        console.error(`Demo account skipped: ${d.email} belongs to an existing account.`);
+        return;
+      }
+      await tx`update users set is_demo = true where id = ${u.id}`;
+    }
+    if (u.must_change_password || !(await verifyPassword(d.password, u.password_hash))) {
+      await tx`update users set password_hash = ${await hashPassword(d.password)}, must_change_password = false,
+                 temp_password_expires_at = null, failed_logins = 0, locked_until = null where id = ${u.id}`;
+    }
   });
+  return true;
 }

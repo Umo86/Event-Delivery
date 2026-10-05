@@ -29,6 +29,8 @@ interface Person {
   must_change_password: boolean;
   last_login_at: Date | null;
   temp_password_expires_at: Date | null;
+  is_demo: boolean;
+  is_super_admin: boolean;
 }
 
 async function audit(sql: Sql, me: CurrentUser, message: string, eventId: string | null = null) {
@@ -52,9 +54,17 @@ async function findPerson(sql: Sql, fd: FormData): Promise<Person> {
   const id = uuidOrNull(fd, 'user_id');
   if (!id) throw new UserError('Missing person.');
   const [p] = await sql<Person[]>`
-    select id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at from users where id = ${id}`;
+    select id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo, is_super_admin
+    from users where id = ${id}`;
   if (!p) throw new UserError('That person no longer exists. Reload the page.');
   return p;
+}
+
+/** Super admins can only be changed by other super admins (never by the demo login), so nobody can be locked out by an admin. */
+function guardSuperAdmin(me: CurrentUser, p: Person) {
+  if (!p.is_super_admin || p.id === me.id) return;
+  if (!me.is_super_admin) throw new UserError('Only a super admin can change a super admin.');
+  if (me.is_demo) throw new UserError('The demo login can’t change a super admin.');
 }
 
 async function otherActiveAdmins(sql: Sql, id: string): Promise<number> {
@@ -114,7 +124,7 @@ export async function invitePerson(_prev: ActionResult | null, fd: FormData): Pr
     const [p] = await sql<Person[]>`
       insert into users (email, full_name, job_title, role, password_hash, must_change_password, temp_password_expires_at, invited_by, invited_at)
       values (${email}, ${name}, ${title}, ${role}, ${hash}, true, ${expiresAt}, ${me.id}, now())
-      returning id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at`;
+      returning id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo, is_super_admin`;
     await audit(sql, me, `Invited ${name} (${email}) as ${accessLevel(role).label}`);
     refresh();
     return {
@@ -132,6 +142,8 @@ export async function sendNewPassword(_prev: ActionResult | null, fd: FormData):
     const sql = await db();
     const p = await findPerson(sql, fd);
     if (p.id === me.id) throw new UserError('Change your own password on the Your account page.');
+    if (p.is_demo) throw new UserError('The demo login’s password comes from the deployment settings and is shown on the sign-in page.');
+    guardSuperAdmin(me, p);
     if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
     const kind: InviteKind = p.last_login_at ? 'reset' : 'invite';
     const { password, hash, expiresAt } = await newTempPassword();
@@ -155,6 +167,8 @@ export async function cancelInvite(_prev: ActionResult | null, fd: FormData): Pr
     const me = await actor('admin');
     const sql = await db();
     const p = await findPerson(sql, fd);
+    if (p.is_demo) throw new UserError('Deactivate the demo login instead. That also takes it off the sign-in page.');
+    guardSuperAdmin(me, p);
     if (p.last_login_at) throw new UserError(`${p.full_name} has already signed in, so deactivate their account instead.`);
     const held = await responsibilitiesOf(sql, p.id);
     const gone = await sql`delete from users where id = ${p.id} and last_login_at is null returning id`;
@@ -177,6 +191,9 @@ export async function changeAccess(_prev: ActionResult | null, fd: FormData): Pr
     const p = await findPerson(sql, fd);
     const role = readRole(fd);
     if (p.id === me.id) throw new UserError('You can’t change your own access level. Ask another admin.');
+    if (p.is_demo && role === 'admin') throw new UserError('The demo login can’t be an admin, because anyone can use it.');
+    guardSuperAdmin(me, p);
+    if (p.is_super_admin && role !== 'admin') throw new UserError(`${p.full_name} is a super admin. Remove that on the super admin page first.`);
     if (p.role === role) return { ok: true, message: `${p.full_name} is already ${role === 'admin' ? 'an' : 'a'} ${accessLevel(role).label}.` };
     if (p.role === 'admin' && p.active && (await otherActiveAdmins(sql, p.id)) === 0) {
       throw new UserError('There must always be at least one active admin.');
@@ -201,6 +218,8 @@ export async function updatePersonDetails(_prev: ActionResult | null, fd: FormDa
     const name = required(fd, 'full_name', 'Name', 120);
     const email = readEmail(fd);
     const title = str(fd, 'job_title', 120);
+    if (p.is_demo && email !== p.email.toLowerCase()) throw new UserError('The demo login’s email comes from the deployment settings.');
+    guardSuperAdmin(me, p);
     if ((await sql`select 1 from users where lower(email) = ${email} and id <> ${p.id}`).length) {
       throw new UserError(`${email} is used by another account.`);
     }
@@ -220,14 +239,23 @@ export async function setPersonActive(_prev: ActionResult | null, fd: FormData):
     const p = await findPerson(sql, fd);
     const active = bool(fd, 'active');
     if (p.active === active) return { ok: true };
+    guardSuperAdmin(me, p);
     if (!active) {
       if (p.id === me.id) throw new UserError('You can’t deactivate your own account. Ask another admin.');
       if (p.role === 'admin' && (await otherActiveAdmins(sql, p.id)) === 0) throw new UserError('There must always be at least one active admin.');
+      if (p.is_super_admin) {
+        const [{ n }] = await sql<{ n: number }[]>`
+          select count(*)::int as n from users where is_super_admin and active and not is_demo and id <> ${p.id}`;
+        if (n === 0) throw new UserError('There must always be at least one active super admin.');
+      }
     }
     await sql`update users set active = ${active} where id = ${p.id}`;
     if (!active) await sql`delete from sessions where user_id = ${p.id}`;
     await audit(sql, me, `${active ? 'Reactivated' : 'Deactivated'} ${p.full_name}`);
     refresh();
+    if (p.is_demo) {
+      return { ok: true, message: active ? 'The demo login is back on the sign-in page.' : 'The demo login is off the sign-in page and no longer works.' };
+    }
     if (!active) {
       const held = await responsibilitiesOf(sql, p.id);
       return {

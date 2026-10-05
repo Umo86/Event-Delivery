@@ -10,6 +10,16 @@ export default async function AccountPage(props: { searchParams: Promise<{ first
   const user = await requireUser({ allowPasswordChange: true });
   const sp = await props.searchParams;
   const forced = user.must_change_password;
+  if (user.is_demo) {
+    return (
+      <>
+        <PageHeader title="Your account" subtitle={user.email} />
+        <Notice tone="info">
+          You’re using the shared demo account, so its password and details can’t be changed. Anyone with the demo login can see what you do here.
+        </Notice>
+      </>
+    );
+  }
   return (
     <>
       <PageHeader title="Your account" subtitle={user.email} />

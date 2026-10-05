@@ -23,7 +23,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     event ? loadBundle(event.id) : Promise.resolve(null),
     sql<AdminPerson[]>`
       select u.id, u.email, u.full_name, u.job_title, u.role, u.active, u.must_change_password, u.last_login_at, u.created_at,
-             u.invited_at, inv.full_name as invited_by_name, u.temp_password_expires_at, u.locked_until
+             u.invited_at, inv.full_name as invited_by_name, u.temp_password_expires_at, u.locked_until, u.is_demo, u.is_super_admin
       from users u left join users inv on inv.id = u.invited_by
       order by lower(u.full_name)`,
     sql<{ id: string; actor_name: string; message: string; created_at: Date }[]>`
@@ -49,6 +49,9 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
   const attention: { text: string; href: string; action: string }[] = [];
   const personLink = (id: string) => `/admin?person=${id}#person-${id}`;
   for (const p of people) {
+    if (p.is_demo && p.active) {
+      attention.push({ text: `The demo login is on the sign-in page, so anyone with the link can sign in as ${p.full_name}.`, href: personLink(p.id), action: 'Open' });
+    }
     const st = personStatus(p);
     if (st === 'invite_expired') attention.push({ text: `${p.full_name}’s invite has expired.`, href: personLink(p.id), action: 'New invite' });
     if (p.active && p.locked_until && new Date(p.locked_until) > new Date()) {
@@ -129,7 +132,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
             </span>}>
             <ul>
               {people.map((p) => (
-                <PersonRow key={p.id} u={p} me={me.id} event={event ? { id: event.id, name: event.name } : null}
+                <PersonRow key={p.id} u={p} me={me.id} meSuper={me.is_super_admin} meDemo={me.is_demo} event={event ? { id: event.id, name: event.name } : null}
                   stages={stages} sponsors={sponsors} names={names} open={sp.person === p.id} />
               ))}
             </ul>

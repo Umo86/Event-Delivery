@@ -5,6 +5,8 @@ import { db, type Sql } from '@/lib/db';
 /** Platform-wide switches, stored in app_settings. */
 export const SETTING = {
   sponsorLinks: 'sponsor_links',
+  /** While 'on', only super admins can sign in or use the platform. */
+  maintenance: 'maintenance',
 } as const;
 
 export async function readSetting(sql: Sql, key: string): Promise<string | null> {
@@ -24,4 +26,9 @@ export async function writeSetting(sql: Sql, key: string, value: string): Promis
 export const sponsorLinksEnabled = cache(async (): Promise<boolean> => {
   const sql = await db();
   return (await readSetting(sql, SETTING.sponsorLinks)) !== 'off';
+});
+
+export const maintenanceOn = cache(async (): Promise<boolean> => {
+  const sql = await db();
+  return (await readSetting(sql, SETTING.maintenance)) === 'on';
 });

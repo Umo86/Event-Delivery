@@ -296,6 +296,20 @@ update users set temp_password_expires_at = now() + interval '7 days' where must
 create index activity_kind_idx on activity (kind, created_at desc);
 `,
   },
+  {
+    version: 5,
+    name: 'super admins and the shared demo login',
+    sql: /* sql */ `
+-- Super admins are admins who can also open the super admin panel (/gs) and manage other super admins.
+-- The first admin, who set the platform up, becomes the first super admin.
+alter table users add column is_super_admin boolean not null default false;
+update users set is_super_admin = true
+  where id = (select id from users where role = 'admin' and active order by created_at limit 1);
+alter table users add constraint users_super_admin_is_admin check (not is_super_admin or role = 'admin');
+-- The shared demo account, whose login is shown on the sign-in page. Its password can't be changed and it is never an admin.
+alter table users add column is_demo boolean not null default false;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -14,7 +14,7 @@ test('signed-out visitors are sent to sign in, then back to the page they wanted
   await expect(page).toHaveURL(new RegExp(`/login\\?next=%2Fitems%2F${itemId('os1')}$`));
   await page.fill('#email', user('olivia').email);
   await page.fill('#password', user('olivia').password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/items/${itemId('os1')}$`));
 
   expect((await request.get('/api/export/os')).status()).toBe(401);
@@ -132,7 +132,7 @@ test('deactivated people are signed out and cannot sign back in', async ({ brows
   await expect(vic).toHaveURL(/\/login/);
   await vic.fill('#email', user('vic').email);
   await vic.fill('#password', user('vic').password);
-  await vic.getByRole('button', { name: 'Sign in' }).click();
+  await vic.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(errorMessage(vic, 'don’t match an account')).toBeVisible();
 
   await row.getByRole('button', { name: 'Reactivate' }).click();
@@ -151,7 +151,7 @@ test('too many wrong passwords lock the account until it is reset', async ({ pag
     await page.fill('#password', password);
     await Promise.all([
       page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/login'),
-      page.getByRole('button', { name: 'Sign in' }).click(),
+      page.getByRole('button', { name: 'Sign in', exact: true }).click(),
     ]);
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
   };

@@ -14,6 +14,8 @@ Built with Next.js, a Neon Postgres database and Vercel Blob for artwork files. 
 - **Invite-only access**: nobody can sign up. Admins invite people from the **Admin** page, which creates the account and writes the invite email for the admin to send from their own email (one click opens it in Outlook or any email app). It holds a temporary password that works for 7 days; people choose their own at first sign-in. The platform itself never sends email.
 - **Access levels**: admins (everything), members (work on lines, sign off their own stages and sponsors) and viewers (read and comment). The Admin page also sets who approves each stage and manages each sponsor, makes new invites, resets passwords, deactivates people and keeps an access log.
 - **Sponsor link switch**: sponsor approval links are the only way in without an account, and an admin can turn them all off in one click.
+- **Optional demo login**: a shared demo account whose details are shown on the sign-in page (set up in the deployment settings, removed by deactivating it on the Admin page).
+- **Super admin panel** at `/gs`, with its own sign-in: platform overview, who is signed in (sign anyone out, or everyone), maintenance mode (only super admins can use the platform while it's on), the sponsor link and demo login switches, and a full audit trail. The first admin is the first super admin; only super admins can make or remove super admins, and admins can't change a super admin's access, sign-in or details.
 
 ## Deploy on Vercel
 
@@ -43,7 +45,7 @@ The database tables are created automatically the first time the app connects. `
 | `BLOB_ACCESS` | `public` if your Blob store was created with public access |
 | `APP_URL` | The address used in invite emails and sponsor links, if not the project's production domain |
 | `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_TITLE`, `BOOTSTRAP_ADMIN_PASSWORD_HASH` | Create the first admin without the setup page (see step 5) |
-| `DEMO_ACCOUNT_EMAIL`, `DEMO_ACCOUNT_NAME`, `DEMO_ACCOUNT_ROLE`, `DEMO_ACCOUNT_PASSWORD_HASH` | Create one demo login (a member unless the role says otherwise). It works like an invite: the password is temporary and must be changed at first sign-in. Created once per address and never recreated after it's removed |
+| `DEMO_ACCOUNT_EMAIL`, `DEMO_ACCOUNT_PASSWORD`, `DEMO_ACCOUNT_NAME`, `DEMO_ACCOUNT_ROLE` | A shared demo login, shown on the sign-in page so anyone with the link can try the platform. It's a member (or a viewer if the role says so) and never an admin; its password can't be changed. Deactivate it on the Admin page to take it off the sign-in page |
 
 Neon and Blob set `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` for you when you create them from the project's Storage tab.
 
@@ -76,7 +78,8 @@ Open http://localhost:3000/setup. The setup code also works locally, or set `SET
 ```bash
 npm run typecheck
 npm test               # unit tests for the sign-off engine and permissions
-npm run test:e2e       # end-to-end: builds the app, resets the local stack and runs every page and process in Chromium
+npm run test:e2e       # end-to-end: builds the app, resets the local stack and runs every page and process in Chromium,
+                       # then restarts with a demo login configured and runs the demo tests
 ```
 
 The end-to-end suite covers setup, sign-in and lockout, invitations (the ready-made email, cancelled and expired invites), access levels and sign-off responsibilities, the access log, the sponsor link switch, stages, event settings, suppliers, lists, sponsors, adding and editing lines, artwork uploads (PNG and PDF), every sign-off decision, admin decisions on behalf of others, sponsor approval links, production, cancelling and deleting, exports, the dashboard, proof sheets, permissions, events and phone layouts.

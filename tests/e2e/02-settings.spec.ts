@@ -91,7 +91,7 @@ test('an invite can be cancelled before it is used, and its password is never sh
   await page.goto('/login');
   await page.fill('#email', 'temp.person@ukcw.test');
   await page.fill('#password', temp);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(errorMessage(page, 'don’t match an account')).toBeVisible();
 });
 
@@ -149,7 +149,7 @@ test('admin can reset a forgotten password and send the new one', async ({ page,
   await vic.goto('/login');
   await vic.fill('#email', 'vic@ukcw.test');
   await vic.fill('#password', user('vic').password);
-  await vic.getByRole('button', { name: 'Sign in' }).click();
+  await vic.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(errorMessage(vic, 'don’t match an account')).toBeVisible(); // old password no longer works
   await login(vic, 'vic@ukcw.test', temp);
   await expect(vic).toHaveURL(/\/account\?first=1/);

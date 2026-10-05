@@ -16,6 +16,10 @@ export interface CurrentUser {
   job_title: string | null;
   role: Role;
   must_change_password: boolean;
+  /** The shared demo login: its password and details can't be changed. */
+  is_demo: boolean;
+  /** Can open the super admin panel (/gs) and manage other super admins. Always an admin too. */
+  is_super_admin: boolean;
 }
 
 function cookieSecure() {
@@ -42,18 +46,26 @@ export async function destroySession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-/** The signed-in user for this request, or null. Cached per request. */
+/**
+ * The signed-in user for this request, or null. Cached per request.
+ * While maintenance mode is on, only super admins count as signed in.
+ */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const sql = await db();
-  const rows = await sql<CurrentUser[]>`
-    select u.id, u.email, u.full_name, u.job_title, u.role, u.must_change_password
+  const rows = await sql<(CurrentUser & { maintenance: string | null })[]>`
+    select u.id, u.email, u.full_name, u.job_title, u.role, u.must_change_password, u.is_demo, u.is_super_admin,
+           (select value from app_settings where key = 'maintenance') as maintenance
     from sessions s join users u on u.id = s.user_id
     where s.token_hash = ${sha256(token)} and s.expires_at > now() and u.active
     limit 1`;
-  return rows[0] ?? null;
+  const r = rows[0];
+  if (!r) return null;
+  const { maintenance, ...user } = r;
+  if (maintenance === 'on' && !user.is_super_admin) return null;
+  return user;
 });
 
 /** For pages: returns the user or sends them to the login page. */
@@ -67,6 +79,13 @@ export async function requireUser(opts: { allowPasswordChange?: boolean } = {}):
 export async function requireAdminPage(): Promise<CurrentUser> {
   const user = await requireUser();
   if (user.role !== 'admin') redirect('/dashboard?denied=1');
+  return user;
+}
+
+/** For server actions on the super admin panel. */
+export async function superActor(): Promise<CurrentUser> {
+  const user = await actor('admin');
+  if (!user.is_super_admin) throw new AuthError('Only super admins can do that.');
   return user;
 }
 

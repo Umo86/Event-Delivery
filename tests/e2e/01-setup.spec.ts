@@ -89,13 +89,13 @@ test('sign out, failed sign in and sign in', async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   await page.fill('#email', ADMIN.email);
   await page.fill('#password', 'wrong-password');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(errorMessage(page, 'don’t match an account')).toBeVisible();
 
   // Email is not case sensitive, and the person returns to the page they asked for
   await page.fill('#email', ADMIN.email.toUpperCase());
   await page.fill('#password', ADMIN.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 });
@@ -105,6 +105,6 @@ test('sign-in ignores links to other websites', async ({ page }) => {
   await page.goto('/login?next=' + encodeURIComponent('//evil.example.com/x'));
   await page.fill('#email', ADMIN.email);
   await page.fill('#password', ADMIN.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/127\.0\.0\.1:3100\/inbox$/);
 });

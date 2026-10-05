@@ -24,6 +24,8 @@ export interface AdminPerson {
   invited_by_name: string | null;
   temp_password_expires_at: Date | null;
   locked_until: Date | null;
+  is_demo: boolean;
+  is_super_admin: boolean;
 }
 
 const ROLE_TONE = { admin: 'blue', member: 'teal', viewer: 'grey' } as const;
@@ -31,9 +33,12 @@ const ROLE_TONE = { admin: 'blue', member: 'teal', viewer: 'grey' } as const;
 const h3 = 'mb-2 text-[15px] font-semibold text-ink';
 const help = 'text-[13px] text-muted';
 
-export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
+export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, names, open }: {
   u: AdminPerson;
   me: string;
+  /** Whether the admin looking at the page is a super admin, and whether they're using the demo login. */
+  meSuper: boolean;
+  meDemo: boolean;
   event: { id: string; name: string } | null;
   /** Stages of the current event that have a named approver (not the sponsor stage). */
   stages: StageRow[];
@@ -42,6 +47,8 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
   open?: boolean;
 }) {
   const isMe = u.id === me;
+  // Super admins can only be changed by other super admins, and never by the demo login
+  const protectedSuper = u.is_super_admin && !isMe && (!meSuper || meDemo);
   const status = personStatus(u);
   const info = STATUS_INFO[status];
   const locked = !!u.locked_until && new Date(u.locked_until) > new Date();
@@ -62,6 +69,8 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
           <ChevronRight size={16} aria-hidden className="shrink-0 text-muted transition-transform group-open:rotate-90" />
           <span className="text-[16px] font-semibold text-ink">{u.full_name}{isMe ? ' (you)' : ''}</span>
           <Chip tone={ROLE_TONE[u.role]}>{accessLevel(u.role).label}</Chip>
+          {u.is_super_admin && <Chip tone="violet">Super admin</Chip>}
+          {u.is_demo && <Chip tone="yellow">Demo login</Chip>}
           {status !== 'active' && <Chip tone={info.tone}>{info.label}</Chip>}
           {locked && <Chip tone="red">Locked out</Chip>}
           <span className="min-w-0 break-all text-[14px] text-muted">{u.email}{u.job_title ? `, ${u.job_title}` : ''}</span>
@@ -73,7 +82,14 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
           <section aria-label={`Sign-in for ${u.full_name}`} className="min-w-0">
             <h3 className={h3}>Sign-in</h3>
             <div className="space-y-1 text-[14px] text-ink-2">
-              {u.invited_at && (
+              {u.is_demo && (
+                <p className="font-semibold text-ink">
+                  {u.active
+                    ? 'The shared demo login. Its email and password are shown on the sign-in page, so anyone with the link can sign in with it. Deactivate it to take it off.'
+                    : 'The shared demo login. It’s deactivated, so it isn’t on the sign-in page and doesn’t work.'}
+                </p>
+              )}
+              {u.invited_at && !u.is_demo && (
                 <p>Invited by {u.invited_by_name ?? 'an admin'} on {fmtDateTime(u.invited_at)}.</p>
               )}
               {u.must_change_password && u.temp_password_expires_at && (
@@ -84,11 +100,12 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
               {locked && <p className="font-semibold text-red-700">Locked out after too many wrong passwords. A new password unlocks the account.</p>}
               {!u.active && <p>Deactivated: {first} can’t sign in.</p>}
               {isMe && <p>This is you. Change your own password on <Link href="/account" className="font-semibold text-ink underline">Your account</Link>.</p>}
+              {protectedSuper && <p>{first} is a super admin, so only another super admin can change their sign-in, access or details.</p>}
             </div>
 
-            {!isMe && (
+            {!isMe && !protectedSuper && (
               <div className="mt-3 space-y-3">
-                {u.active && (
+                {u.active && !u.is_demo && (
                   <DetailsForm action={sendNewPassword}
                     confirm={neverSignedIn ? undefined : `Reset ${u.full_name}’s password? They’ll be signed out, and you’ll get a temporary password to send them.`}>
                     <input type="hidden" name="user_id" value={u.id} />
@@ -101,18 +118,24 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
                   </DetailsForm>
                 )}
                 {/* One form for both directions, so its message stays on screen when the button flips */}
-                {(!neverSignedIn || !u.active) && (
+                {(u.is_demo || !neverSignedIn || !u.active) && (
                   <ActionForm action={setPersonActive}
-                    confirm={u.active ? `Deactivate ${u.full_name}? They’ll be signed out straight away and can’t sign back in.` : undefined}>
+                    confirm={u.active
+                      ? u.is_demo
+                        ? 'Deactivate the demo login? It comes off the sign-in page and anyone using it is signed out.'
+                        : `Deactivate ${u.full_name}? They’ll be signed out straight away and can’t sign back in.`
+                      : undefined}>
                     <input type="hidden" name="user_id" value={u.id} />
                     <input type="hidden" name="active" value={u.active ? '0' : '1'} />
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <SubmitButton variant={u.active ? 'danger' : 'secondary'} small pendingText="Saving…">{u.active ? 'Deactivate' : 'Reactivate'}</SubmitButton>
-                      <span className={help}>{u.active ? 'Their name stays on everything they did.' : 'Lets them sign in again with their current password.'}</span>
+                      <span className={help}>{u.is_demo
+                        ? (u.active ? 'Takes the demo login off the sign-in page.' : 'Puts the demo login back on the sign-in page.')
+                        : (u.active ? 'Their name stays on everything they did.' : 'Lets them sign in again with their current password.')}</span>
                     </div>
                   </ActionForm>
                 )}
-                {canCancelInvite(u) && (
+                {canCancelInvite(u) && !u.is_demo && (
                   <ActionForm action={cancelInvite} confirm={`Cancel the invite for ${u.full_name}? Their account will be removed.`}>
                     <input type="hidden" name="user_id" value={u.id} />
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -128,15 +151,19 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
           {/* Access level */}
           <section aria-label={`Access level for ${u.full_name}`} className="min-w-0">
             <h3 className={h3}>Access level</h3>
-            {isMe ? (
-              <p className={help}>You’re an admin. Another admin would need to change your access level.</p>
+            {isMe || protectedSuper || u.is_super_admin ? (
+              <p className={help}>
+                {isMe ? 'You’re an admin. Another admin would need to change your access level.'
+                  : protectedSuper ? 'Only another super admin can change a super admin’s access.'
+                    : `${first} is a super admin. To make them anything other than an admin, remove that on the super admin page first.`}
+              </p>
             ) : (
               <ActionForm action={changeAccess} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="user_id" value={u.id} />
                 <div className="min-w-[200px] flex-1">
                   <label htmlFor={`ar-${u.id}`} className="sr-only">Access level</label>
                   <select key={u.role} id={`ar-${u.id}`} name="role" defaultValue={u.role} className={inputCls}>
-                    {ACCESS_LEVELS.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+                    {ACCESS_LEVELS.filter((a) => !u.is_demo || a.key !== 'admin').map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
                   </select>
                 </div>
                 <SubmitButton variant="dark" small>Save access</SubmitButton>
@@ -198,15 +225,18 @@ export function PersonRow({ u, me, event, stages, sponsors, names, open }: {
           {/* Details */}
           <section aria-label={`Details for ${u.full_name}`} className="min-w-0">
             <h3 className={h3}>Details</h3>
+            {protectedSuper ? <p className={help}>Only another super admin can change these.</p> : (
             <ActionForm action={updatePersonDetails} className="grid items-end gap-3 sm:grid-cols-2">
               <input type="hidden" name="user_id" value={u.id} />
               <Field label="Name" htmlFor={`pn-${u.id}`}><input id={`pn-${u.id}`} name="full_name" required defaultValue={u.full_name} className={inputCls} /></Field>
               <Field label="Job title" htmlFor={`pt-${u.id}`}><input id={`pt-${u.id}`} name="job_title" defaultValue={u.job_title ?? ''} className={inputCls} /></Field>
-              <Field label="Email (used to sign in)" htmlFor={`pe-${u.id}`} className="sm:col-span-2">
-                <input id={`pe-${u.id}`} name="email" type="email" required defaultValue={u.email} className={inputCls} />
+              <Field label="Email (used to sign in)" htmlFor={`pe-${u.id}`} className="sm:col-span-2"
+                help={u.is_demo ? 'Set in the deployment settings.' : undefined}>
+                <input id={`pe-${u.id}`} name="email" type="email" required defaultValue={u.email} readOnly={u.is_demo} className={inputCls} />
               </Field>
               <div><SubmitButton variant="secondary" small>Save details</SubmitButton></div>
             </ActionForm>
+            )}
           </section>
         </div>
       </details>
