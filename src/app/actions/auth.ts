@@ -8,7 +8,7 @@ import { run, required, str, UserError, type ActionResult } from '@/lib/action';
 import { hashPassword, sha256, verifyPassword, PASSWORD_MIN } from '@/lib/auth/password';
 import { actor, createSession, destroySession, getCurrentUser, SESSION_COOKIE } from '@/lib/auth/session';
 import { checkSetupCode } from '@/lib/setup';
-import { EVENT_COOKIE } from '@/lib/data/load';
+import { EVENT_COOKIE, getAppName } from '@/lib/data/load';
 import { createDefaultEvent } from '@/lib/data/seed';
 import { logActivity } from '@/lib/activity';
 import { maintenanceOn } from '@/lib/settings';
@@ -72,7 +72,7 @@ async function authenticate(fd: FormData, opts: { superOnly?: boolean } = {}) {
     throw new UserError('That account isn’t a super admin. Use the normal sign-in page instead.');
   }
   if (!u.is_super_admin && (await maintenanceOn())) {
-    throw new UserError('Event Delivery is closed for maintenance, so only super admins can sign in right now. Try again later.');
+    throw new UserError(`${await getAppName()} is closed for maintenance, so only super admins can sign in right now. Try again later.`);
   }
   await sql`update users set failed_logins = 0, locked_until = null, last_login_at = now() where id = ${u.id}`;
   return u;

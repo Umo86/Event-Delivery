@@ -32,7 +32,7 @@ export default async function SchedulePage(props: {
   if (!sched) return <NoEvent />;
   const filters = readFilters(await props.searchParams);
   const all = category ? sched.rows.filter((r) => r.item.category === category.key) : sched.rows;
-  const rows = applyFilters(all, filters, user.id);
+  const rows = applyFilters(all, filters, user.id, event.turnaround_days);
   const active = all.filter((r) => r.state.group !== 'cancelled');
 
   const people = sched.bundle.users.filter((u) => u.active).map((u) => ({ value: u.id, label: u.full_name }));
@@ -98,7 +98,13 @@ export default async function SchedulePage(props: {
 
       <FilterBar
         key={cat}
-        statuses={[{ value: 'attention', label: 'Needs attention' }, ...GROUPS.map((g) => ({ value: g.key, label: g.label }))]}
+        statuses={[
+          { value: 'attention', label: 'Needs attention' },
+          { value: 'slow', label: `Slow sign-off (over ${event.turnaround_days} days)` },
+          { value: 'production', label: 'Approved or in production' },
+          { value: 'approved_plus', label: 'Approved or later' },
+          ...GROUPS.map((g) => ({ value: g.key, label: g.label })),
+        ]}
         people={people}
         sponsors={sched.bundle.sponsors.map((s) => ({ value: s.id, label: s.name }))}
         halls={halls}

@@ -41,6 +41,12 @@ export function fmtDateTime(ts: Date | string | null | undefined): string {
   return parts;
 }
 
+/** How late a deadline is, e.g. "3 days overdue" (for dates before today). */
+export function overdueBy(date: string, today: string): string {
+  const n = daysBetween(date, today);
+  return `${n} day${n === 1 ? '' : 's'} overdue`;
+}
+
 /** Relative wording for a deadline compared with today. */
 export function relativeDue(date: string | null, today: string): string {
   if (!date) return '';

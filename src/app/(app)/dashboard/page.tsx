@@ -6,11 +6,11 @@ import { getCurrentEvent, loadSchedule, type ScheduleRow } from '@/lib/data/load
 import { loadAttention, type AttentionItem } from '@/lib/data/attention';
 import { loadShowSummaries, WHEN_TONE, type ShowSummary } from '@/lib/data/shows';
 import { db } from '@/lib/db';
-import { addDays, daysBetween, fmtDateTime, relativeDue } from '@/lib/dates';
+import { addDays, daysBetween, fmtDateTime, overdueBy, relativeDue } from '@/lib/dates';
 import { urgencyCompare } from '@/lib/domain/engine';
-import { CATEGORIES, itemCode } from '@/lib/domain/labels';
+import { ACTION_KIND, actionKind, CATEGORIES, itemCode } from '@/lib/domain/labels';
 import type { Category, EventRow, StageRow } from '@/lib/domain/types';
-import { btn, cx, inputCls, money, Notice, PageHeader, Panel } from '@/components/ui';
+import { btn, Chip, cx, inputCls, money, Notice, PageHeader, Panel } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 import { switchEvent } from '@/app/actions/auth';
 
@@ -29,7 +29,7 @@ const PHASES = [
   { key: 1, label: 'Awaiting artwork', color: '#7c6fd6', status: 'awaiting_artwork' },
   { key: 2, label: 'In sign-off', color: '#e3a008', status: 'in_signoff' },
   { key: 3, label: 'Needs attention', color: '#dc2626', status: 'attention' },
-  { key: 4, label: 'Approved or in production', color: '#0284c7', status: '' },
+  { key: 4, label: 'Approved or in production', color: '#0284c7', status: 'production' },
   { key: 5, label: 'Installed', color: '#15803d', status: 'installed' },
 ] as const;
 
@@ -155,7 +155,7 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
         <Activity recent={recent} />
       </div>
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
-        <Cost {...show} />
+        <Cost {...show} readOnly />
         <Sponsors {...show} />
       </div>
     </>
@@ -167,11 +167,6 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
 type ShowData = {
   event: EventRow; active: ScheduleRow[]; today: string; names: Map<string, string>; userId: string;
   bundle: { stages: StageRow[]; sponsors: { id: string; name: string }[] };
-};
-
-const overdueBy = (due: string, today: string) => {
-  const n = daysBetween(due, today);
-  return `${n} day${n === 1 ? '' : 's'} overdue`;
 };
 
 const lineCost = (r: ScheduleRow) => (r.item.unit_cost ?? 0) * (r.item.qty && r.item.qty > 0 ? r.item.qty : 1);
@@ -246,7 +241,10 @@ function YourActions({ rows, openTasks, today }: { rows: ScheduleRow[]; openTask
                   <span className="plate shrink-0 text-[12.5px] text-muted">{r.code}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14.5px] font-semibold text-ink">{r.item.description}</span>
-                    <span className="block text-[13px] text-ink-2">{r.state.action}</span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-ink-2">
+                      <Chip tone={ACTION_KIND[actionKind(r.state.group)].tone} className="!px-1.5 !py-0 !text-[11.5px]">{ACTION_KIND[actionKind(r.state.group)].label}</Chip>
+                      {r.state.action}
+                    </span>
                   </span>
                   {r.state.due && <span className={cx('shrink-0 text-[13px]', late ? 'font-semibold text-red-700' : 'text-muted')}>{late ? overdueBy(r.state.due, today) : `Due ${relativeDue(r.state.due, today)}`}</span>}
                 </Link>
@@ -313,7 +311,7 @@ function Tiles({ event, active, today }: ShowData) {
     <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {tile('Overdue or not signed off', overdue.length, '/schedule/all?flag=urgent&sort=due', { danger: true, sub: 'Past their next deadline' })}
       {tile('Due in the next 7 days', dueWeek.length, '/schedule/all?sort=due', { sub: 'Across all three lists' })}
-      {tile('Slow sign-offs', slow.length, '/inbox?view=team', { sub: `Waiting more than ${event.turnaround_days} days` })}
+      {tile('Slow sign-offs', slow.length, '/schedule/all?status=slow&sort=waiting', { sub: `Waiting more than ${event.turnaround_days} days` })}
       {tile('Approved or later', active.length ? `${Math.round((approved.length / active.length) * 100)}%` : '0%', '/schedule/all?status=approved_plus', { sub: `${approved.length} of ${active.length} lines` })}
     </div>
   );
@@ -458,7 +456,7 @@ function Workload({ active, names, userId }: ShowData) {
   );
 }
 
-function Cost({ event, active }: ShowData) {
+function Cost({ event, active, readOnly = false }: ShowData & { readOnly?: boolean }) {
   const committed = active.reduce((s, r) => s + lineCost(r), 0);
   return (
     <Panel title="Cost">
@@ -470,7 +468,7 @@ function Cost({ event, active }: ShowData) {
         <div className="mt-2 h-3 w-full rounded-full bg-paper" role="img" aria-label={`${Math.round((committed / event.budget) * 100)}% of budget committed`}>
           <div className={cx('h-3 rounded-full', committed > event.budget ? 'bg-red-600' : 'bg-ink')} style={{ width: `${Math.min(100, (committed / event.budget) * 100)}%` }} />
         </div>
-      ) : <p className="mt-1 text-[13.5px] text-muted">Add a budget in Show setup to track spend against it.</p>}
+      ) : <p className="mt-1 text-[13.5px] text-muted">{readOnly ? 'No budget is set for this show yet.' : 'Add a budget in Show setup to track spend against it.'}</p>}
       <table className="mt-4 w-full text-[14px]">
         <tbody>
           {CATEGORIES.map((c) => (

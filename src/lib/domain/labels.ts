@@ -57,6 +57,21 @@ export const GROUPS: { key: Group; label: string; tone: Tone }[] = [
 ];
 export const groupInfo = (k: Group) => GROUPS.find((g) => g.key === k)!;
 
+/** What kind of job a line is waiting on: new artwork, a sign-off decision, or ordering and delivery. */
+export type ActionKind = 'artwork' | 'signoff' | 'production';
+
+export function actionKind(group: Group): ActionKind {
+  if (group === 'awaiting_artwork' || group === 'changes_requested' || group === 'rejected') return 'artwork';
+  if (group === 'in_signoff' || group === 'on_hold') return 'signoff';
+  return 'production';
+}
+
+export const ACTION_KIND: Record<ActionKind, { label: string; tone: Tone }> = {
+  artwork: { label: 'Artwork', tone: 'violet' },
+  signoff: { label: 'Sign-off', tone: 'amber' },
+  production: { label: 'Production', tone: 'blue' },
+};
+
 export const FLAGS: { key: Flag; label: string; tone: Tone }[] = [
   { key: 'not_signed_off', label: 'Not signed off', tone: 'darkred' },
   { key: 'overdue', label: 'Overdue', tone: 'red' },

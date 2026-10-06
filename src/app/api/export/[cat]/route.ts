@@ -23,7 +23,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ cat: string
   if (!sched) return new Response('No event', { status: 404 });
   const url = new URL(request.url);
   const filters = readFilters(Object.fromEntries(url.searchParams));
-  const rows = applyFilters(category ? sched.rows.filter((r) => r.item.category === category.key) : sched.rows, filters, me.id);
+  const rows = applyFilters(category ? sched.rows.filter((r) => r.item.category === category.key) : sched.rows, filters, me.id, event.turnaround_days);
   const names = sched.bundle.ctx.userNames;
   const suppliers = new Map(sched.bundle.suppliers.map((s) => [s.id, s.name]));
   const stages = sched.bundle.stages;

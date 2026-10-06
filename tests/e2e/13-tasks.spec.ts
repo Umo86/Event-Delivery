@@ -16,7 +16,7 @@ test('the personal board: add a task, sub-tasks, a document, a deadline, and mov
   const todo = page.getByRole('region', { name: 'To do' });
   const card = todo.getByRole('article', { name: 'Order floor vinyl' });
   await expect(card).toBeVisible();
-  await expect(card).toContainText('Overdue'); // past deadline is flagged
+  await expect(card).toContainText(/\d+ days overdue/); // past deadline is flagged
 
   // Expand and add a sub-task
   await card.getByRole('button', { name: 'Expand' }).click();

@@ -164,6 +164,11 @@ test('a super admin can see who is signed in and sign them out', async ({ browse
   await expect(trail).toContainText('Changed Fiona Final from Manager to Super Admin');
   await page.getByRole('link', { name: 'Lines', exact: true }).click();
   await expect(trail.getByRole('link', { name: /^(OS|SS|SI)-\d{3}$/ }).first()).toBeVisible(); // line entries link to the line
+  await expect(trail).toContainText('Deleted SS-002'); // deleted lines keep their history here
+  await page.getByRole('link', { name: 'Setup', exact: true }).click();
+  await expect(trail).toContainText('Renamed the platform to UKCW Signage');
+  await expect(trail).toContainText('Added sponsor BuildCo');
+  await expect(trail).not.toContainText('Signed everyone else out');
 
   await page.goto('/admin/platform');
   await page.screenshot({ path: test.info().outputPath('platform.png'), fullPage: true });

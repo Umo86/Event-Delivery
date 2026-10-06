@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Calendar, Check, ChevronDown, ExternalLink, FileText, Plus, Trash2, X } from 'lucide-react';
 import type { TaskStatus } from '@/lib/domain/types';
-import { relativeDue } from '@/lib/dates';
+import { overdueBy, relativeDue } from '@/lib/dates';
+import { ACTION_KIND, type ActionKind } from '@/lib/domain/labels';
 import {
   addSubtask, createTask, deleteSubtask, deleteTask, moveTask, removeDocument, toggleSubtask, updateTask,
 } from '@/app/actions/tasks';
 import { ActionForm, SubmitButton } from '../forms';
 import { TaskUploader } from './task-uploader';
-import { btn, cx } from '../ui';
+import { btn, Chip, cx } from '../ui';
 
-export type ActionCard = { itemId: string; code: string; title: string; action: string; due: string | null; overdue: boolean };
+export type ActionCard = {
+  itemId: string; code: string; title: string; action: string; kind: ActionKind; due: string | null; overdue: boolean;
+};
 export type SubtaskLite = { id: string; title: string; done: boolean };
 export type DocLite = { id: string; name: string };
 export type TaskLite = {
@@ -92,14 +95,14 @@ export function TaskBoard({ today, userId, access, actions, tasks }: {
                     className={cx('block rounded-[10px] border bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors hover:border-ink-2',
                       a.overdue ? 'border-red-300' : 'border-line')}>
                     <div className="flex items-center gap-2">
-                      <span className="rounded bg-signal-soft px-1.5 py-0.5 text-[11px] font-semibold text-ink">Sign-off</span>
+                      <Chip tone={ACTION_KIND[a.kind].tone} className="!px-1.5 !text-[11.5px]">{ACTION_KIND[a.kind].label}</Chip>
                       <span className="text-[12px] text-muted">{a.code}</span>
                     </div>
                     <p className="mt-1 text-[14.5px] font-semibold text-ink">{a.title}</p>
                     <p className="mt-0.5 text-[13px] text-ink-2">{a.action}</p>
                     {a.due && (
                       <p className={cx('mt-1 text-[12.5px]', a.overdue ? 'font-semibold text-red-700' : 'text-muted')}>
-                        {a.overdue ? 'Overdue — ' : 'Due '}{relativeDue(a.due, today)}
+                        {a.overdue ? overdueBy(a.due, today) : `Due ${relativeDue(a.due, today)}`}
                       </p>
                     )}
                   </Link>
@@ -147,7 +150,7 @@ function TaskCard({ task, today, userId, access }: { task: TaskLite; today: stri
             {task.deadline && (
               <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold ring-1 ring-inset',
                 overdue ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-slate-100 text-slate-700 ring-slate-200')}>
-                <Calendar size={11} aria-hidden /> {overdue ? 'Overdue' : 'Due'} {relativeDue(task.deadline, today)}
+                <Calendar size={11} aria-hidden /> {overdue ? overdueBy(task.deadline!, today) : `Due ${relativeDue(task.deadline, today)}`}
               </span>
             )}
             {task.subtasks.length > 0 && (

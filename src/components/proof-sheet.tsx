@@ -76,7 +76,7 @@ export function ProofSheet({ row, event, version, imageSrc, stages, appName, sho
       <p className="mt-6 text-center text-[12px] text-muted">
         {external
           ? `Sent from ${appName} for ${event.name}.`
-          : `Printed ${fmtDate(new Date().toISOString().slice(0, 10), 'long')} from ${appName}. ${stages.length} sign-off stage${stages.length === 1 ? '' : 's'} configured for this event.`}
+          : `Printed ${fmtDate(new Date().toISOString().slice(0, 10), 'long')} from ${appName}. ${stages.length} sign-off stage${stages.length === 1 ? '' : 's'} set up for this show.`}
       </p>
     </article>
   );

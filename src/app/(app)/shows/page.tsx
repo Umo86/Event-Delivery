@@ -49,7 +49,7 @@ export default async function ShowsPage() {
 
       {archived.length > 0 && (
         <Panel title={`Archived (${archived.length})`} className="mt-6" padded={false}>
-          <p className="border-b border-line px-4 py-2.5 text-[13.5px] text-muted">Archived shows stay readable. Restore one to bring it back into the menu’s show list.</p>
+          <p className="border-b border-line px-4 py-2.5 text-[13.5px] text-muted">Archived shows stay readable and are marked as archived in the menu. Restore one to make it live again.</p>
           <ul>
             {archived.map((s) => <Row key={s.e.id} s={s} here={s.e.id === current?.id} canArchive />)}
           </ul>

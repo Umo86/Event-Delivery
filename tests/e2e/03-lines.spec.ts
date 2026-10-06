@@ -58,7 +58,7 @@ test('a member adds an organiser sign with full details', async ({ page }) => {
   await expect(details).toContainText('Double-sided');
   await expect(details).toContainText('Signs Express');
   await expect(details).toContainText('£900.00'); // 2 × £450
-  await expect(details).toContainText('30 Mar 2027 (event default)');
+  await expect(details).toContainText('30 Mar 2027 (show default)');
   await expect(page.getByRole('link', { name: 'Full-size files' })).toHaveAttribute('href', 'https://example.sharepoint.com/ukcw/os-001');
 });
 

@@ -130,7 +130,7 @@ export async function setEventDepartments(_prev: ActionResult | null, fd: FormDa
   return run(async () => {
     const me = await actor('manager');
     const eventId = uuidOrNull(fd, 'event_id');
-    if (!eventId) throw new UserError('Missing event.');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
     const want = new Set(fd.getAll('department_ids').filter(isUuid));
     const sql = await db();
     const [e] = await sql<{ name: string }[]>`select name from events where id = ${eventId}`;

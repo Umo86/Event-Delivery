@@ -13,7 +13,7 @@ import { setEventDepartments } from '@/app/actions/departments';
 export const metadata: Metadata = { title: 'Show setup' };
 
 export default async function EventSettingsPage(props: { searchParams: Promise<{ welcome?: string; created?: string }> }) {
-  await requireManager();
+  const user = await requireManager();
   const sp = await props.searchParams;
   const event = await getCurrentEvent();
   if (!event) return <NoEvent />;
@@ -21,12 +21,14 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
   if (!bundle) return <NoEvent />;
   const people = bundle.users.filter((u) => u.active && u.role !== 'user');
   const e = event;
+  const isSuper = user.role === 'super_admin';
 
-  const steps = [
-    { done: bundle.users.length > 1, text: 'Invite your team', href: '/admin' },
+  // Steps a manager can't do themselves say who does them instead of linking to a page they can't open.
+  const steps: { done: boolean; text: string; href: string | null }[] = [
+    { done: bundle.users.length > 1, text: isSuper ? 'Invite your team' : 'Invite your team (a super admin does this)', href: isSuper ? '/admin' : null },
     { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_ids.length > 0), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
     { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles in-house artwork and production (below)', href: '#owners' },
-    { done: bundle.sponsors.length > 0, text: 'Add sponsors and their account managers', href: '/sponsors' },
+    { done: bundle.sponsors.length > 0, text: isSuper ? 'Add sponsors and their account managers' : 'Add sponsors', href: '/sponsors' },
     { done: bundle.suppliers.length > 0, text: 'Add your suppliers', href: '/suppliers' },
   ];
   const showSteps = !!sp.welcome || steps.some((s) => !s.done);
@@ -50,7 +52,9 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
                   s.done ? 'bg-green-600 text-white' : 'bg-signal text-ink')}>
                   {s.done ? <Check size={14} strokeWidth={3} aria-label="Done" /> : i + 1}
                 </span>
-                <Link href={s.href} className={cx('font-semibold underline-offset-2 hover:underline', s.done ? 'text-muted line-through' : 'text-ink')}>{s.text}</Link>
+                {s.href
+                  ? <Link href={s.href} className={cx('font-semibold underline-offset-2 hover:underline', s.done ? 'text-muted line-through' : 'text-ink')}>{s.text}</Link>
+                  : <span className={cx('font-semibold', s.done ? 'text-muted line-through' : 'text-ink-2')}>{s.text}</span>}
               </li>
             ))}
           </ol>

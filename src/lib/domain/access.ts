@@ -14,8 +14,8 @@ export const ACCESS_LEVELS: { key: Role; label: string; summary: string; email: 
   {
     key: 'manager',
     label: 'Manager',
-    summary: 'Adds, edits and deletes signage, changes status, creates events, manages sponsors, suppliers and sign-off setup, and signs off their stages.',
-    email: 'You can add, edit and remove signage, change status, create events and sign off the stages you look after',
+    summary: 'Adds, edits and deletes signage, changes status, creates shows, manages sponsors, suppliers and sign-off setup, and signs off their stages.',
+    email: 'You can add, edit and remove signage, change status, create shows and sign off the stages you look after',
   },
   {
     key: 'user',
@@ -36,7 +36,7 @@ export const ABILITIES: { label: string; super_admin: string; manager: string; u
   { label: 'Add, edit and delete lines, upload artwork', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Change production status', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Sign off', super_admin: 'Any stage', manager: 'Their stages', user: 'No' },
-  { label: 'Create and manage events', super_admin: 'Yes', manager: 'Yes', user: 'No' },
+  { label: 'Create and manage shows', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Sponsors, suppliers, sign-off setup, dropdown lists', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'People, access levels, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },
 ];

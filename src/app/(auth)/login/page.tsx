@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { db, isDatabaseConfigured } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
 import { login } from '@/app/actions/auth';
+import { getAppName } from '@/lib/data/load';
 import { getDemoLogin } from '@/lib/demo';
 import { maintenanceOn } from '@/lib/settings';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -19,11 +20,11 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
   const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users`;
   if (n === 0) redirect('/setup');
   if (await getCurrentUser()) redirect('/dashboard');
-  const [demo, maintenance] = await Promise.all([getDemoLogin(), maintenanceOn()]);
+  const [demo, maintenance, appName] = await Promise.all([getDemoLogin(), maintenanceOn(), getAppName()]);
   return (
     <>
       {maintenance && (
-        <div className="mb-5"><Notice tone="warn">Event Delivery is closed for maintenance. Only super admins can sign in right now.</Notice></div>
+        <div className="mb-5"><Notice tone="warn">{appName} is closed for maintenance. Only super admins can sign in right now.</Notice></div>
       )}
       <h1 className="text-[30px] font-semibold text-ink">Sign in</h1>
       <p className="mt-1 text-muted">For invited people only. Use the email address your invite was sent to.</p>

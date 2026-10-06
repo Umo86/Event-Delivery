@@ -228,7 +228,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
                   </fieldset>
                   <fieldset>
                     <legend className="mb-1 text-[13.5px] font-semibold text-ink-2">Account manager for these sponsors</legend>
-                    {sponsors.length === 0 ? <p className={help}>No sponsors in this event yet.</p> : (
+                    {sponsors.length === 0 ? <p className={help}>No sponsors in this show yet.</p> : (
                       <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
                         {sponsors.map((s) => (
                           <DutyOption key={s.id} uid={u.id} name="sponsor_ids" value={s.id} label={s.name} checked={s.account_manager_id === u.id}

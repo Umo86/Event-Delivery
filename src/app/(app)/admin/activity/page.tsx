@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Activity' };
 const FILTERS = [
   { key: 'all', label: 'Everything' },
   { key: 'access', label: 'Access' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'setup', label: 'Setup' },
   { key: 'lines', label: 'Lines' },
 ] as const;
 
@@ -23,9 +23,11 @@ export default async function ActivityPage(props: { searchParams: Promise<{ log?
   const sp = await props.searchParams;
   const filter = FILTERS.find((f) => f.key === sp.log)?.key ?? 'all';
   const sql = await db();
+  // Setup covers shows, stages, departments, lists, suppliers, sponsors and the platform name.
+  // Lines includes deletions, which are logged without a line (the line is gone).
   const where = filter === 'access' ? sql`where a.kind = 'access'`
-    : filter === 'settings' ? sql`where a.kind = 'settings'`
-      : filter === 'lines' ? sql`where a.item_id is not null` : sql``;
+    : filter === 'setup' ? sql`where a.kind in ('settings', 'sponsor')`
+      : filter === 'lines' ? sql`where a.item_id is not null or a.kind = 'deleted'` : sql``;
   const trail = await sql<{
     id: string; actor_name: string; message: string; created_at: Date; event_name: string | null;
     item_id: string | null; category: Category | null; ref_no: number | null;
@@ -39,7 +41,7 @@ export default async function ActivityPage(props: { searchParams: Promise<{ log?
 
   return (
     <>
-      <Intro>Who changed what, newest first: sign-ins and access changes, settings, and every line.</Intro>
+      <Intro>Who changed what, newest first: sign-ins and access changes, show setup, and every line.</Intro>
       <Panel title="Audit trail" padded={false}
         actions={
           <nav className="flex flex-wrap gap-1" aria-label="Filter">

@@ -3,10 +3,10 @@ import { acceptNextDialog, errorMessage, expectImagesLoaded, itemId, loginAs, ok
 
 test.describe.configure({ mode: 'serial' });
 
-test('my actions is a board of sign-off actions plus personal tasks', async ({ page }) => {
+test('my actions is a board of lines waiting on you plus personal tasks', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto('/inbox');
-  await expect(page.getByText('3 sign-off actions waiting on you in UKCW London 2027, plus your own tasks.')).toBeVisible();
+  await expect(page.getByText('3 lines waiting on you in UKCW London 2027, plus your own tasks.')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Main' }).first();
   await expect(nav.getByRole('link', { name: /My actions/ })).toContainText('3');
   // Sign-off actions land automatically in the red "To do" column
@@ -23,7 +23,7 @@ test('my actions is a board of sign-off actions plus personal tasks', async ({ p
   await expect(page).toHaveURL(/view=team/);
   const unassigned = page.locator('details').filter({ hasText: 'Account manager not set' });
   await expect(unassigned).toHaveAttribute('open', '');
-  await expect(unassigned).toContainText('Give the sponsor an account manager on the Sponsors page.');
+  await expect(unassigned).toContainText('A super admin needs to give the sponsor an account manager.'); // managers can't choose one
   await expect(unassigned).toContainText('1 overdue');
   await expect(page.locator('details').filter({ hasText: 'Pete Production (you)' })).toContainText('3 lines');
 });
@@ -64,6 +64,17 @@ test('the dashboard summarises progress, workload, cost and sponsors', async ({ 
   await page.getByRole('link', { name: /Overdue or not signed off/ }).click();
   await expect(page).toHaveURL(/\/schedule\/all\?flag=urgent/);
   await expect(page.locator('table tbody tr')).toHaveCount(1);
+
+  // Every tile opens exactly the lines it counts, with the filter showing what's applied
+  await page.goto('/dashboard');
+  await page.getByRole('link', { name: /Approved or later/ }).click();
+  await expect(page).toHaveURL(/\/schedule\/all\?status=approved_plus/);
+  await expect(page.getByRole('combobox', { name: 'Status' })).toHaveValue('approved_plus');
+  await expect(page.locator('table tbody tr')).toHaveCount(2);
+  await page.goto('/dashboard');
+  await page.getByRole('link', { name: /Slow sign-offs/ }).click();
+  await expect(page).toHaveURL(/\/schedule\/all\?status=slow/);
+  await expect(page.getByRole('combobox', { name: 'Status' })).toHaveValue('slow');
 });
 
 test('the proof sheet shows the artwork, spec and sign-off record', async ({ page }) => {

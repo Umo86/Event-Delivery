@@ -27,11 +27,21 @@ test('a manager lands on their dashboard, with their actions first', async ({ pa
   await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
   const mine = panel(page, /^Your actions/);
   await expect(mine.getByRole('link').first()).toBeVisible();
+  // Each action says what kind of job it is
+  await expect(mine.getByRole('link', { name: /Registration directional totem/ })).toContainText('Artwork');
+  await expect(mine.getByRole('link', { name: /Acme Steel feature area banner/ })).toContainText('Production');
   await expect(panel(page, 'Coming up')).toBeVisible();
   await expect(menu(page).getByRole('link', { name: 'Show setup', exact: true })).toBeVisible();
   await expect(menu(page).getByRole('link', { name: 'People', exact: true })).toHaveCount(0);
   await expect(menu(page).getByRole('link', { name: 'Platform', exact: true })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('manager-dashboard.png'), fullPage: true });
+
+  // The same badges on their board
+  await menu(page).getByRole('link', { name: /^My actions/ }).click();
+  const todo = page.getByRole('region', { name: 'To do' });
+  await expect(todo.getByRole('link', { name: /Acme Steel feature area banner/ })).toContainText('Production');
+  await expect(todo.getByRole('link', { name: /Registration directional totem/ })).toContainText('Artwork');
+  await page.screenshot({ path: test.info().outputPath('manager-board.png'), fullPage: true });
 });
 
 test('a user lands on a read-only overview and can find any line', async ({ page }) => {

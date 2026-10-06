@@ -3,7 +3,7 @@ import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import type { DepartmentRow, UserRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { Chip, Field, inputCls, Panel } from '@/components/ui';
+import { Chip, Field, inputCls, Intro, Panel } from '@/components/ui';
 import {
   addDepartment, moveDepartment, renameDepartment, setDepartmentArchived, setDepartmentMembers,
 } from '@/app/actions/departments';
@@ -24,6 +24,8 @@ export default async function DepartmentsPage() {
   const archived = departments.filter((d) => d.archived);
 
   return (
+    <>
+    <Intro>The teams in your organisation, shared by every show. People belong to departments, and each sign-off stage draws its approvers from one.</Intro>
     <div className="space-y-6">
       <Panel title="Add a department">
         <ActionForm action={addDepartment} resetOnSuccess className="flex flex-wrap items-end gap-3">
@@ -32,7 +34,6 @@ export default async function DepartmentsPage() {
           </Field>
           <SubmitButton variant="secondary">Add department</SubmitButton>
         </ActionForm>
-        <p className="mt-2 text-[13px] text-muted">People belong to departments; each sign-off stage draws its approvers from one. Add as many custom departments as you need.</p>
       </Panel>
 
       {active.map((d, i) => {
@@ -60,7 +61,7 @@ export default async function DepartmentsPage() {
               <ActionForm action={setDepartmentMembers}>
                 <input type="hidden" name="department_id" value={d.id} />
                 <span className="mb-1.5 block text-[13.5px] font-semibold text-ink-2">People in {d.name}</span>
-                {people.length === 0 ? <p className="text-[13px] text-muted">Invite people on the Admin page first.</p> : (
+                {people.length === 0 ? <p className="text-[13px] text-muted">Nobody to add yet. A super admin invites people in Admin › People.</p> : (
                   <ul className="mb-3 grid max-h-64 gap-x-6 gap-y-1 overflow-y-auto pr-1 sm:grid-cols-2">
                     {people.map((u) => (
                       <li key={u.id}>
@@ -95,5 +96,6 @@ export default async function DepartmentsPage() {
         </Panel>
       )}
     </div>
+    </>
   );
 }

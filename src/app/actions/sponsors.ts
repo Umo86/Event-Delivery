@@ -30,7 +30,7 @@ export async function createSponsor(_prev: ActionResult | null, fd: FormData): P
   return run(async () => {
     const me = await actor('manager');
     const eventId = uuidOrNull(fd, 'event_id');
-    if (!eventId) throw new UserError('Missing event.');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
     const s = await readSponsor(fd);
     // The account manager signs off for the sponsor, so only admins choose who that is.
     if (me.role !== 'super_admin') s.account_manager_id = null;

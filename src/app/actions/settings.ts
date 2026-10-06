@@ -24,7 +24,7 @@ export async function updateEvent(_prev: ActionResult | null, fd: FormData): Pro
   return run(async () => {
     const me = await actor('manager');
     const id = uuidOrNull(fd, 'event_id');
-    if (!id) throw new UserError('Missing event.');
+    if (!id) throw new UserError('Missing show. Reload the page.');
     const studio = uuidOrNull(fd, 'studio_owner_id');
     const prod = uuidOrNull(fd, 'production_owner_id');
     if (!(await userExists(studio)) || !(await userExists(prod))) throw new UserError('Choose people from the team list.');
@@ -43,7 +43,7 @@ export async function updateEvent(_prev: ActionResult | null, fd: FormData): Pro
     };
     const venue = required(fd, 'venue', 'Venue', 80);
     const values = {
-      name: required(fd, 'name', 'Event name', 120),
+      name: required(fd, 'name', 'Show name', 120),
       venue,
       build_start: date(fd, 'build_start', 'Build-up start'),
       show_open: showOpen,
@@ -130,7 +130,7 @@ export async function setEventArchived(_prev: ActionResult | null, fd: FormData)
   return run(async () => {
     const me = await actor('manager');
     const id = uuidOrNull(fd, 'event_id');
-    if (!id) throw new UserError('Missing event.');
+    if (!id) throw new UserError('Missing show. Reload the page.');
     const archived = bool(fd, 'archived');
     const sql = await db();
     if (archived) {
@@ -182,7 +182,7 @@ export async function addStage(_prev: ActionResult | null, fd: FormData): Promis
   return run(async () => {
     const me = await actor('manager');
     const eventId = uuidOrNull(fd, 'event_id');
-    if (!eventId) throw new UserError('Missing event.');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
     const name = required(fd, 'name', 'Stage name', 60);
     const sql = await db();
     const [{ p }] = await sql<{ p: number }[]>`select coalesce(max(position), 0)::int + 1 as p from stages where event_id = ${eventId} and not archived`;
@@ -314,14 +314,15 @@ export async function saveList(_prev: ActionResult | null, fd: FormData): Promis
   });
 }
 
-// ---- System ----------------------------------------------------------------
+// ---- Platform (Admin › Platform) ---------------------------------------------
 export async function setAppName(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('super_admin');
+    const me = await actor('super_admin');
     const name = required(fd, 'app_name', 'Name', 40);
     const sql = await db();
     await sql`insert into app_settings (key, value) values ('app_name', ${name})
               on conflict (key) do update set value = excluded.value, updated_at = now()`;
+    await logActivity(sql, { eventId: null, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Renamed the platform to ${name}` });
     refresh();
     return { ok: true, message: 'Saved.' };
   });

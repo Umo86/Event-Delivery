@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { requireUser } from '@/lib/auth/session';
+import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { canEdit } from '@/lib/domain/permissions';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { Panel, textareaCls } from '@/components/ui';
+import { Intro, Panel, textareaCls } from '@/components/ui';
 import { saveList } from '@/app/actions/settings';
 
 export const metadata: Metadata = { title: 'Dropdown lists' };
@@ -14,13 +14,13 @@ const LISTS = [
   { key: 'zone', title: 'Zones and areas', help: 'Show areas, features and theatres.' },
   { key: 'material', title: 'Materials', help: '' },
   { key: 'position', title: 'Positions', help: 'How a sign is fixed or displayed.' },
-  { key: 'hall_excel', title: 'ExCeL London halls', help: 'Shown when the event venue is ExCeL London.' },
-  { key: 'hall_nec', title: 'NEC Birmingham halls', help: 'Shown when the event venue is NEC Birmingham.' },
+  { key: 'hall_excel', title: 'ExCeL London halls', help: 'Shown when the show’s venue is ExCeL London.' },
+  { key: 'hall_nec', title: 'NEC Birmingham halls', help: 'Shown when the show’s venue is NEC Birmingham.' },
   { key: 'hall_other', title: 'Other venue halls', help: 'Shown when the venue is set to Other.' },
 ];
 
 export default async function ListsPage() {
-  const user = await requireUser();
+  const user = await requireManager();
   const sql = await db();
   const rows = await sql<{ list_key: string; value: string }[]>`select list_key, value from list_options order by list_key, sort, lower(value)`;
   const byKey: Record<string, string[]> = {};
@@ -28,9 +28,9 @@ export default async function ListsPage() {
   const editable = canEdit(user);
   return (
     <div className="space-y-4">
-      <p className="max-w-3xl text-[14.5px] text-ink-2">
-        These are suggestions in the line form. People can still type something that isn’t on a list. One option per line.
-      </p>
+      <Intro>
+        Suggestions offered in the line form, shared by every show. People can still type something that isn’t on a list. One option per line.
+      </Intro>
       <div className="grid gap-4 lg:grid-cols-2">
         {LISTS.map((l) => (
           <Panel key={l.key} title={l.title}>

@@ -40,7 +40,7 @@ export default async function ItemPage(props: {
   const defArt = defaultArtworkDue(bundle.event, item.category);
   const defPrint = defaultPrintDeadline(bundle.event, item.category);
   const dateOr = (d: string | null, fallback: string | null) =>
-    d ? fmtDate(d, 'long') : fallback ? <span className="text-muted">{fmtDate(fallback, 'long')} (event default)</span> : <span className="text-muted">Not set</span>;
+    d ? fmtDate(d, 'long') : fallback ? <span className="text-muted">{fmtDate(fallback, 'long')} (show default)</span> : <span className="text-muted">Not set</span>;
 
   const spec: [string, React.ReactNode][] = [
     ['Sponsor', sponsor ? <>{sponsor.name}{sponsor.account_manager_id ? <span className="text-muted">, managed by {names.get(sponsor.account_manager_id)}</span> : null}</> : <span className="text-muted">None</span>],

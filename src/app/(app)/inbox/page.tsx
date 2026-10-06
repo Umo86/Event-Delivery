@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth/session';
+import { getCurrentUser, requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent, loadSchedule, type ScheduleRow } from '@/lib/data/load';
 import { urgencyCompare } from '@/lib/domain/engine';
+import { actionKind } from '@/lib/domain/labels';
 import type { SubtaskRow, TaskDocumentRow, TaskRow } from '@/lib/domain/types';
 import { blobAccess } from '@/lib/storage';
 import { ItemTable } from '@/components/item-table';
@@ -11,10 +12,16 @@ import { TaskBoard, type TaskLite } from '@/components/tasks/board';
 import { cx, Empty, PageHeader } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 
-export const metadata: Metadata = { title: 'My actions' };
+// Users can't be given sign-off work, so for them this page is just their own task board.
+const pageTitle = (role: string | undefined) => (role === 'user' ? 'My tasks' : 'My actions');
+
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: pageTitle((await getCurrentUser())?.role) };
+}
 
 export default async function InboxPage(props: { searchParams: Promise<{ view?: string }> }) {
   const user = await requireUser();
+  const title = pageTitle(user.role);
   const { view } = await props.searchParams;
   const event = await getCurrentEvent();
   if (!event) return <NoEvent />;
@@ -52,7 +59,7 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
     const people = [...byPerson.values()].sort((a, b) => (a.userId ? 1 : 0) - (b.userId ? 1 : 0) || b.rows.length - a.rows.length);
     return (
       <>
-        <PageHeader title="My actions" subtitle={`Everything waiting on someone in ${event.name}.`} />
+        <PageHeader title={title} subtitle={`Everything waiting on someone in ${event.name}.`} />
         {tabs}
         {people.length === 0 ? <Empty title="Nothing is waiting on anyone">Every line is installed, cancelled or not started.</Empty> : (
           <div className="space-y-3">
@@ -73,7 +80,10 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
                     {!p.userId && (
                       <p className="mb-3 text-[14px] text-ink-2">
                         Nobody is set to handle these. {p.label === 'Account manager not set'
-                          ? 'Give the sponsor an account manager on the Sponsors page.' : 'Choose an approver or owner in Settings.'}
+                          ? (user.role === 'super_admin'
+                            ? 'Give the sponsor an account manager on the Sponsors page.'
+                            : 'A super admin needs to give the sponsor an account manager.')
+                          : 'Choose an approver or owner in Show setup.'}
                       </p>
                     )}
                     <ItemTable rows={p.rows.sort((a, b) => urgencyCompare(a.state, b.state))} today={today} showCategory showAction />
@@ -87,12 +97,13 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
     );
   }
 
-  // The personal board: sign-off actions waiting on me (auto) + my own tasks.
+  // The personal board: lines waiting on me (artwork, sign-off or production; added automatically) + my own tasks.
   const actions = mine.map((r) => ({
     itemId: r.item.id,
     code: r.code,
     title: r.item.description,
     action: r.state.action,
+    kind: actionKind(r.state.group),
     due: r.state.due,
     overdue: !!r.state.due && r.state.due < today,
   }));
@@ -116,13 +127,15 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
     documents: (docs.get(t.id) ?? []).map((d) => ({ id: d.id, name: d.name })),
   }));
 
-  const subtitle = actions.length
-    ? `${actions.length} sign-off action${actions.length === 1 ? '' : 's'} waiting on you in ${event.name}, plus your own tasks.`
-    : `Your board for ${event.name}. Sign-off actions land in To do automatically.`;
+  const subtitle = user.role === 'user'
+    ? `Your own task board for ${event.name}.`
+    : actions.length
+      ? `${actions.length} line${actions.length === 1 ? '' : 's'} waiting on you in ${event.name}, plus your own tasks.`
+      : `Your board for ${event.name}. Anything that needs you lands in To do automatically.`;
 
   return (
     <>
-      <PageHeader title="My actions" subtitle={subtitle} />
+      <PageHeader title={title} subtitle={subtitle} />
       {tabs}
       <TaskBoard today={today} userId={user.id} access={blobAccess()} actions={actions} tasks={tasks} />
     </>

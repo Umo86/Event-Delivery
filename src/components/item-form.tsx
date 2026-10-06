@@ -87,7 +87,7 @@ export function ItemForm({ bundle, category, item, cancelHref, defaultSponsorId 
               {ARTWORK_BY.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
             </select>
           </Field>
-          <Field label="Artwork due" htmlFor="artwork_due" help={defArt ? `Leave blank to use the event default (${fmtDate(defArt, 'long')}).` : 'Leave blank to use the event default.'}>
+          <Field label="Artwork due" htmlFor="artwork_due" help={defArt ? `Leave blank to use the show’s default (${fmtDate(defArt, 'long')}).` : 'Leave blank to use the show’s default.'}>
             <input id="artwork_due" name="artwork_due" type="date" defaultValue={v('artwork_due')} className={inputCls} />
           </Field>
           <Field label="Link to full-size files (optional)" htmlFor="artwork_link" help="SharePoint, Dropbox or WeTransfer link to print-ready files.">

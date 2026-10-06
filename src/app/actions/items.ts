@@ -32,7 +32,7 @@ async function readItemFields(fd: FormData, eventId: string, category: Category)
   const sponsorId = uuidOrNull(fd, 'sponsor_id');
   if (sponsorId) {
     const s = await sql`select 1 from sponsors where id = ${sponsorId} and event_id = ${eventId}`;
-    if (!s.length) throw new UserError('Pick a sponsor from this event’s list.');
+    if (!s.length) throw new UserError('Pick a sponsor from this show’s list.');
   } else if (category !== 'organiser_signage') {
     throw new UserError('Choose the sponsor for this line.');
   }
@@ -358,7 +358,7 @@ export async function createShareLink(_prev: ActionResult | null, fd: FormData):
     }
     if (!sponsor) throw new UserError('Choose the sponsor for this line first.');
     if (!canDecideStage(me, stage, sponsor)) throw new UserError('Only the sponsor’s account manager (or a super admin) can send an approval link.');
-    if (!(await sponsorLinksEnabled())) throw new UserError('Sponsor approval links are turned off. An admin can turn them back on in Admin.');
+    if (!(await sponsorLinksEnabled())) throw new UserError('Sponsor approval links are turned off. A super admin can turn them back on in Admin › Platform.');
     const token = randomToken(24);
     const expires = new Date(Date.now() + 30 * 86400000);
     const recipient = str(fd, 'recipient_name', 120);

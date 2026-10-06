@@ -4,7 +4,7 @@ import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { Field, inputCls, Panel } from '@/components/ui';
+import { Field, inputCls, Intro, Panel } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 import { addStage, moveStage, removeStage, saveStage } from '@/app/actions/settings';
 
@@ -25,12 +25,11 @@ export default async function StagesPage() {
 
   return (
     <div className="space-y-4">
-      <p className="max-w-3xl text-[14.5px] text-ink-2">
-        Every line goes through these stages in order for {event.name}. A stage opens only once the one before it has approved the
-        current artwork, and any new artwork version starts again from the first stage. Give each stage a department and
-        one or more approvers — any one of them can sign it off. Manage who’s in each department in{' '}
+      <Intro>
+        Every line in {event.name} goes through these stages in order. A stage opens once the one before it approves, and new
+        artwork starts again from the first stage. Any one of a stage’s approvers can sign it off; choose them from{' '}
         <Link href="/settings/departments" className="font-semibold text-ink underline underline-offset-2">Departments</Link>.
-      </p>
+      </Intro>
       {bundle.stages.map((s, i) => {
         const deptMembers = s.department_id ? inDept.get(s.department_id) ?? new Set<string>() : new Set<string>();
         // People in this stage's department first, then everyone else
@@ -76,7 +75,7 @@ export default async function StagesPage() {
               {!s.uses_account_manager && (
                 <fieldset>
                   <legend className="mb-1 text-[13.5px] font-semibold text-ink-2">Approvers (any one can sign off)</legend>
-                  {ordered.length === 0 ? <p className="text-[13px] text-muted">Invite people first on the Admin page.</p> : (
+                  {ordered.length === 0 ? <p className="text-[13px] text-muted">Nobody to choose yet. A super admin invites people in Admin › People.</p> : (
                     <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
                       {ordered.map((u) => (
                         <li key={u.id}>

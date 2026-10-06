@@ -13,7 +13,7 @@ import { firstName, inviteMessage, type InviteKind } from '@/lib/invite-message'
 import { SETTING, writeSetting } from '@/lib/settings';
 import { appOrigin } from '@/lib/url';
 
-// Everything on the Admin page: invitations, access levels, sign-off responsibilities and platform switches.
+// Admin › People (invitations, access levels, sign-off responsibilities) and the sponsor links switch on Admin › Platform.
 // Every change is written to the access log. The platform doesn't send email: an invite or reset gives the admin
 // a ready-made message with the temporary password to send from their own mailbox.
 
@@ -270,7 +270,7 @@ export async function saveSignoffDuties(_prev: ActionResult | null, fd: FormData
   return run(async () => {
     const me = await actor('super_admin');
     const eventId = uuidOrNull(fd, 'event_id');
-    if (!eventId) throw new UserError('Missing event.');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
     const sql = await db();
     const p = await findPerson(sql, fd);
     if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);

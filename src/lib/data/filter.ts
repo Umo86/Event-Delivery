@@ -24,7 +24,11 @@ export function readFilters(sp: Record<string, string | string[] | undefined>): 
   };
 }
 
-export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string): ScheduleRow[] {
+/** Status filters that aren't a single group: needs attention, still open, approved and beyond, approved but not
+ *  yet installed, and sign-offs waiting longer than the show's target. */
+export const STATUS_SETS = ['attention', 'open', 'approved_plus', 'production', 'slow'] as const;
+
+export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string, turnaroundDays = Infinity): ScheduleRow[] {
   const q = f.q?.toLowerCase();
   let out = rows.filter((r) => {
     const s = r.state;
@@ -33,7 +37,9 @@ export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string): Sch
       if (f.status === 'attention' && s.phase !== 3) return false;
       if (f.status === 'open' && !(s.phase >= 1 && s.phase <= 4)) return false;
       if (f.status === 'approved_plus' && s.phase !== 4 && s.phase !== 5) return false;
-      if (!['attention', 'open', 'approved_plus'].includes(f.status) && s.group !== f.status) return false;
+      if (f.status === 'production' && s.phase !== 4) return false;
+      if (f.status === 'slow' && !((s.group === 'in_signoff' || s.group === 'on_hold') && (s.daysWaiting ?? 0) > turnaroundDays)) return false;
+      if (!(STATUS_SETS as readonly string[]).includes(f.status) && s.group !== f.status) return false;
     }
     if (f.waiting) {
       if (f.waiting === 'me' && !s.waitingOnUserIds.includes(meId)) return false;
