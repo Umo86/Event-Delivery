@@ -280,10 +280,13 @@ function BoardCard(p: {
       )}
       {extra}
       <span className="flex-1" />
-      <button type="button" onClick={p.remove} className={cx(iconBtn, 'hover:text-red-700')}
-        aria-label={card.kind === 'task' ? 'Delete task' : 'Clear from board'} title={card.kind === 'task' ? 'Delete task' : 'Clear from board'}>
-        {card.kind === 'task' ? <Trash2 size={15} aria-hidden /> : <X size={16} aria-hidden />}
-      </button>
+      {/* Tasks can always be deleted; a line is only cleared once it has stopped waiting on the person */}
+      {(card.kind === 'task' || !card.waitingOnMe) && (
+        <button type="button" onClick={p.remove} className={cx(iconBtn, 'hover:text-red-700')}
+          aria-label={card.kind === 'task' ? 'Delete task' : 'Clear from board'} title={card.kind === 'task' ? 'Delete task' : 'Clear from board'}>
+          {card.kind === 'task' ? <Trash2 size={15} aria-hidden /> : <X size={16} aria-hidden />}
+        </button>
+      )}
     </div>
   );
 

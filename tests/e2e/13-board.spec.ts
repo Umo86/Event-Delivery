@@ -111,7 +111,8 @@ test('my actions: lines move to In progress and come back, but are completed by 
 
   // Dropping a line on Complete is refused with an explanation
   await started.dragTo(column(page, 'complete'));
-  await expect(page.getByRole('alert')).toContainText('SS-001 is completed by doing the work on its line page');
+  await expect(page.getByText('SS-001 is completed by doing the work on its line page: it moves to Complete by itself.')).toBeVisible();
+  await expect(started.getByRole('button', { name: 'Clear from board' })).toHaveCount(0); // only once it stops waiting on Pete
   await expect(doing.getByRole('article', { name: /Acme Steel feature area banner/ })).toBeVisible();
 
   await started.getByRole('button', { name: 'Move to To do' }).click();
