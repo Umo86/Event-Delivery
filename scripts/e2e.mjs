@@ -48,7 +48,8 @@ const stack = await startStack({ reset: true });
 let server;
 let code = 1;
 try {
-  if (!skipBuild && (await run('npx', ['next', 'build'])) !== 0) throw new Error('Build failed');
+  // npm run build (not next build directly) so the prebuild step copies the PDF.js worker into public/, as on a fresh clone
+  if (!skipBuild && (await run('npm', ['run', 'build'])) !== 0) throw new Error('Build failed');
   server = await startServer();
   code = await run('npx', ['playwright', 'test', '--grep-invert', '@demo', ...pwArgs]);
   if (code === 0 && pwArgs.length === 0) {

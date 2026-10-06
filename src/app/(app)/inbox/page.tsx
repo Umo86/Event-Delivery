@@ -2,18 +2,19 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/session';
 import { getCurrentEvent, loadSchedule, type ScheduleRow } from '@/lib/data/load';
+import { loadBoardData } from '@/lib/data/tasks';
+import { londonDate } from '@/lib/dates';
 import { urgencyCompare } from '@/lib/domain/engine';
-import { ItemTable } from '@/components/item-table';
+import { categoryInfo } from '@/lib/domain/labels';
+import { buildBoard, openCount, TASK_STATUSES } from '@/lib/domain/tasks';
+import { ItemTable, thumbUrl } from '@/components/item-table';
+import { KanbanBoard, type BoardColumnData, type Card } from '@/components/board/kanban';
 import { cx, Empty, PageHeader } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 
 export const metadata: Metadata = { title: 'My actions' };
 
-const SECTIONS = [
-  { key: 'signoff', title: 'Sign-off decisions', groups: ['in_signoff', 'on_hold'] },
-  { key: 'artwork', title: 'Artwork to create, chase or revise', groups: ['awaiting_artwork', 'changes_requested', 'rejected'] },
-  { key: 'production', title: 'Production and delivery', groups: ['approved', 'sent_to_supplier', 'in_production', 'delivered'] },
-] as const;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export default async function InboxPage(props: { searchParams: Promise<{ view?: string }> }) {
   const user = await requireUser();
@@ -25,12 +26,22 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
   const today = sched.bundle.ctx.today;
   const names = sched.bundle.ctx.userNames;
   const open = sched.rows.filter((r) => r.state.group !== 'cancelled' && r.state.waitingOnLabel);
-  const mine = open.filter((r) => r.state.waitingOnUserIds.includes(user.id)).sort((a, b) => urgencyCompare(a.state, b.state));
+  const waitingOnMe = (r: ScheduleRow) => r.state.group !== 'cancelled' && r.state.waitingOnUserIds.includes(user.id);
   const team = view === 'team';
+
+  const { tasks, started } = await loadBoardData(event.id, user.id);
+  const byId = new Map(sched.rows.map((r) => [r.item.id, r]));
+  const board = buildBoard({
+    lines: [...sched.rows].sort((a, b) => urgencyCompare(a.state, b.state)).map((r) => ({ id: r.item.id, waitingOnMe: waitingOnMe(r) })),
+    started,
+    tasks,
+  });
+  const mineCount = board.to_do.lineIds.length + board.in_progress.lineIds.length;
+  const openTasks = board.to_do.tasks.length + board.in_progress.tasks.length;
 
   const tabs = (
     <nav className="mb-5 flex gap-1 border-b border-line" aria-label="Inbox views">
-      {[{ href: '/inbox', label: `Waiting on me (${mine.length})`, on: !team }, { href: '/inbox?view=team', label: 'Whole team', on: team }].map((t) => (
+      {[{ href: '/inbox', label: `My board (${openCount(board)})`, on: !team }, { href: '/inbox?view=team', label: 'Whole team', on: team }].map((t) => (
         <Link key={t.href} href={t.href} aria-current={t.on ? 'page' : undefined}
           className={cx('-mb-px border-b-[3px] px-3 py-2 text-[15px] font-semibold', t.on ? 'border-signal text-ink' : 'border-transparent text-muted hover:text-ink')}>
           {t.label}
@@ -89,27 +100,59 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
     );
   }
 
+  // ---- The board --------------------------------------------------------------------
+  const lineCard = (id: string): Card | null => {
+    const r = byId.get(id);
+    if (!r) return null;
+    return {
+      kind: 'line',
+      id,
+      code: r.code,
+      description: r.item.description,
+      category: categoryInfo(r.item.category).label,
+      sponsor: r.sponsor?.name ?? null,
+      group: r.state.group,
+      statusLabel: r.state.statusLabel,
+      action: r.state.action,
+      due: r.state.due,
+      flag: r.state.flag,
+      thumb: thumbUrl(r),
+      daysWaiting: r.state.daysWaiting,
+      waitingOnMe: waitingOnMe(r),
+    };
+  };
+  const columns: BoardColumnData[] = TASK_STATUSES.map((s) => {
+    const col = board[s.key];
+    return {
+      status: s.key,
+      cards: [
+        ...col.lineIds.map(lineCard).filter((c): c is Card => c !== null),
+        ...col.tasks.map((t): Card => {
+          const linked = t.item_id ? byId.get(t.item_id) : null;
+          return {
+            kind: 'task',
+            id: t.id,
+            title: t.title,
+            notes: t.notes,
+            due: t.due,
+            item: linked ? { id: linked.item.id, code: linked.code, description: linked.item.description } : null,
+            completedAt: t.completed_at ? londonDate(new Date(t.completed_at)) : null,
+          };
+        }),
+      ],
+    };
+  });
+  const lineOptions = sched.rows.filter((r) => !r.item.cancelled).map((r) => ({ id: r.item.id, label: `${r.code} ${r.item.description}` }));
+
+  const subtitle = mineCount || openTasks
+    ? `${mineCount ? `${plural(mineCount, 'line')} waiting on you` : 'No lines waiting on you'} and ${plural(openTasks, 'open task')} in ${event.name}. Drag cards between columns, or use the arrows.`
+    : `Nothing is waiting on you in ${event.name}. Add your own tasks to the board, and lines that need you will appear here by themselves.`;
+
   return (
     <>
-      <PageHeader title="My actions"
-        subtitle={mine.length ? `${mine.length} thing${mine.length === 1 ? '' : 's'} waiting on you in ${event.name}, most urgent first.` : `Nothing is waiting on you in ${event.name}.`} />
+      <PageHeader title="My actions" subtitle={subtitle} />
       {tabs}
-      {mine.length === 0 ? (
-        <Empty title="You’re all caught up">When a line needs your decision, artwork or production update, it appears here.</Empty>
-      ) : (
-        <div className="space-y-8">
-          {SECTIONS.map((s) => {
-            const rows = mine.filter((r) => (s.groups as readonly string[]).includes(r.state.group));
-            if (!rows.length) return null;
-            return (
-              <section key={s.key}>
-                <h2 className="mb-2 text-[19px] font-semibold text-ink">{s.title} <span className="text-muted">({rows.length})</span></h2>
-                <ItemTable rows={rows} today={today} showCategory showAction />
-              </section>
-            );
-          })}
-        </div>
-      )}
+      <KanbanBoard eventId={event.id} columns={columns} today={today} lineOptions={lineOptions} />
     </>
   );
 }

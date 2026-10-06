@@ -181,3 +181,22 @@ export interface ActivityRow {
   message: string;
   created_at: Date;
 }
+
+/** A column on a person's board (the My actions page). */
+export type TaskStatus = 'to_do' | 'in_progress' | 'complete';
+
+export interface TaskRow {
+  id: string;
+  event_id: string;
+  user_id: string;
+  /** The schedule line this task is about, if any. */
+  item_id: string | null;
+  title: string;
+  notes: string | null;
+  due: string | null;
+  status: TaskStatus;
+  position: number;
+  completed_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
