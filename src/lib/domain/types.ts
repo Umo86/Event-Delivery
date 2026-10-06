@@ -181,3 +181,35 @@ export interface ActivityRow {
   message: string;
   created_at: Date;
 }
+
+export type TaskStatus = 'todo' | 'in_process' | 'complete';
+
+export interface TaskRow {
+  id: string;
+  user_id: string;
+  event_id: string;
+  title: string;
+  notes: string | null;
+  status: TaskStatus;
+  deadline: string | null;
+  created_at: Date;
+  completed_at: Date | null;
+}
+
+export interface SubtaskRow {
+  id: string;
+  task_id: string;
+  title: string;
+  done: boolean;
+  created_at: Date;
+}
+
+export interface TaskDocumentRow {
+  id: string;
+  task_id: string;
+  name: string;
+  url: string;
+  size: number | null;
+  content_type: string | null;
+  uploaded_at: Date;
+}

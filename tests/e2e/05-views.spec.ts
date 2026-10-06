@@ -3,19 +3,21 @@ import { acceptNextDialog, errorMessage, expectImagesLoaded, itemId, loginAs, ok
 
 test.describe.configure({ mode: 'serial' });
 
-test('my actions shows what is waiting on me, grouped by kind of work', async ({ page }) => {
+test('my actions is a board of sign-off actions plus personal tasks', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto('/inbox');
-  await expect(page.getByText('3 things waiting on you in UKCW London 2027, most urgent first.')).toBeVisible();
+  await expect(page.getByText('3 sign-off actions waiting on you in UKCW London 2027, plus your own tasks.')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Main' }).first();
   await expect(nav.getByRole('link', { name: /My actions/ })).toContainText('3');
-  const artwork = page.locator('section').filter({ has: page.getByRole('heading', { name: /Artwork to create, chase or revise/ }) });
-  await expect(artwork.getByRole('heading')).toContainText('(2)');
-  await expect(artwork).toContainText('Upload new artwork (rejected by Marketing)');
-  await expect(artwork).toContainText('Create the artwork');
-  const production = page.locator('section').filter({ has: page.getByRole('heading', { name: /Production and delivery/ }) });
-  await expect(production).toContainText('Acme Steel feature area banner');
-  await expect(production).toContainText('Send to supplier / place order');
+  // Sign-off actions land automatically in the red "To do" column
+  const todo = page.getByRole('region', { name: 'To do' });
+  await expect(todo).toContainText('Upload new artwork (rejected by Marketing)');
+  await expect(todo).toContainText('Create the artwork');
+  await expect(todo).toContainText('Acme Steel feature area banner');
+  await expect(todo).toContainText('Send to supplier / place order');
+  // The three kanban columns are present
+  await expect(page.getByRole('region', { name: 'In process' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Complete' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Whole team' }).click();
   await expect(page).toHaveURL(/view=team/);
@@ -129,9 +131,9 @@ test('sponsor pages: details, account manager and removal rules', async ({ page 
 test('my actions updates when a sponsor gets an account manager', async ({ page }) => {
   await loginAs(page, 'amy');
   await page.goto('/inbox');
-  await expect(page.getByRole('link', { name: 'Waiting on me (1)' })).toBeVisible();
-  await expect(page.locator('main')).toContainText('BuildCo branded lanyards');
-  await expect(page.locator('main')).toContainText('Chase artwork from BuildCo');
+  const todo = page.getByRole('region', { name: 'To do' });
+  await expect(todo).toContainText('BuildCo branded lanyards');
+  await expect(todo).toContainText('Chase artwork from BuildCo');
 });
 
 test('a line shows its supplier’s scope of work and suggests the right suppliers', async ({ page }) => {

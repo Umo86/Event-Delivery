@@ -45,7 +45,7 @@ test('uploading artwork starts sign-off, with a preview and thumbnail', async ({
 test('each approver signs off in turn and can ask for changes', async ({ browser }) => {
   const olivia = await asUser(browser, 'olivia');
   await olivia.page.goto('/inbox');
-  await expect(olivia.page.getByRole('heading', { name: /Sign-off decisions/ })).toContainText('(2)');
+  await expect(olivia.page.getByRole('region', { name: 'To do' })).toContainText('Hall S1 entrance banner');
   await olivia.page.getByRole('link', { name: /Hall S1 entrance banner/ }).first().click();
   await expect(olivia.page).toHaveURL(new RegExp(`/items/${itemId('os1')}`));
   await decide(olivia.page, 'Operations', 'Approve');
@@ -72,7 +72,7 @@ test('each approver signs off in turn and can ask for changes', async ({ browser
 test('a new version (PDF) restarts sign-off and keeps older versions', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto('/inbox');
-  await expect(page.getByRole('heading', { name: /Artwork to create, chase or revise/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'To do' })).toBeVisible();
   await page.goto(`/items/${itemId('os1')}`);
   await expect(page.getByText('Upload a revised version')).toBeVisible();
   await uploadArtwork(page, { name: 'OS-001 banner v2.pdf', mimeType: 'application/pdf', buffer: makePdf('UKCW S1') }, 'Logo enlarged');
@@ -99,7 +99,7 @@ test('every stage approves, then production moves the line on', async ({ browser
 
   const fiona = await asUser(browser, 'fiona');
   await fiona.page.goto('/inbox');
-  await expect(fiona.page.getByRole('link', { name: 'Waiting on me (1)' })).toBeVisible();
+  await expect(fiona.page.getByRole('region', { name: 'To do' })).toContainText('Hall S1 entrance banner');
   await fiona.page.goto(`/items/${itemId('os1')}`);
   await decide(fiona.page, 'Final sign-off', 'Approve');
   await expectStatus(fiona.page, 'Approved – ready to order');

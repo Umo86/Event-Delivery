@@ -1,19 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/session';
+import { db } from '@/lib/db';
 import { getCurrentEvent, loadSchedule, type ScheduleRow } from '@/lib/data/load';
 import { urgencyCompare } from '@/lib/domain/engine';
+import type { SubtaskRow, TaskDocumentRow, TaskRow } from '@/lib/domain/types';
+import { blobAccess } from '@/lib/storage';
 import { ItemTable } from '@/components/item-table';
+import { TaskBoard, type TaskLite } from '@/components/tasks/board';
 import { cx, Empty, PageHeader } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 
 export const metadata: Metadata = { title: 'My actions' };
-
-const SECTIONS = [
-  { key: 'signoff', title: 'Sign-off decisions', groups: ['in_signoff', 'on_hold'] },
-  { key: 'artwork', title: 'Artwork to create, chase or revise', groups: ['awaiting_artwork', 'changes_requested', 'rejected'] },
-  { key: 'production', title: 'Production and delivery', groups: ['approved', 'sent_to_supplier', 'in_production', 'delivered'] },
-] as const;
 
 export default async function InboxPage(props: { searchParams: Promise<{ view?: string }> }) {
   const user = await requireUser();
@@ -29,8 +27,8 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
   const team = view === 'team';
 
   const tabs = (
-    <nav className="mb-5 flex gap-1 border-b border-line" aria-label="Inbox views">
-      {[{ href: '/inbox', label: `Waiting on me (${mine.length})`, on: !team }, { href: '/inbox?view=team', label: 'Whole team', on: team }].map((t) => (
+    <nav className="mb-5 flex gap-1 border-b border-line" aria-label="Board views">
+      {[{ href: '/inbox', label: 'My board', on: !team }, { href: '/inbox?view=team', label: 'Whole team', on: team }].map((t) => (
         <Link key={t.href} href={t.href} aria-current={t.on ? 'page' : undefined}
           className={cx('-mb-px border-b-[3px] px-3 py-2 text-[15px] font-semibold', t.on ? 'border-signal text-ink' : 'border-transparent text-muted hover:text-ink')}>
           {t.label}
@@ -89,27 +87,44 @@ export default async function InboxPage(props: { searchParams: Promise<{ view?: 
     );
   }
 
+  // The personal board: sign-off actions waiting on me (auto) + my own tasks.
+  const actions = mine.map((r) => ({
+    itemId: r.item.id,
+    code: r.code,
+    title: r.item.description,
+    action: r.state.action,
+    due: r.state.due,
+    overdue: !!r.state.due && r.state.due < today,
+  }));
+
+  const sql = await db();
+  const [taskRows, subtaskRows, docRows] = await Promise.all([
+    sql<TaskRow[]>`select * from tasks where user_id = ${user.id} and event_id = ${event.id}
+      order by status, deadline asc nulls last, created_at`,
+    sql<SubtaskRow[]>`select s.* from task_subtasks s join tasks t on t.id = s.task_id
+      where t.user_id = ${user.id} and t.event_id = ${event.id} order by s.created_at`,
+    sql<TaskDocumentRow[]>`select d.* from task_documents d join tasks t on t.id = d.task_id
+      where t.user_id = ${user.id} and t.event_id = ${event.id} order by d.uploaded_at`,
+  ]);
+  const subs = new Map<string, SubtaskRow[]>();
+  for (const s of subtaskRows) (subs.get(s.task_id) ?? subs.set(s.task_id, []).get(s.task_id)!).push(s);
+  const docs = new Map<string, TaskDocumentRow[]>();
+  for (const d of docRows) (docs.get(d.task_id) ?? docs.set(d.task_id, []).get(d.task_id)!).push(d);
+  const tasks: TaskLite[] = taskRows.map((t) => ({
+    id: t.id, title: t.title, notes: t.notes, status: t.status, deadline: t.deadline,
+    subtasks: (subs.get(t.id) ?? []).map((s) => ({ id: s.id, title: s.title, done: s.done })),
+    documents: (docs.get(t.id) ?? []).map((d) => ({ id: d.id, name: d.name })),
+  }));
+
+  const subtitle = actions.length
+    ? `${actions.length} sign-off action${actions.length === 1 ? '' : 's'} waiting on you in ${event.name}, plus your own tasks.`
+    : `Your board for ${event.name}. Sign-off actions land in To do automatically.`;
+
   return (
     <>
-      <PageHeader title="My actions"
-        subtitle={mine.length ? `${mine.length} thing${mine.length === 1 ? '' : 's'} waiting on you in ${event.name}, most urgent first.` : `Nothing is waiting on you in ${event.name}.`} />
+      <PageHeader title="My actions" subtitle={subtitle} />
       {tabs}
-      {mine.length === 0 ? (
-        <Empty title="You’re all caught up">When a line needs your decision, artwork or production update, it appears here.</Empty>
-      ) : (
-        <div className="space-y-8">
-          {SECTIONS.map((s) => {
-            const rows = mine.filter((r) => (s.groups as readonly string[]).includes(r.state.group));
-            if (!rows.length) return null;
-            return (
-              <section key={s.key}>
-                <h2 className="mb-2 text-[19px] font-semibold text-ink">{s.title} <span className="text-muted">({rows.length})</span></h2>
-                <ItemTable rows={rows} today={today} showCategory showAction />
-              </section>
-            );
-          })}
-        </div>
-      )}
+      <TaskBoard today={today} userId={user.id} access={blobAccess()} actions={actions} tasks={tasks} />
     </>
   );
 }

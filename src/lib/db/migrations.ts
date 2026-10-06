@@ -379,6 +379,47 @@ insert into event_departments (event_id, department_id)
   select distinct event_id, department_id from stages where department_id is not null on conflict do nothing;
 `,
   },
+  {
+    version: 8,
+    name: 'personal task board',
+    sql: /* sql */ `
+-- A private kanban board per person, scoped to a show. Columns are 'todo' / 'in_process' / 'complete'.
+create table tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users(id) on delete cascade,
+  event_id uuid not null references events(id) on delete cascade,
+  title text not null,
+  notes text,
+  status text not null default 'todo' check (status in ('todo', 'in_process', 'complete')),
+  deadline date,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+create index tasks_owner_idx on tasks (user_id, event_id, status);
+
+-- Checklist items under a task.
+create table task_subtasks (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks(id) on delete cascade,
+  title text not null,
+  done boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index task_subtasks_task_idx on task_subtasks (task_id);
+
+-- Files attached to a task (stored in Blob, served through /api/task-files).
+create table task_documents (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid not null references tasks(id) on delete cascade,
+  name text not null,
+  url text not null,
+  size bigint,
+  content_type text,
+  uploaded_at timestamptz not null default now()
+);
+create index task_documents_task_idx on task_documents (task_id);
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

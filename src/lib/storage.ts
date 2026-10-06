@@ -36,6 +36,23 @@ export function artworkPrefix(eventId: string, itemId: string): string {
   return `artwork/${eventId}/${itemId}/`;
 }
 
+export function taskDocPrefix(userId: string, taskId: string): string {
+  return `task-docs/${userId}/${taskId}/`;
+}
+
+// Files people attach to their personal tasks: artwork plus everyday office documents.
+export const TASK_DOC_TYPES = [
+  ...ALLOWED_UPLOAD_TYPES,
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+];
+
 function isVercelBlobUrl(url: string): boolean {
   try {
     return new URL(url).hostname.endsWith('.blob.vercel-storage.com');
