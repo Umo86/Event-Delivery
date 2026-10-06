@@ -2,7 +2,7 @@ import 'server-only';
 import type { Sql } from '@/lib/db';
 import { createDefaultEvent } from '@/lib/data/seed';
 import { logActivity } from '@/lib/activity';
-import { hashPassword, verifyPassword } from '@/lib/auth/password';
+import { hashPassword, sha256, verifyPassword } from '@/lib/auth/password';
 import { demoSettings } from '@/lib/demo-settings';
 
 const SCRYPT_HASH = /^scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9+/]+={0,2}\$[A-Za-z0-9+/]+={0,2}$/;
@@ -52,6 +52,32 @@ export async function bootstrapAdmin(sql: Sql): Promise<void> {
  * - It never takes over an account that belongs to a real person.
  * Returns false while the platform isn't set up yet, so the caller can try again later.
  */
+/**
+ * One-time password reset from the deployment settings, for recovering an account without database access:
+ *   RESET_ADMIN_EMAIL and RESET_ADMIN_PASSWORD (plaintext — used once, then safe to remove).
+ * It applies each distinct email+password combination exactly once (recorded in app_settings), so it never
+ * overrides a password the person later changes in the app, and a redeploy won't keep resetting it.
+ */
+export async function ensureAdminPassword(sql: Sql): Promise<void> {
+  const email = process.env.RESET_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.RESET_ADMIN_PASSWORD?.trim();
+  if (!email || !password || password.length < 8) return;
+  const key = `admin_pwd_reset:${email}`;
+  const stamp = sha256(password);
+  const [done] = await sql<{ value: string }[]>`select value from app_settings where key = ${key}`;
+  if (done?.value === stamp) return; // this exact reset has already been applied
+  const [u] = await sql<{ id: string; full_name: string }[]>`select id, full_name from users where lower(email) = ${email}`;
+  if (!u) return; // nothing to reset yet
+  const hash = await hashPassword(password);
+  await sql`update users set password_hash = ${hash}, must_change_password = false, failed_logins = 0, locked_until = null where id = ${u.id}`;
+  await sql`delete from sessions where user_id = ${u.id}`; // force a fresh sign-in with the new password
+  await sql`insert into app_settings (key, value) values (${key}, ${stamp})
+            on conflict (key) do update set value = excluded.value, updated_at = now()`;
+  await logActivity(sql, { eventId: null, itemId: null, userId: u.id, actorName: 'Deployment settings', kind: 'access',
+    message: `Reset the password for ${u.full_name} (${email}) from the deployment settings` });
+  console.log('Admin password reset applied');
+}
+
 export async function ensureDemoAccount(sql: Sql): Promise<boolean> {
   const d = demoSettings(process.env);
   if (!d) return true;

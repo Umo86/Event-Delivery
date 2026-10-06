@@ -1,7 +1,7 @@
 import 'server-only';
 import postgres from 'postgres';
 import { MIGRATIONS, LATEST_VERSION } from './migrations';
-import { bootstrapAdmin, ensureDemoAccount } from '@/lib/bootstrap';
+import { bootstrapAdmin, ensureAdminPassword, ensureDemoAccount } from '@/lib/bootstrap';
 
 export type Sql = postgres.Sql<Record<string, never>>;
 
@@ -101,6 +101,7 @@ export async function db(): Promise<Sql> {
   if (!g.__edMigrated) {
     g.__edMigrated = migrate()
       .then(() => bootstrapAdmin(sql).catch((e) => console.error('Bootstrap admin failed', e)))
+      .then(() => ensureAdminPassword(sql).catch((e) => console.error('Admin password reset failed', e)))
       .then(() => ensureDemoAccount(sql).then((ready) => { g.__edDemoReady = ready; }).catch((e) => console.error('Demo account failed', e)))
       .catch((e) => {
         g.__edMigrated = null;
