@@ -9,10 +9,10 @@ const card = (page: Page, name: string | RegExp) => page.getByRole('article', { 
 async function addTask(page: Page, status: 'to_do' | 'in_progress' | 'complete', title: string, extra: { due?: string; notes?: string; line?: string } = {}) {
   const col = column(page, status);
   await col.getByRole('button', { name: /^Add a task to/ }).click();
-  await col.getByLabel('Task').fill(title);
-  if (extra.due) await col.getByLabel('Due').fill(extra.due);
-  if (extra.notes) await col.getByLabel('Notes').fill(extra.notes);
-  if (extra.line) await col.getByLabel('Line').selectOption({ label: extra.line });
+  await col.getByLabel('Task', { exact: true }).fill(title);
+  if (extra.due) await col.getByLabel('Due', { exact: true }).fill(extra.due);
+  if (extra.notes) await col.getByLabel('Notes', { exact: true }).fill(extra.notes);
+  if (extra.line) await col.getByLabel('Line', { exact: true }).selectOption({ label: extra.line });
   await col.getByRole('button', { name: 'Add task' }).click();
   await expect(col.getByRole('article', { name: title })).toBeVisible();
 }
@@ -67,16 +67,16 @@ test('my actions: add tasks to each column, move them with the arrows and by dra
   // Edit a task
   const chase = todo.getByRole('article', { name: 'Chase Signs Express for the revised quote' });
   await chase.getByRole('button', { name: 'Edit task' }).click();
-  await chase.getByLabel('Task').fill('Chase Signs Express for the quote');
-  await chase.getByLabel('Due').fill('2099-01-01');
+  await chase.getByLabel('Task', { exact: true }).fill('Chase Signs Express for the quote');
+  await chase.getByLabel('Due', { exact: true }).fill('2099-01-01');
   await chase.getByRole('button', { name: 'Save' }).click();
   await expect(todo.getByRole('article', { name: 'Chase Signs Express for the quote' })).toContainText('Due 1 Jan 99');
   await expect(todo.getByRole('article', { name: 'Chase Signs Express for the revised quote' })).toHaveCount(0);
 
   // A blank title is refused
   await todo.getByRole('button', { name: 'Add a task to To do' }).click();
-  await todo.getByLabel('Task').fill('   ');
-  await todo.getByLabel('Task').evaluate((el) => (el as HTMLInputElement).removeAttribute('required'));
+  await todo.getByLabel('Task', { exact: true }).fill('   ');
+  await todo.getByLabel('Task', { exact: true }).evaluate((el) => (el as HTMLInputElement).removeAttribute('required'));
   await todo.getByRole('button', { name: 'Add task' }).click();
   await expect(todo.getByRole('alert')).toContainText('Task is required.');
   await todo.getByRole('button', { name: 'Cancel' }).click();
