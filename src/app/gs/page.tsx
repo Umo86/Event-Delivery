@@ -10,6 +10,7 @@ import { maintenanceOn, sponsorLinksEnabled } from '@/lib/settings';
 import { blobAccess, isBlobConfigured } from '@/lib/storage';
 import { Mark } from '@/components/brand';
 import { ActionForm, SubmitButton } from '@/components/forms';
+import { PasswordInput } from '@/components/password-input';
 import { Chip, cx, Field, inputCls, Notice, Panel } from '@/components/ui';
 import { superAdminLogin, superAdminLogout } from '@/app/actions/auth';
 import { setSponsorLinks } from '@/app/actions/admin';
@@ -53,7 +54,7 @@ function SignIn({ appName, signedInAs }: { appName: string; signedInAs: string |
               <input id="gs-email" name="email" type="email" autoComplete="username" required className={inputCls} />
             </Field>
             <Field label="Password" htmlFor="gs-password">
-              <input id="gs-password" name="password" type="password" autoComplete="current-password" required className={inputCls} />
+              <PasswordInput id="gs-password" name="password" autoComplete="current-password" required />
             </Field>
             <SubmitButton variant="dark" className="w-full" pendingText="Signing in…">Sign in as super admin</SubmitButton>
           </ActionForm>

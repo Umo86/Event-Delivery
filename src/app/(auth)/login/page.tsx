@@ -6,6 +6,7 @@ import { login } from '@/app/actions/auth';
 import { getDemoLogin } from '@/lib/demo';
 import { maintenanceOn } from '@/lib/settings';
 import { ActionForm, SubmitButton } from '@/components/forms';
+import { PasswordInput } from '@/components/password-input';
 import { Field, inputCls, Notice } from '@/components/ui';
 
 export const metadata: Metadata = { title: 'Sign in' };
@@ -32,7 +33,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
           <input id="email" name="email" type="email" autoComplete="username" required className={inputCls} />
         </Field>
         <Field label="Password" htmlFor="password">
-          <input id="password" name="password" type="password" autoComplete="current-password" required className={inputCls} />
+          <PasswordInput id="password" name="password" autoComplete="current-password" required />
         </Field>
         <SubmitButton className="w-full" pendingText="Signing in…">Sign in</SubmitButton>
       </ActionForm>

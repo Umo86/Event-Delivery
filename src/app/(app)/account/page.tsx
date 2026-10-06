@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { requireUser } from '@/lib/auth/session';
 import { changePassword, updateProfile } from '@/app/actions/auth';
 import { ActionForm, SubmitButton } from '@/components/forms';
+import { PasswordInput } from '@/components/password-input';
 import { Field, inputCls, Notice, PageHeader, Panel } from '@/components/ui';
 
 export const metadata: Metadata = { title: 'Your account' };
@@ -30,13 +31,13 @@ export default async function AccountPage(props: { searchParams: Promise<{ first
         <Panel title="Change password">
           <ActionForm action={changePassword} resetOnSuccess className="space-y-3">
             <Field label={forced ? 'Temporary password' : 'Current password'} htmlFor="current">
-              <input id="current" name="current" type="password" required autoComplete="current-password" className={inputCls} />
+              <PasswordInput id="current" name="current" required autoComplete="current-password" />
             </Field>
             <Field label="New password" htmlFor="password" help="At least 8 characters.">
-              <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" className={inputCls} />
+              <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
             </Field>
             <Field label="New password again" htmlFor="confirm">
-              <input id="confirm" name="confirm" type="password" required minLength={8} autoComplete="new-password" className={inputCls} />
+              <PasswordInput id="confirm" name="confirm" required minLength={8} autoComplete="new-password" />
             </Field>
             <SubmitButton>Change password</SubmitButton>
           </ActionForm>

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { db, isDatabaseConfigured } from '@/lib/db';
 import { setupFirstAdmin } from '@/app/actions/auth';
 import { ActionForm, SubmitButton } from '@/components/forms';
+import { PasswordInput } from '@/components/password-input';
 import { Field, inputCls, Notice } from '@/components/ui';
 
 export const metadata: Metadata = { title: 'Set up' };
@@ -34,10 +35,10 @@ export default async function SetupPage() {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Password" htmlFor="password" help="At least 8 characters.">
-            <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" className={inputCls} />
+            <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
           </Field>
           <Field label="Confirm password" htmlFor="confirm">
-            <input id="confirm" name="confirm" type="password" required minLength={8} autoComplete="new-password" className={inputCls} />
+            <PasswordInput id="confirm" name="confirm" required minLength={8} autoComplete="new-password" />
           </Field>
         </div>
         <SubmitButton className="w-full" pendingText="Creating…">Create admin account</SubmitButton>
