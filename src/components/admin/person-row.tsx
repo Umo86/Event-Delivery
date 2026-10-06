@@ -177,7 +177,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
           <section aria-label={`Departments for ${u.full_name}`} className="min-w-0">
             <h3 className={h3}>Departments</h3>
             {departments.length === 0 ? (
-              <p className={help}>No departments yet. Add them in Settings › Departments.</p>
+              <p className={help}>No departments yet. Add them in Show setup › Departments.</p>
             ) : (
               <ActionForm action={setPersonDepartments} className="space-y-2">
                 <input type="hidden" name="user_id" value={u.id} />

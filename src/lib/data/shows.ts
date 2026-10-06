@@ -16,6 +16,27 @@ export interface ShowSummary {
   when: { label: string; tone: 'now' | 'soon' | 'future' | 'past' | 'none' };
 }
 
+function range(from: string | null, to: string | null): string | null {
+  if (!from || !to) return from ? fmtDate(from, 'long') : to ? fmtDate(to, 'long') : null;
+  if (from === to) return fmtDate(from, 'long');
+  const [fy, fm] = from.split('-');
+  const [ty, tm] = to.split('-');
+  if (fy === ty && fm === tm) return `${Number(from.split('-')[2])}–${fmtDate(to, 'long')}`; // 28–30 Sep 2027
+  if (fy === ty) return `${fmtDate(from, 'long').replace(/ \d{4}$/, '')} – ${fmtDate(to, 'long')}`; // 28 Sep – 1 Oct 2027
+  return `${fmtDate(from, 'long')} – ${fmtDate(to, 'long')}`;
+}
+
+/** A show's run of dates on one line: build-up, open to close, and breakdown. */
+export function showDates(e: Pick<EventRow, 'build_start' | 'show_open' | 'show_close' | 'breakdown_end'>): string {
+  const open = range(e.show_open, e.show_close);
+  const parts = [
+    e.build_start ? `Build-up from ${fmtDate(e.build_start, 'long')}` : null,
+    open ? `Open ${open}` : null,
+    e.breakdown_end ? `Breakdown to ${fmtDate(e.breakdown_end, 'long')}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'No dates set yet.';
+}
+
 function when(e: EventRow, today: string): ShowSummary['when'] {
   if (!e.show_open) return { label: 'Dates not set', tone: 'none' };
   const close = e.show_close ?? e.show_open;

@@ -6,7 +6,7 @@ test.describe.configure({ mode: 'serial' });
 test('departments: the catalogue, people, and assigning to a show and stage', async ({ page }) => {
   await loginAs(page, 'admin');
   await page.goto('/settings/departments');
-  await expect(page.getByRole('navigation', { name: 'Settings' }).getByRole('link', { name: 'Departments' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Show setup' }).getByRole('link', { name: 'Departments' })).toBeVisible();
   for (const d of ['Operations', 'Sales', 'Marketing', 'Content', 'External']) {
     await expect(panel(page, new RegExp(`^${d} `))).toBeVisible(); // seeded defaults
   }

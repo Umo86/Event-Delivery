@@ -204,7 +204,7 @@ test('sign-off stages: approvers, adding, reordering and removing', async ({ pag
   await expect.poll(() => stageNames(page)).toEqual(['Operations', 'Marketing', 'Sponsor', 'Final sign-off']);
 });
 
-test('event settings: owners, budget and suggested deadlines', async ({ page }) => {
+test('show details: owners, budget and suggested deadlines', async ({ page }) => {
   await asAdmin(page);
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Still to set up' })).toBeVisible();
@@ -214,13 +214,13 @@ test('event settings: owners, budget and suggested deadlines', async ({ page }) 
   await page.fill('#budget', '£25,000');
   await page.fill('#build_start', '2027-05-07');
   await page.fill('#show_close', '2027-05-01');
-  await page.getByRole('button', { name: 'Save event settings' }).click();
+  await page.getByRole('button', { name: 'Save show details' }).click();
   await expect(errorMessage(page, 'closing day must be on or after the opening day')).toBeVisible();
   await expect(page.locator('#budget')).toHaveValue('£25,000'); // kept after the error
 
   await page.fill('#show_close', '2027-05-13');
-  await page.getByRole('button', { name: 'Save event settings' }).click();
-  await expect(okMessage(page, 'Event settings saved.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save show details' }).click();
+  await expect(okMessage(page, 'Show details saved.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Suggest from opening day' }).click();
   await expect(okMessage(page, 'Suggested deadlines filled in and saved.')).toBeVisible();

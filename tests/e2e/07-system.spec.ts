@@ -49,9 +49,12 @@ test('the platform can be renamed', async ({ page }) => {
   await expect(nav.getByText('Event Delivery')).toBeVisible();
 });
 
-test('a new event copies stages and sponsors, and people can switch between events', async ({ page }) => {
+test('a new show copies stages and sponsors, and people can switch between shows', async ({ page }) => {
   await loginAs(page, 'admin');
-  await page.goto('/settings/events');
+  await page.goto('/settings/events'); // the old address goes to All shows, where shows are created
+  await expect(page).toHaveURL(/\/shows$/);
+  await page.getByRole('link', { name: 'New show' }).click();
+  await expect(page).toHaveURL(/\/shows\/new$/);
   await page.fill('#ne-name', 'UKCW Birmingham 2027');
   await page.selectOption('#ne-venue', 'NEC Birmingham');
   await page.fill('#ne-build', '2027-09-25');
@@ -62,26 +65,26 @@ test('a new event copies stages and sponsors, and people can switch between even
   await page.getByLabel('Also copy the sponsor list').check();
   // Breakdown can't be before the closing day
   await page.fill('#ne-breakdown', '2027-09-29');
-  await page.getByRole('button', { name: 'Create event' }).click();
+  await page.getByRole('button', { name: 'Create show' }).click();
   await expect(errorMessage(page, 'Breakdown must end on or after the closing day.')).toBeVisible();
   await page.fill('#ne-breakdown', '2027-10-01');
-  await page.getByRole('button', { name: 'Create event' }).click();
+  await page.getByRole('button', { name: 'Create show' }).click();
   await expect(page).toHaveURL(/\/settings\?created=1/);
-  await expect(page.getByText('Event created. Check its dates and deadlines below.')).toBeVisible();
+  await expect(page.getByText('Show created. Check its dates and deadlines below.')).toBeVisible();
   await expect(page.locator('#name')).toHaveValue('UKCW Birmingham 2027');
   await expect(page.locator('#build_start')).toHaveValue('2027-09-25');
   await expect(page.locator('#breakdown_end')).toHaveValue('2027-10-01');
   await expect(page.getByLabel('Organiser signage artwork due')).toHaveValue('2027-08-17');
   await expect(page.locator('#budget')).toHaveValue('25000');
 
-  // The events list shows the run of dates
-  await page.goto('/settings/events');
+  // All shows lists the run of dates
+  await page.goto('/shows');
   await expect(page.locator('li').filter({ hasText: 'UKCW Birmingham 2027' }))
     .toContainText('Build-up from 25 Sep 2027 · Open 28–30 Sep 2027 · Breakdown to 1 Oct 2027');
-  await page.screenshot({ path: test.info().outputPath('events.png'), fullPage: true });
+  await page.screenshot({ path: test.info().outputPath('all-shows.png'), fullPage: true });
   await page.goto('/suppliers');
   await page.locator('aside').first().screenshot({ path: test.info().outputPath('sidebar.png') });
-  await page.goto('/settings/events'); // back for the rest of the test
+  await page.goto('/shows'); // back for the rest of the test
 
   const switcher = page.locator('#event-switch');
   await expect(switcher.locator('option:checked')).toHaveText('UKCW Birmingham 2027');
@@ -105,19 +108,20 @@ test('a new event copies stages and sponsors, and people can switch between even
   await expect(page.getByRole('heading', { name: 'UKCW Birmingham 2027', level: 2 })).toBeVisible();
 });
 
-test('events can be archived, but one must stay active', async ({ page }) => {
+test('shows can be archived and restored from All shows, but one must stay live', async ({ page }) => {
   await loginAs(page, 'admin');
-  await page.goto('/settings/events');
+  await page.goto('/shows');
   const bham = page.locator('li').filter({ hasText: 'UKCW Birmingham 2027' });
+  const london = page.locator('li').filter({ hasText: 'UKCW London 2027' });
   acceptNextDialog(page);
   await bham.getByRole('button', { name: 'Archive' }).click();
   await expect(bham.getByText('Archived', { exact: true })).toBeVisible();
-  const london = page.locator('li').filter({ hasText: 'UKCW London 2027' });
-  acceptNextDialog(page);
-  await london.getByRole('button', { name: 'Archive' }).click();
-  await expect(errorMessage(london, 'Keep at least one active event.')).toBeVisible();
+  await expect(panel(page, /^Archived \(1\)$/)).toContainText('UKCW Birmingham 2027');
+  // London is now the only live show, so it isn't offered for archiving
+  await expect(london.getByRole('button', { name: 'Archive' })).toHaveCount(0);
   await bham.getByRole('button', { name: 'Restore' }).click();
   await expect(bham.getByText('Archived', { exact: true })).toHaveCount(0);
+  await expect(london.getByRole('button', { name: 'Archive' })).toBeVisible();
   await page.locator('#event-switch').selectOption({ label: 'UKCW London 2027' });
   await expect(page.locator('#event-switch option:checked')).toHaveText('UKCW London 2027');
 });
@@ -151,7 +155,7 @@ test.describe('on a phone', () => {
     await loginAs(page, 'admin');
     const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/schedule/ss/new', '/sponsors',
       `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/admin',
-      '/suppliers', '/settings/lists', '/settings/events', '/admin/platform', '/admin/activity', '/account', '/gs'];
+      '/suppliers', '/settings/lists', '/shows', '/shows/new', '/admin/platform', '/admin/activity', '/account', '/gs'];
     const wide: string[] = [];
     for (const p of pages) {
       await page.goto(p);

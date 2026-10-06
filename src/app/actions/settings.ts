@@ -58,16 +58,16 @@ export async function updateEvent(_prev: ActionResult | null, fd: FormData): Pro
     };
     const sql = await db();
     await sql`update events set ${sql(values as never)} where id = ${id}`;
-    await logActivity(sql, { eventId: id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: 'Updated event settings' });
+    await logActivity(sql, { eventId: id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: 'Updated the show details' });
     refresh();
-    return { ok: true, message: suggest ? 'Suggested deadlines filled in and saved.' : 'Event settings saved.' };
+    return { ok: true, message: suggest ? 'Suggested deadlines filled in and saved.' : 'Show details saved.' };
   });
 }
 
 export async function createEvent(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const me = await actor('manager');
-    const name = required(fd, 'name', 'Event name', 120);
+    const name = required(fd, 'name', 'Show name', 120);
     const venue = required(fd, 'venue', 'Venue', 80);
     const buildStart = date(fd, 'build_start', 'Build-up start');
     const showOpen = date(fd, 'show_open', 'Opening day');
@@ -118,7 +118,7 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
                on conflict do nothing`;
       return ev.id;
     });
-    await logActivity(sql, { eventId: newId, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Created event ${name}` });
+    await logActivity(sql, { eventId: newId, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Created the show ${name}` });
     const jar = await cookies();
     jar.set(EVENT_COOKIE, newId, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
     refresh();
@@ -135,12 +135,12 @@ export async function setEventArchived(_prev: ActionResult | null, fd: FormData)
     const sql = await db();
     if (archived) {
       const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from events where not archived and id <> ${id}`;
-      if (n === 0) throw new UserError('Keep at least one active event. Create the next one first.');
+      if (n === 0) throw new UserError('Keep at least one live show. Create the next one first.');
     }
     await sql`update events set archived = ${archived} where id = ${id}`;
-    await logActivity(sql, { eventId: id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: archived ? 'Archived the event' : 'Restored the event' });
+    await logActivity(sql, { eventId: id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: archived ? 'Archived the show' : 'Restored the show' });
     refresh();
-    return { ok: true, message: archived ? 'Event archived.' : 'Event restored.' };
+    return { ok: true, message: archived ? 'Show archived.' : 'Show restored.' };
   });
 }
 

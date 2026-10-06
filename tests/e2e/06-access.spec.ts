@@ -6,7 +6,7 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 async function settingsTabs(page: Page) {
-  return (await page.getByRole('navigation', { name: 'Settings' }).getByRole('link').allInnerTexts()).map((t) => t.trim());
+  return (await page.getByRole('navigation', { name: 'Show setup' }).getByRole('link').allInnerTexts()).map((t) => t.trim());
 }
 
 test('signed-out visitors are sent to sign in, then back to the page they wanted', async ({ page, request }) => {
@@ -80,10 +80,10 @@ test('managers can run signage and settings, but not user management or system',
   await expect(page.getByRole('heading', { name: /shows/i, level: 1 })).toBeVisible();
   await page.goto('/settings/stages');
   await expect(page).toHaveURL(/\/settings\/stages$/);
-  await page.goto('/settings/events');
-  await expect(page).toHaveURL(/\/settings\/events$/);
+  await page.goto('/shows/new');
+  await expect(page.getByRole('heading', { name: 'New show', level: 1 })).toBeVisible();
   await page.goto('/settings');
-  expect(await settingsTabs(page)).toEqual(['Event', 'Sign-off stages', 'Departments', 'Dropdown lists', 'Events']); // no System
+  expect(await settingsTabs(page)).toEqual(['Details and dates', 'Sign-off stages', 'Departments', 'Dropdown lists']);
 
   await page.goto('/suppliers'); // managers can add, edit and remove suppliers
   await expect(page.getByRole('button', { name: 'Add supplier' })).toBeVisible();

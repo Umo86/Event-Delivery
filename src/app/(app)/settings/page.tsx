@@ -5,12 +5,12 @@ import { requireManager } from '@/lib/auth/session';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { VENUES } from '@/lib/domain/labels';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { Field, inputCls, Notice, Panel, cx } from '@/components/ui';
+import { Field, Intro, inputCls, Notice, Panel, cx } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 import { updateEvent } from '@/app/actions/settings';
 import { setEventDepartments } from '@/app/actions/departments';
 
-export const metadata: Metadata = { title: 'Event settings' };
+export const metadata: Metadata = { title: 'Show setup' };
 
 export default async function EventSettingsPage(props: { searchParams: Promise<{ welcome?: string; created?: string }> }) {
   await requireManager();
@@ -39,7 +39,8 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
 
   return (
     <div className="space-y-6">
-      {sp.created && <Notice tone="ok">Event created. Check its dates and deadlines below.</Notice>}
+      <Intro>Name, venue, dates and deadlines for {e.name}. To set up a different show, switch to it from the menu.</Intro>
+      {sp.created && <Notice tone="ok">Show created. Check its dates and deadlines below.</Notice>}
       {showSteps && (
         <Panel title={sp.welcome ? 'Welcome. Here’s how to get set up' : 'Still to set up'}>
           <ol className="space-y-2">
@@ -58,9 +59,9 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
 
       <ActionForm action={updateEvent} className="space-y-6">
         <input type="hidden" name="event_id" value={e.id} />
-        <Panel title="Event">
+        <Panel title="Show details">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Event name" htmlFor="name"><input id="name" name="name" required defaultValue={e.name} className={inputCls} /></Field>
+            <Field label="Show name" htmlFor="name"><input id="name" name="name" required defaultValue={e.name} className={inputCls} /></Field>
             <Field label="Venue" htmlFor="venue" help="Sets which hall list appears.">
               <select id="venue" name="venue" defaultValue={e.venue} className={inputCls}>
                 {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -121,7 +122,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
             </table>
           </div>
         </Panel>
-        <SubmitButton>Save event settings</SubmitButton>
+        <SubmitButton>Save show details</SubmitButton>
       </ActionForm>
 
       <Panel title="Departments involved">
@@ -130,7 +131,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
           <Link href="/settings/departments" className="font-semibold text-ink underline underline-offset-2">Departments</Link>.
         </p>
         {bundle.departments.length === 0 ? (
-          <p className="text-[14px] text-muted">No departments yet. Add them in Settings › Departments.</p>
+          <p className="text-[14px] text-muted">No departments yet. Add them in Show setup › Departments.</p>
         ) : (
           <ActionForm action={setEventDepartments} className="space-y-3">
             <input type="hidden" name="event_id" value={e.id} />
