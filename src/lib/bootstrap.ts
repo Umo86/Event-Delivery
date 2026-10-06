@@ -69,7 +69,7 @@ export async function ensureAdminPassword(sql: Sql): Promise<void> {
   const [u] = await sql<{ id: string; full_name: string }[]>`select id, full_name from users where lower(email) = ${email}`;
   if (!u) return; // nothing to reset yet
   const hash = await hashPassword(password);
-  await sql`update users set password_hash = ${hash}, must_change_password = false, failed_logins = 0, locked_until = null where id = ${u.id}`;
+  await sql`update users set password_hash = ${hash}, must_change_password = false, failed_logins = 0, locked_until = null, active = true where id = ${u.id}`;
   await sql`delete from sessions where user_id = ${u.id}`; // force a fresh sign-in with the new password
   await sql`insert into app_settings (key, value) values (${key}, ${stamp})
             on conflict (key) do update set value = excluded.value, updated_at = now()`;
