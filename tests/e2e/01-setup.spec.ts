@@ -85,12 +85,12 @@ test('setup cannot be run a second time', async ({ page, request }) => {
 
 test('sign out, failed sign in and sign in', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
-  await expect(page).toHaveURL(/\/inbox$/);
-  await expect(page.getByRole('heading', { name: 'My actions' })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole('heading', { name: 'Control centre' })).toBeVisible();
   await logout(page);
 
-  await page.goto('/dashboard');
-  await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
+  await page.goto('/sponsors');
+  await expect(page).toHaveURL(/\/login\?next=%2Fsponsors$/);
   await page.fill('#email', ADMIN.email);
   await page.fill('#password', 'wrong-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -100,8 +100,8 @@ test('sign out, failed sign in and sign in', async ({ page }) => {
   await page.fill('#email', ADMIN.email.toUpperCase());
   await page.fill('#password', ADMIN.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page).toHaveURL(/\/sponsors$/);
+  await expect(page.getByRole('heading', { name: 'Sponsors', level: 1 })).toBeVisible();
 });
 
 test('sign-in ignores links to other websites', async ({ page }) => {
@@ -110,5 +110,5 @@ test('sign-in ignores links to other websites', async ({ page }) => {
   await page.fill('#email', ADMIN.email);
   await page.fill('#password', ADMIN.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page).toHaveURL(/127\.0\.0\.1:3100\/inbox$/);
+  await expect(page).toHaveURL(/127\.0\.0\.1:3100\/dashboard$/);
 });

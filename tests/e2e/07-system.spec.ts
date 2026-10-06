@@ -101,7 +101,7 @@ test('a new event copies stages and sponsors, and people can switch between even
   await page.goto(`/items/${itemId('os1')}`);
   await page.locator('#event-switch').selectOption({ label: 'UKCW Birmingham 2027' });
   await expect(page).toHaveURL(/\/dashboard$/); // a line belongs to one event, so switching goes to the dashboard
-  await expect(page.getByText('UKCW Birmingham 2027, NEC Birmingham.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'UKCW Birmingham 2027', level: 2 })).toBeVisible();
 });
 
 test('events can be archived, but one must stay active', async ({ page }) => {

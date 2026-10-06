@@ -23,7 +23,7 @@ function isLocalPath(s: string): boolean {
 
 function safeNext(v: FormDataEntryValue | null): string {
   const s = typeof v === 'string' ? v : '';
-  return isLocalPath(s) && !s.startsWith('/login') ? s : '/inbox';
+  return isLocalPath(s) && !s.startsWith('/login') ? s : '/dashboard';
 }
 
 /**
@@ -158,7 +158,7 @@ export async function changePassword(_prev: ActionResult | null, fd: FormData): 
     const jar = await cookies();
     const keep = jar.get(SESSION_COOKIE)?.value;
     await sql`delete from sessions where user_id = ${me.id} and token_hash <> ${keep ? sha256(keep) : ''}`;
-    if (u.must_change_password) redirect('/inbox');
+    if (u.must_change_password) redirect('/dashboard');
     return { ok: true, message: 'Password changed.' };
   });
 }

@@ -23,6 +23,6 @@ test('admins get an overview of every show and can open one', async ({ page }) =
   // Opening a show switches to it and lands on its dashboard
   await bham.getByRole('button').click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText('UKCW Birmingham 2027, NEC Birmingham.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'UKCW Birmingham 2027', level: 2 })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main' }).first().locator('#event-switch option:checked')).toHaveText('UKCW Birmingham 2027');
 });

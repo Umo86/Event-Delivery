@@ -8,7 +8,7 @@ export function proxy(request: NextRequest) {
   url.searchParams.delete('_rsc');
   const next = `${url.pathname}${url.search}`;
   url.pathname = '/login';
-  url.search = next === '/inbox' ? '' : `?next=${encodeURIComponent(next)}`;
+  url.search = next === '/dashboard' ? '' : `?next=${encodeURIComponent(next)}`;
   return NextResponse.redirect(url);
 }
 

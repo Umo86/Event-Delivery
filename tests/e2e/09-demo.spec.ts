@@ -18,10 +18,10 @@ test.describe('shared demo login @demo', () => {
     await expect(box).toContainText(DEMO.email);
     await expect(box).toContainText(DEMO.password);
     await box.getByRole('button', { name: 'Sign in with the demo account' }).click();
-    await expect(page).toHaveURL(/\/inbox$/); // no forced password change
+    await expect(page).toHaveURL(/\/dashboard$/); // no forced password change
     const nav = page.getByRole('navigation', { name: 'Main' }).first();
     await expect(nav.getByText('Demo User')).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
+    await expect(nav.getByRole('link', { name: 'People', exact: true })).toHaveCount(0);
     await page.goto('/account');
     await expect(page.getByText('You’re using the shared demo account')).toBeVisible();
     await expect(page.locator('#password')).toHaveCount(0); // its password can't be changed
@@ -39,7 +39,7 @@ test.describe('shared demo login @demo', () => {
       await expect(errorMessage(page, 'don’t match an account')).toBeVisible();
     }
     await page.getByRole('region', { name: 'Trying it out?' }).getByRole('button', { name: 'Sign in with the demo account' }).click();
-    await expect(page).toHaveURL(/\/inbox$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
   });
 
   test('admins see the demo login flagged and can take it off the sign-in page', async ({ browser, page }) => {

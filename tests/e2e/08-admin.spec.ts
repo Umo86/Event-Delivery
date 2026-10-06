@@ -11,7 +11,7 @@ test('the admin page is for signed-in admins only', async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin$/);
   await loginAs(page, 'admin');
   await page.goto('/dashboard');
-  await page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Admin', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'People', exact: true }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible();
   // The old team page now lives here
@@ -82,11 +82,11 @@ test('sign-off responsibilities are handed over from each person’s row', async
   await olivia.getByLabel('Access level', { exact: true }).selectOption('user');
   await olivia.getByRole('button', { name: 'Save access' }).click();
   await expect(okMessage(olivia, 'They still look after Operations stage, but users can’t sign off')).toBeVisible();
-  await expect(page.getByText('Olivia Ops approves Operations but is a viewer.')).toBeVisible();
+  await expect(page.getByText('Olivia Ops approves Operations but is a User.')).toBeVisible();
   await olivia.getByLabel('Access level', { exact: true }).selectOption('manager');
   await olivia.getByRole('button', { name: 'Save access' }).click();
   await expect(okMessage(olivia, 'Olivia Ops is now a Manager.')).toBeVisible();
-  await expect(page.getByText('Olivia Ops approves Operations but is a viewer.')).toHaveCount(0);
+  await expect(page.getByText('Olivia Ops approves Operations but is a User.')).toHaveCount(0);
 });
 
 test('an expired invite is refused at sign-in and can be sent again', async ({ browser, page }) => {

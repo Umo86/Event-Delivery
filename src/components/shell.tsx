@@ -21,24 +21,46 @@ export interface ShellProps {
   children: React.ReactNode;
 }
 
-const NAV = [
-  { href: '/inbox', label: 'My actions', icon: Inbox, key: 'inbox' },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
-  { href: '/shows', label: 'All shows', icon: CalendarRange, key: 'shows' },
-  { href: '/schedule/os', label: 'Organiser signage', icon: Signpost, key: 'os' },
-  { href: '/schedule/ss', label: 'Sponsor signage', icon: Flag, key: 'ss' },
-  { href: '/schedule/si', label: 'Sponsor items', icon: Package, key: 'si' },
-  { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
-  { href: '/suppliers', label: 'Suppliers', icon: Truck, key: 'suppliers' },
-  { href: '/settings', label: 'Settings', icon: Settings, key: 'settings' },
-  { href: '/admin', label: 'Admin', icon: ShieldCheck, key: 'admin' },
-  { href: '/gs', label: 'Super admin', icon: Gauge, key: 'gs' },
-] as const;
+type NavItem = { href: string; label: string; icon: typeof Inbox; key: string };
+
+/** The menu, grouped, with each role seeing only what it can use. */
+function navFor(role: string): { group: string; items: NavItem[] }[] {
+  const manager = role === 'super_admin' || role === 'manager';
+  const home = role === 'super_admin' ? 'Control centre' : role === 'user' ? 'Overview' : 'Dashboard';
+  const groups: { group: string; items: NavItem[] }[] = [
+    { group: 'Home', items: [
+      { href: '/dashboard', label: home, icon: LayoutDashboard, key: 'dashboard' },
+      { href: '/inbox', label: manager ? 'My actions' : 'My tasks', icon: Inbox, key: 'inbox' },
+    ] },
+    { group: 'Signage', items: [
+      { href: '/schedule/os', label: 'Organiser signage', icon: Signpost, key: 'os' },
+      { href: '/schedule/ss', label: 'Sponsor signage', icon: Flag, key: 'ss' },
+      { href: '/schedule/si', label: 'Sponsor items', icon: Package, key: 'si' },
+    ] },
+    { group: 'Show', items: [
+      { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
+      { href: '/suppliers', label: 'Suppliers', icon: Truck, key: 'suppliers' },
+      ...(manager ? [{ href: '/settings', label: 'Show setup', icon: Settings, key: 'settings' }] : []),
+    ] },
+  ];
+  if (role === 'super_admin') {
+    groups.push({ group: 'Admin', items: [
+      { href: '/admin', label: 'People', icon: ShieldCheck, key: 'admin' },
+      { href: '/gs', label: 'Platform', icon: Gauge, key: 'platform' },
+    ] });
+  }
+  return groups;
+}
 
 export function AppShell(p: ShellProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [pathname]);
+  const groups = navFor(p.user.role);
+  // The most specific item that matches the current page is the active one
+  const activeHref = groups.flatMap((g) => g.items.map((i) => i.href))
+    .filter((h) => pathname === h || pathname.startsWith(h + '/'))
+    .sort((a, b) => b.length - a.length)[0];
 
   const nav = (
     <nav className="flex h-full flex-col" aria-label="Main">
@@ -50,7 +72,7 @@ export function AppShell(p: ShellProps) {
       {p.currentEvent && (
         <form action={p.switchEvent} className="mx-3 mb-3 rounded-lg bg-white/[0.06] p-3">
           <input type="hidden" name="back" value={pathname} />
-          <label htmlFor="event-switch" className="block text-[12px] font-medium text-white/60">Event</label>
+          <label htmlFor="event-switch" className="block text-[12px] font-medium text-white/60">Show</label>
           <select
             key={p.currentEvent.id /* remount so the shown event always matches the one in use */}
             id="event-switch"
@@ -67,43 +89,51 @@ export function AppShell(p: ShellProps) {
           </select>
           <p className="mt-0.5 text-[12.5px] text-white/60">{p.currentEvent.detail}</p>
           <noscript><button className="mt-2 text-[12px] underline">Switch</button></noscript>
+          {(p.user.role === 'super_admin' || p.user.role === 'manager') && (
+            <Link href="/shows" aria-current={pathname === '/shows' ? 'page' : undefined}
+              className={cx('mt-2 flex items-center gap-1.5 text-[13px] font-semibold', pathname === '/shows' ? 'text-signal' : 'text-white/75 hover:text-white')}>
+              <CalendarRange size={14} aria-hidden /> All shows
+            </Link>
+          )}
         </form>
       )}
 
-      <ul className="flex-1 space-y-0.5 px-3">
-        {NAV.filter((n) => {
-          const manager = p.user.role === 'super_admin' || p.user.role === 'manager';
-          if (n.key === 'admin' || n.key === 'gs') return p.user.superAdmin;
-          if (n.key === 'shows' || n.key === 'settings') return manager;
-          return true;
-        }).map((n) => {
-          const active = pathname === n.href || pathname.startsWith(n.href + '/');
-          const count = n.key === 'inbox' ? p.myCount : n.key === 'os' || n.key === 'ss' || n.key === 'si' ? p.counts[n.key] : null;
-          return (
-            <li key={n.href}>
-              <Link
-                href={n.href}
-                aria-current={active ? 'page' : undefined}
-                className={cx(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-[15px] font-medium transition-colors',
-                  active ? 'bg-signal text-ink' : 'text-white/80 hover:bg-white/[0.08] hover:text-white',
-                )}
-              >
-                <n.icon size={18} strokeWidth={2} aria-hidden />
-                <span className="flex-1">{n.label}</span>
-                {count !== null && count > 0 && (
-                  <span className={cx(
-                    'min-w-6 rounded-full px-1.5 text-center text-[12px] font-bold',
-                    n.key === 'inbox' ? (active ? 'bg-ink text-signal' : 'bg-signal text-ink') : active ? 'bg-ink/10 text-ink' : 'bg-white/10 text-white/70',
-                  )}>
-                    {count}
-                  </span>
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="flex-1 space-y-3 overflow-y-auto px-3 pb-3">
+        {groups.map((g) => (
+          <div key={g.group}>
+            <p className="px-3 pb-1 text-[12px] font-medium text-white/45">{g.group}</p>
+            <ul className="space-y-0.5">
+              {g.items.map((n) => {
+                const active = n.href === activeHref;
+                const count = n.key === 'inbox' ? p.myCount : n.key === 'os' || n.key === 'ss' || n.key === 'si' ? p.counts[n.key] : null;
+                return (
+                  <li key={n.href}>
+                    <Link
+                      href={n.href}
+                      aria-current={active ? 'page' : undefined}
+                      className={cx(
+                        'flex items-center gap-3 rounded-md px-3 py-[7px] text-[15px] font-medium transition-colors',
+                        active ? 'bg-signal text-ink' : 'text-white/80 hover:bg-white/[0.08] hover:text-white',
+                      )}
+                    >
+                      <n.icon size={18} strokeWidth={2} aria-hidden />
+                      <span className="flex-1">{n.label}</span>
+                      {count !== null && count > 0 && (
+                        <span className={cx(
+                          'min-w-6 rounded-full px-1.5 text-center text-[12px] font-bold',
+                          n.key === 'inbox' ? (active ? 'bg-ink text-signal' : 'bg-signal text-ink') : active ? 'bg-ink/10 text-ink' : 'bg-white/10 text-white/70',
+                        )}>
+                          {count}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
 
       <div className="border-t border-white/10 p-3">
         <Link href="/account" className="flex items-center gap-3 rounded-md px-3 py-2 text-white/85 hover:bg-white/[0.08]">

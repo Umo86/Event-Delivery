@@ -26,12 +26,12 @@ test('the super admin page has its own sign-in, for super admins only', async ({
   await expect(panel(page, 'Audit trail')).toContainText(`${ADMIN.name}: Signed in to the super admin panel`);
   await page.getByRole('link', { name: 'Back to the platform' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Super admin', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Platform', exact: true })).toBeVisible();
 });
 
 test('people who aren’t super admins can’t open the panel', async ({ page }) => {
   await loginAs(page, 'pete');
-  await expect(page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Super admin', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'Platform', exact: true })).toHaveCount(0);
   await page.goto('/gs');
   await expect(page.getByText('You’re signed in as Pete Production, who isn’t a super admin.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign everyone else out' })).toHaveCount(0);
@@ -90,12 +90,12 @@ test('maintenance mode lets only super admins in', async ({ browser, page }) => 
   await expect(errorMessage(pete.page, 'closed for maintenance, so only super admins can sign in')).toBeVisible();
 
   await page.goto('/dashboard'); // super admins carry on as normal
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Control centre' })).toBeVisible();
   await page.goto('/gs');
   await panel(page, 'Platform switches').getByRole('button', { name: 'Turn maintenance off' }).click();
   await expect(okMessage(panel(page, 'Platform switches'), 'Maintenance mode is off.')).toBeVisible();
   await login(pete.page, user('pete').email, user('pete').password);
-  await expect(pete.page).toHaveURL(/\/inbox$/);
+  await expect(pete.page).toHaveURL(/\/dashboard$/);
   await pete.ctx.close();
 });
 
@@ -164,12 +164,14 @@ test('the super admin dashboard has event info, signage info, quick links and ch
   await pw.locator('#gs-confirm').fill('Umit-super-2027x');
   await pw.getByRole('button', { name: 'Change password' }).click();
   await expect(okMessage(pw, 'Password changed.')).toBeVisible();
+  await expect(pw.locator('#gs-cur')).toHaveValue(''); // saved and the form has cleared
 
   await pw.locator('#gs-cur').fill('Umit-super-2027x');
   await pw.locator('#gs-new').fill(ADMIN.password);
   await pw.locator('#gs-confirm').fill(ADMIN.password);
   await pw.getByRole('button', { name: 'Change password' }).click();
   await expect(okMessage(pw, 'Password changed.')).toBeVisible();
+  await expect(pw.locator('#gs-cur')).toHaveValue(''); // saved and the form has cleared
 
   // Wrong current password is rejected
   await pw.locator('#gs-cur').fill('not-the-password');

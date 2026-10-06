@@ -55,9 +55,9 @@ test('users can look but not change anything', async ({ page }) => {
     await expect(page.getByText('You don’t have access to that page.')).toBeVisible();
   }
   const mainNav = page.getByRole('navigation', { name: 'Main' }).first();
-  await expect(mainNav.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
+  await expect(mainNav.getByRole('link', { name: 'People', exact: true })).toHaveCount(0);
   await expect(mainNav.getByRole('link', { name: 'All shows' })).toHaveCount(0);
-  await expect(mainNav.getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await expect(mainNav.getByRole('link', { name: 'Show setup' })).toHaveCount(0);
   await page.goto('/sponsors');
   await expect(page.getByRole('heading', { name: 'Add a sponsor' })).toHaveCount(0);
 
@@ -123,7 +123,7 @@ test('deactivated people are signed out and cannot sign back in', async ({ brows
   const vic = await vicCtx.newPage();
   await loginAs(vic, 'vic');
   await vic.goto('/dashboard');
-  await expect(vic.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(vic.getByRole('heading', { name: 'Overview' })).toBeVisible();
 
   await login(page, ADMIN.email, ADMIN.password);
   await page.goto('/admin');
@@ -152,7 +152,7 @@ test('deactivated people are signed out and cannot sign back in', async ({ brows
   await expect(okMessage(row, 'Vic Viewer can sign in again.')).toBeVisible();
   await expect(row.locator('summary').getByText('Deactivated', { exact: true })).toHaveCount(0);
   await login(vic, user('vic').email, user('vic').password);
-  await expect(vic).toHaveURL(/\/inbox$/);
+  await expect(vic).toHaveURL(/\/dashboard$/);
   await vicCtx.close();
 });
 
@@ -191,6 +191,6 @@ test('too many wrong passwords lock the account until it is reset', async ({ pag
   await page.fill('#password', 'Mark-pass-2027b');
   await page.fill('#confirm', 'Mark-pass-2027b');
   await page.getByRole('button', { name: 'Change password' }).click();
-  await expect(page).toHaveURL(/\/inbox$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   saveUser('mark', { ...mark, password: 'Mark-pass-2027b' });
 });

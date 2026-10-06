@@ -121,7 +121,7 @@ test('new people must choose their own password when they first sign in', async 
     await page.fill('#password', next);
     await page.fill('#confirm', next);
     await page.getByRole('button', { name: 'Change password' }).click();
-    await expect(page).toHaveURL(/\/inbox$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     saveUser(p.key, { name: p.name, email: p.email, password: next });
   }
   await asAdmin(page);
@@ -157,7 +157,7 @@ test('admin can reset a forgotten password and send the new one', async ({ page,
   await vic.fill('#password', 'Vic-pass-2027b');
   await vic.fill('#confirm', 'Vic-pass-2027b');
   await vic.getByRole('button', { name: 'Change password' }).click();
-  await expect(vic).toHaveURL(/\/inbox$/);
+  await expect(vic).toHaveURL(/\/dashboard$/);
   saveUser('vic', { ...user('vic'), password: 'Vic-pass-2027b' });
   await ctx.close();
 });

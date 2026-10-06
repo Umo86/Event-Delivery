@@ -18,7 +18,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
   const sql = await db();
   const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users`;
   if (n === 0) redirect('/setup');
-  if (await getCurrentUser()) redirect('/inbox');
+  if (await getCurrentUser()) redirect('/dashboard');
   const [demo, maintenance] = await Promise.all([getDemoLogin(), maintenanceOn()]);
   return (
     <>

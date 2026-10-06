@@ -6,6 +6,7 @@ import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { fmtDateTime } from '@/lib/dates';
 import { ABILITIES, ACCESS_LEVELS, personStatus, TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
 import { sponsorLinksEnabled } from '@/lib/settings';
+import { loadAttention } from '@/lib/data/attention';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { cx, Field, inputCls, PageHeader, Panel } from '@/components/ui';
 import { DetailsForm } from '@/components/admin/details-form';
@@ -38,7 +39,6 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
   const deptIds = new Map<string, string[]>();
   for (const m of memberships) (deptIds.get(m.user_id) ?? deptIds.set(m.user_id, []).get(m.user_id)!).push(m.department_id);
   const names = new Map(people.map((p) => [p.id, p.full_name]));
-  const byId = new Map(people.map((p) => [p.id, p]));
   const stages = (bundle?.stages ?? []).filter((s) => !s.uses_account_manager);
   const sponsors = bundle?.sponsors ?? [];
 
@@ -50,39 +50,8 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     else counts.active += 1;
   }
 
-  // Things an admin should sort out, most important first
-  const attention: { text: string; href: string; action: string }[] = [];
-  const personLink = (id: string) => `/admin?person=${id}#person-${id}`;
-  for (const p of people) {
-    if (p.is_demo && p.active) {
-      attention.push({ text: `The demo login is on the sign-in page, so anyone with the link can sign in as ${p.full_name}.`, href: personLink(p.id), action: 'Open' });
-    }
-    const st = personStatus(p);
-    if (st === 'invite_expired') attention.push({ text: `${p.full_name}’s invite has expired.`, href: personLink(p.id), action: 'New invite' });
-    if (p.active && p.locked_until && new Date(p.locked_until) > new Date()) {
-      attention.push({ text: `${p.full_name} is locked out after too many wrong passwords.`, href: personLink(p.id), action: 'Open' });
-    }
-  }
-  const cantSignOff = (id: string | null) => {
-    const p = id ? byId.get(id) : null;
-    return p && (!p.active || p.role === 'user') ? p : null;
-  };
-  for (const s of stages) {
-    if (s.approver_ids.length === 0) {
-      attention.push({ text: `The ${s.name} stage has no approver.`, href: '/settings/stages', action: 'Choose' });
-      continue;
-    }
-    for (const aid of s.approver_ids) {
-      const p = cantSignOff(aid);
-      if (p) attention.push({ text: `${p.full_name} approves ${s.name} but ${p.active ? 'is a viewer' : 'is deactivated'}.`, href: personLink(p.id), action: 'Open' });
-    }
-  }
-  const noManager = sponsors.filter((s) => !s.account_manager_id).length;
-  if (noManager) attention.push({ text: `${noManager} sponsor${noManager === 1 ? ' has' : 's have'} no account manager.`, href: '/sponsors', action: 'View' });
-  for (const s of sponsors) {
-    const p = cantSignOff(s.account_manager_id);
-    if (p) attention.push({ text: `${p.full_name} manages ${s.name} but ${p.active ? 'is a viewer' : 'is deactivated'}.`, href: personLink(p.id), action: 'Open' });
-  }
+  // Things a super admin should sort out, most important first (shared with the Control centre)
+  const attention = await loadAttention(sql, event?.id ?? null);
 
   return (
     <>
