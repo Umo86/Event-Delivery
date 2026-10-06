@@ -136,3 +136,45 @@ test('a super admin can see who is signed in and sign them out', async ({ browse
   await page.goto('/gs');
   await page.screenshot({ path: test.info().outputPath('super-admin-sign-in.png') });
 });
+
+test('the super admin dashboard has event info, signage info, quick links and change password', async ({ page }) => {
+  await loginAs(page, 'admin');
+  await page.goto('/gs');
+
+  // Quick links to everything a manager (and more) can reach
+  const links = panel(page, 'Go to the platform');
+  for (const name of ['All shows', 'Organiser signage', 'Sponsors', 'Suppliers', 'Settings', 'Admin (people)']) {
+    await expect(links.getByRole('link', { name, exact: true })).toBeVisible();
+  }
+
+  // Signage info for the current show
+  const signage = page.locator('section').filter({ has: page.getByRole('heading', { name: /^Signage/ }) });
+  await expect(signage).toContainText('Total lines');
+  await expect(signage.getByRole('link', { name: 'Organiser signage' })).toBeVisible();
+
+  // Event info
+  const events = panel(page, /^Events \(/);
+  await expect(events).toContainText('UKCW London 2027');
+  await expect(events.getByRole('link', { name: 'Create or manage events' })).toBeVisible();
+
+  // Change your own password, right here — then change it back so the rest of the suite still signs in
+  const pw = panel(page, 'Your password');
+  await pw.locator('#gs-cur').fill(ADMIN.password);
+  await pw.locator('#gs-new').fill('Umit-super-2027x');
+  await pw.locator('#gs-confirm').fill('Umit-super-2027x');
+  await pw.getByRole('button', { name: 'Change password' }).click();
+  await expect(okMessage(pw, 'Password changed.')).toBeVisible();
+
+  await pw.locator('#gs-cur').fill('Umit-super-2027x');
+  await pw.locator('#gs-new').fill(ADMIN.password);
+  await pw.locator('#gs-confirm').fill(ADMIN.password);
+  await pw.getByRole('button', { name: 'Change password' }).click();
+  await expect(okMessage(pw, 'Password changed.')).toBeVisible();
+
+  // Wrong current password is rejected
+  await pw.locator('#gs-cur').fill('not-the-password');
+  await pw.locator('#gs-new').fill('Another-pass-1');
+  await pw.locator('#gs-confirm').fill('Another-pass-1');
+  await pw.getByRole('button', { name: 'Change password' }).click();
+  await expect(errorMessage(pw, 'Your current password isn’t right.')).toBeVisible();
+});

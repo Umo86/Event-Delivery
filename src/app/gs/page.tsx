@@ -1,20 +1,36 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import {
+  ArrowLeft, CalendarRange, Flag, Handshake, Inbox, LayoutDashboard, LogOut, Package, Settings, ShieldCheck, Signpost, Truck,
+} from 'lucide-react';
 import { db, isDatabaseConfigured } from '@/lib/db';
 import { LATEST_VERSION } from '@/lib/db/migrations';
 import { getCurrentUser, type CurrentUser } from '@/lib/auth/session';
-import { getAppName } from '@/lib/data/load';
-import { fmtDateTime } from '@/lib/dates';
+import { getAppName, getCurrentEvent, listEvents, loadSchedule } from '@/lib/data/load';
+import { fmtDate, fmtDateTime } from '@/lib/dates';
 import { maintenanceOn, sponsorLinksEnabled } from '@/lib/settings';
 import { blobAccess, isBlobConfigured } from '@/lib/storage';
 import { Mark } from '@/components/brand';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { PasswordInput } from '@/components/password-input';
 import { Chip, cx, Field, inputCls, Notice, Panel } from '@/components/ui';
-import { superAdminLogin, superAdminLogout } from '@/app/actions/auth';
+import { changePassword, superAdminLogin, superAdminLogout } from '@/app/actions/auth';
 import { setSponsorLinks } from '@/app/actions/admin';
 import { setDemoLogin, setMaintenance, setSuperAdmin, signOutEveryoneElse, signOutPerson } from '@/app/actions/superadmin';
+
+// Everywhere a super admin can go in the platform, surfaced on this dashboard (it has no app sidebar of its own).
+const QUICK_LINKS = [
+  { href: '/inbox', label: 'My actions', icon: Inbox },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/shows', label: 'All shows', icon: CalendarRange },
+  { href: '/schedule/os', label: 'Organiser signage', icon: Signpost },
+  { href: '/schedule/ss', label: 'Sponsor signage', icon: Flag },
+  { href: '/schedule/si', label: 'Sponsor items', icon: Package },
+  { href: '/sponsors', label: 'Sponsors', icon: Handshake },
+  { href: '/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/admin', label: 'Admin (people)', icon: ShieldCheck },
+];
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +129,24 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
   const [demo] = await sql<{ id: string; full_name: string; email: string; active: boolean }[]>`
     select id, full_name, email, active from users where is_demo order by created_at limit 1`;
 
+  // Event and signage info, so the super admin can see and reach it without leaving this dashboard.
+  const [events, current] = await Promise.all([listEvents(), getCurrentEvent()]);
+  const sched = current ? await loadSchedule(current.id) : null;
+  const rows = (sched?.rows ?? []).filter((r) => r.state.group !== 'cancelled');
+  const catCount = (cat: string) => rows.filter((r) => r.item.category === cat).length;
+  const signage = {
+    total: rows.length,
+    os: catCount('organiser_signage'),
+    ss: catCount('sponsor_signage'),
+    si: catCount('sponsor_item'),
+    inSignoff: rows.filter((r) => r.state.group === 'in_signoff' || r.state.group === 'on_hold').length,
+    overdue: rows.filter((r) => r.state.rank === 1).length,
+    approved: rows.filter((r) => r.state.phase >= 4).length,
+  };
+  const approvedPct = signage.total ? Math.round((signage.approved / signage.total) * 100) : 0;
+  const range = (a: string | null, b: string | null) =>
+    a && b ? `${fmtDate(a)} – ${fmtDate(b)}` : a ? fmtDate(a) : b ? fmtDate(b) : '—';
+
   const tiles: { label: string; value: string | number; sub?: string }[] = [
     { label: 'Active people', value: c.active, sub: [c.waiting ? `${c.waiting} waiting to sign in` : null, c.deactivated ? `${c.deactivated} deactivated` : null].filter(Boolean).join(', ') || undefined },
     { label: 'Super admins', value: c.supers, sub: `${c.managers} manager${c.managers === 1 ? '' : 's'}` },
@@ -164,8 +198,72 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
           ))}
         </ul>
 
+        <Panel title="Go to the platform" className="mb-6">
+          <p className="mb-3 text-[13.5px] text-muted">Everything a manager can do, plus people and settings. These open the full app in a new context — the super admin bar brings you back here.</p>
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {QUICK_LINKS.map((l) => (
+              <li key={l.href}>
+                <Link href={l.href}
+                  className="flex items-center gap-2.5 rounded-[10px] border border-line bg-white px-3 py-2.5 text-[14px] font-semibold text-ink hover:border-ink-2 hover:bg-paper">
+                  <l.icon size={18} className="shrink-0 text-ink-2" aria-hidden /> {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-6">
+            <Panel title={current ? `Signage — ${current.name}` : 'Signage'} padded={false}
+              actions={<Link href="/dashboard" className="text-[13.5px] font-semibold text-ink underline underline-offset-2">Open the dashboard</Link>}>
+              {!current ? <p className="p-4 text-[14px] text-muted">No active event yet.</p> : signage.total === 0 ? (
+                <p className="p-4 text-[14px] text-muted">No lines on this show yet. <Link href="/schedule/os" className="font-semibold text-ink underline">Add the first</Link>.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 sm:grid-cols-4">
+                    {([['Total lines', signage.total, null], ['In sign-off', signage.inSignoff, null], ['Overdue', signage.overdue, signage.overdue ? 'text-red-700' : null], ['Approved+', `${approvedPct}%`, 'text-green-700']] as const).map(([label, value, tone]) => (
+                      <div key={label}>
+                        <span className={cx('block font-display text-[26px] font-semibold leading-none', tone ?? 'text-ink')}>{value}</span>
+                        <span className="mt-1 block text-[13px] text-muted">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <ul className="border-t border-line">
+                    {([['Organiser signage', signage.os, '/schedule/os'], ['Sponsor signage', signage.ss, '/schedule/ss'], ['Sponsor items', signage.si, '/schedule/si']] as const).map(([label, count, href]) => (
+                      <li key={href} className="flex items-center justify-between border-b border-line px-4 py-2.5 last:border-0">
+                        <Link href={href} className="text-[14.5px] font-semibold text-ink hover:underline">{label}</Link>
+                        <span className="text-[14px] text-muted">{count} line{count === 1 ? '' : 's'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Panel>
+
+            <Panel title={`Events (${events.length})`} padded={false}
+              actions={<Link href="/settings/events" className="text-[13.5px] font-semibold text-ink underline underline-offset-2">Create or manage events</Link>}>
+              {events.length === 0 ? <p className="p-4 text-[14px] text-muted">No events yet.</p> : (
+                <ul>
+                  {events.map((e) => (
+                    <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-3 last:border-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center gap-2">
+                          <span className="text-[15.5px] font-semibold text-ink">{e.name}</span>
+                          {e.id === current?.id && <Chip tone="teal">Current</Chip>}
+                          {e.archived && <Chip tone="grey">Archived</Chip>}
+                        </p>
+                        <p className="text-[13px] text-muted">
+                          {e.venue} · Open {range(e.show_open, e.show_close)}
+                          {e.budget != null && ` · £${e.budget.toLocaleString('en-GB')} budget`}
+                        </p>
+                      </div>
+                      <Link href="/settings" className="text-[13.5px] font-semibold text-ink underline underline-offset-2">Edit</Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
             <Panel title="Managers and super admins" padded={false}
               actions={<Link href="/admin" className="text-[13.5px] font-semibold text-ink underline underline-offset-2">Invite or change people on the Admin page</Link>}>
               <p className="border-b border-line px-4 py-2.5 text-[13.5px] text-muted">
@@ -233,6 +331,21 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
           </div>
 
           <aside className="min-w-0 space-y-6">
+            <Panel title="Your password">
+              <ActionForm action={changePassword} resetOnSuccess className="space-y-3">
+                <Field label="Current password" htmlFor="gs-cur">
+                  <PasswordInput id="gs-cur" name="current" required autoComplete="current-password" />
+                </Field>
+                <Field label="New password" htmlFor="gs-new" help="At least 8 characters.">
+                  <PasswordInput id="gs-new" name="password" required minLength={8} autoComplete="new-password" />
+                </Field>
+                <Field label="New password again" htmlFor="gs-confirm">
+                  <PasswordInput id="gs-confirm" name="confirm" required minLength={8} autoComplete="new-password" />
+                </Field>
+                <SubmitButton variant="dark" small>Change password</SubmitButton>
+              </ActionForm>
+            </Panel>
+
             <Panel title="Platform switches">
               <div className="space-y-5">
                 <section aria-label="Maintenance mode">
