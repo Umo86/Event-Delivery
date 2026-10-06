@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { requireAdminPage } from '@/lib/auth/session';
+import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent, listEvents } from '@/lib/data/load';
 import { fmtDate } from '@/lib/dates';
@@ -31,7 +31,7 @@ function schedule(e: { build_start: string | null; show_open: string | null; sho
 }
 
 export default async function EventsPage() {
-  await requireAdminPage();
+  await requireManager();
   const [events, current] = await Promise.all([listEvents(), getCurrentEvent()]);
   const sql = await db();
   const counts = await sql<{ event_id: string; n: number }[]>`select event_id, count(*)::int as n from items group by event_id`;

@@ -18,7 +18,7 @@ export interface CurrentUser {
   must_change_password: boolean;
   /** The shared demo login: its password and details can't be changed. */
   is_demo: boolean;
-  /** Can open the super admin panel (/gs) and manage other super admins. Always an admin too. */
+  /** Derived: role === 'super_admin'. Full control, including the super admin panel (/gs). */
   is_super_admin: boolean;
 }
 
@@ -55,15 +55,16 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const sql = await db();
-  const rows = await sql<(CurrentUser & { maintenance: string | null })[]>`
-    select u.id, u.email, u.full_name, u.job_title, u.role, u.must_change_password, u.is_demo, u.is_super_admin,
+  const rows = await sql<(Omit<CurrentUser, 'is_super_admin'> & { maintenance: string | null })[]>`
+    select u.id, u.email, u.full_name, u.job_title, u.role, u.must_change_password, u.is_demo,
            (select value from app_settings where key = 'maintenance') as maintenance
     from sessions s join users u on u.id = s.user_id
     where s.token_hash = ${sha256(token)} and s.expires_at > now() and u.active
     limit 1`;
   const r = rows[0];
   if (!r) return null;
-  const { maintenance, ...user } = r;
+  const { maintenance, ...rest } = r;
+  const user: CurrentUser = { ...rest, is_super_admin: rest.role === 'super_admin' };
   if (maintenance === 'on' && !user.is_super_admin) return null;
   return user;
 });
@@ -76,27 +77,36 @@ export async function requireUser(opts: { allowPasswordChange?: boolean } = {}):
   return user;
 }
 
-export async function requireAdminPage(): Promise<CurrentUser> {
+/** For pages managers can open (signage, events, settings). Users are sent away. */
+export async function requireManager(): Promise<CurrentUser> {
   const user = await requireUser();
-  if (user.role !== 'admin') redirect('/dashboard?denied=1');
+  if (user.role === 'user') redirect('/dashboard?denied=1');
+  return user;
+}
+
+/** For pages only super admins can open (user management, system, the super admin panel). */
+export async function requireSuperAdmin(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (user.role !== 'super_admin') redirect('/dashboard?denied=1');
   return user;
 }
 
 /** For server actions on the super admin panel. */
 export async function superActor(): Promise<CurrentUser> {
-  const user = await actor('admin');
-  if (!user.is_super_admin) throw new AuthError('Only super admins can do that.');
-  return user;
+  return actor('super_admin');
 }
 
 export class AuthError extends Error {}
 
+const RANK: Record<string, number> = { user: 1, manager: 2, super_admin: 3 };
+
 /** For server actions: throws instead of redirecting. */
-export async function actor(level: 'viewer' | 'member' | 'admin' = 'member', opts: { allowPasswordChange?: boolean } = {}): Promise<CurrentUser> {
+export async function actor(level: 'user' | 'manager' | 'super_admin' = 'manager', opts: { allowPasswordChange?: boolean } = {}): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) throw new AuthError('Your session has ended. Please sign in again.');
   if (user.must_change_password && !opts.allowPasswordChange) throw new AuthError('Choose your own password first, on the Your account page.');
-  if (level === 'member' && user.role === 'viewer') throw new AuthError('Your account is read-only.');
-  if (level === 'admin' && user.role !== 'admin') throw new AuthError('Only admins can do that.');
+  if (RANK[user.role] < RANK[level]) {
+    throw new AuthError(level === 'super_admin' ? 'Only super admins can do that.' : 'Your account is read-only.');
+  }
   return user;
 }

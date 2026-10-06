@@ -22,7 +22,7 @@ export function SponsorForm({ eventId, users, sponsor, canChooseManager }: {
           help={canChooseManager ? 'Signs off on the sponsor’s behalf and chases their artwork.' : 'Signs off on the sponsor’s behalf. Only admins can choose who.'}>
           <select id={`${p}am`} name="account_manager_id" defaultValue={sponsor?.account_manager_id ?? ''} disabled={!canChooseManager} className={inputCls}>
             <option value="">Not set</option>
-            {users.filter((u) => u.active && u.role !== 'viewer').map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+            {users.filter((u) => u.active && u.role !== 'user').map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
           </select>
         </Field>
         <Field label="Sponsor contact" htmlFor={`${p}cname`}>

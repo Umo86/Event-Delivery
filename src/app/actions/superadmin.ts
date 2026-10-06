@@ -21,7 +21,7 @@ async function person(sql: Sql, fd: FormData) {
   const id = uuidOrNull(fd, 'user_id');
   if (!id) throw new UserError('Missing person.');
   const [p] = await sql<{ id: string; full_name: string; role: string; active: boolean; is_super_admin: boolean; is_demo: boolean }[]>`
-    select id, full_name, role, active, is_super_admin, is_demo from users where id = ${id}`;
+    select id, full_name, role, active, (role = 'super_admin') as is_super_admin, is_demo from users where id = ${id}`;
   if (!p) throw new UserError('That person no longer exists. Reload the page.');
   return p;
 }
@@ -37,13 +37,16 @@ export async function setSuperAdmin(_prev: ActionResult | null, fd: FormData): P
     if (p.is_super_admin === make) return { ok: true };
     if (make) {
       if (p.is_demo) throw new UserError('The demo login can’t be a super admin, because anyone can use it.');
-      if (p.role !== 'admin') throw new UserError(`Make ${p.full_name} an admin on the Admin page first.`);
       if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
+    } else {
+      const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users where role = 'super_admin' and active and id <> ${p.id}`;
+      if (n === 0) throw new UserError('There must always be at least one active Super Admin.');
     }
-    await sql`update users set is_super_admin = ${make} where id = ${p.id}`;
+    // Promoting makes them a Super Admin; demoting drops them to Manager.
+    await sql`update users set role = ${make ? 'super_admin' : 'manager'} where id = ${p.id}`;
     await audit(sql, me, `${make ? 'Made' : 'Removed'} ${p.full_name} ${make ? 'a super admin' : 'as a super admin'}`);
     refresh();
-    return { ok: true, message: make ? `${p.full_name} is now a super admin.` : `${p.full_name} is no longer a super admin, but is still an admin.` };
+    return { ok: true, message: make ? `${p.full_name} is now a super admin.` : `${p.full_name} is now a Manager.` };
   });
 }
 

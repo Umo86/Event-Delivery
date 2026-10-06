@@ -46,12 +46,12 @@ test.describe('shared demo login @demo', () => {
     await loginAs(page, 'admin');
     await page.goto('/admin');
     await expect(page.getByText('The demo login is on the sign-in page, so anyone with the link can sign in as Demo User.')).toBeVisible();
-    await expect(panel(page, 'Access log')).toContainText(`Created the shared demo login Demo User (${DEMO.email}) as Member`);
+    await expect(panel(page, 'Access log')).toContainText(`Created the shared demo login Demo User (${DEMO.email}) as Manager`);
     const row = await openPerson(page, DEMO.email);
     await expect(row.locator('summary').getByText('Demo login', { exact: true })).toBeVisible();
     await expect(row.getByRole('button', { name: 'Reset password' })).toHaveCount(0);
     await expect(row.getByRole('button', { name: 'Cancel invite' })).toHaveCount(0);
-    await expect(row.getByLabel('Access level', { exact: true }).locator('option')).toHaveText(['Member', 'Viewer']); // never admin
+    await expect(row.getByLabel('Access level', { exact: true }).locator('option')).toHaveText(['Manager', 'User']); // never admin
 
     acceptNextDialog(page);
     await row.getByRole('button', { name: 'Deactivate' }).click();

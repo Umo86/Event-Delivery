@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { ArrowRight } from 'lucide-react';
-import { requireAdminPage } from '@/lib/auth/session';
+import { requireManager } from '@/lib/auth/session';
 import { listEvents, loadSchedule } from '@/lib/data/load';
 import { daysBetween, fmtDate, londonDate } from '@/lib/dates';
 import type { EventRow } from '@/lib/domain/types';
@@ -31,7 +31,7 @@ function when(e: EventRow, today: string): Summary['when'] {
 }
 
 export default async function ShowsPage() {
-  await requireAdminPage();
+  await requireManager();
   const events = await listEvents();
   const today = londonDate();
   const summaries: Summary[] = await Promise.all(events.map(async (e) => {

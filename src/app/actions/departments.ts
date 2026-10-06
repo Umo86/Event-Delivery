@@ -14,7 +14,7 @@ const log = (sql: Sql, me: CurrentUser, message: string) =>
 
 export async function addDepartment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const name = required(fd, 'name', 'Department name', 60);
     const sql = await db();
     if ((await sql`select 1 from departments where lower(name) = lower(${name})`).length) throw new UserError(`${name} is already a department.`);
@@ -28,7 +28,7 @@ export async function addDepartment(_prev: ActionResult | null, fd: FormData): P
 
 export async function renameDepartment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'department_id');
     if (!id) throw new UserError('Missing department.');
     const name = required(fd, 'name', 'Department name', 60);
@@ -45,7 +45,7 @@ export async function renameDepartment(_prev: ActionResult | null, fd: FormData)
 
 export async function moveDepartment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('admin');
+    await actor('manager');
     const id = uuidOrNull(fd, 'department_id');
     const dir = fd.get('dir');
     if (!id || (dir !== 'up' && dir !== 'down')) throw new UserError('Missing department.');
@@ -65,7 +65,7 @@ export async function moveDepartment(_prev: ActionResult | null, fd: FormData): 
 
 export async function setDepartmentArchived(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'department_id');
     if (!id) throw new UserError('Missing department.');
     const archived = fd.get('archived') === '1';
@@ -82,7 +82,7 @@ export async function setDepartmentArchived(_prev: ActionResult | null, fd: Form
 /** Sets exactly who is in a department (from the Departments page). */
 export async function setDepartmentMembers(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'department_id');
     if (!id) throw new UserError('Missing department.');
     const want = new Set(fd.getAll('user_ids').filter(isUuid));
@@ -105,7 +105,7 @@ export async function setDepartmentMembers(_prev: ActionResult | null, fd: FormD
 /** Sets which departments a person is in (from the Admin page). */
 export async function setPersonDepartments(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const userId = uuidOrNull(fd, 'user_id');
     if (!userId) throw new UserError('Missing person.');
     const want = new Set(fd.getAll('department_ids').filter(isUuid));
@@ -128,7 +128,7 @@ export async function setPersonDepartments(_prev: ActionResult | null, fd: FormD
 /** Sets which departments a show involves (from the Event settings page). */
 export async function setEventDepartments(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const eventId = uuidOrNull(fd, 'event_id');
     if (!eventId) throw new UserError('Missing event.');
     const want = new Set(fd.getAll('department_ids').filter(isUuid));

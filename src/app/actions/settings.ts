@@ -22,7 +22,7 @@ async function userExists(id: string | null) {
 // ---- Event --------------------------------------------------------------------
 export async function updateEvent(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'event_id');
     if (!id) throw new UserError('Missing event.');
     const studio = uuidOrNull(fd, 'studio_owner_id');
@@ -66,7 +66,7 @@ export async function updateEvent(_prev: ActionResult | null, fd: FormData): Pro
 
 export async function createEvent(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const name = required(fd, 'name', 'Event name', 120);
     const venue = required(fd, 'venue', 'Venue', 80);
     const buildStart = date(fd, 'build_start', 'Build-up start');
@@ -128,7 +128,7 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
 
 export async function setEventArchived(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'event_id');
     if (!id) throw new UserError('Missing event.');
     const archived = bool(fd, 'archived');
@@ -147,7 +147,7 @@ export async function setEventArchived(_prev: ActionResult | null, fd: FormData)
 // ---- Stages -------------------------------------------------------------------
 export async function saveStage(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'stage_id');
     if (!id) throw new UserError('Missing stage.');
     const usesAm = bool(fd, 'uses_account_manager');
@@ -180,7 +180,7 @@ export async function saveStage(_prev: ActionResult | null, fd: FormData): Promi
 
 export async function addStage(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const eventId = uuidOrNull(fd, 'event_id');
     if (!eventId) throw new UserError('Missing event.');
     const name = required(fd, 'name', 'Stage name', 60);
@@ -195,7 +195,7 @@ export async function addStage(_prev: ActionResult | null, fd: FormData): Promis
 
 export async function moveStage(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('admin');
+    await actor('manager');
     const id = uuidOrNull(fd, 'stage_id');
     const dir = str(fd, 'dir', 4);
     if (!id || (dir !== 'up' && dir !== 'down')) throw new UserError('Missing stage.');
@@ -217,7 +217,7 @@ export async function moveStage(_prev: ActionResult | null, fd: FormData): Promi
 
 export async function removeStage(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'stage_id');
     if (!id) throw new UserError('Missing stage.');
     const sql = await db();
@@ -254,7 +254,7 @@ async function readSupplier(fd: FormData) {
 
 export async function saveSupplier(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'supplier_id');
     const s = await readSupplier(fd);
     const sql = await db();
@@ -278,7 +278,7 @@ export async function saveSupplier(_prev: ActionResult | null, fd: FormData): Pr
 
 export async function deleteSupplier(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const id = uuidOrNull(fd, 'supplier_id');
     if (!id) throw new UserError('Missing supplier.');
     const sql = await db();
@@ -294,7 +294,7 @@ export async function deleteSupplier(_prev: ActionResult | null, fd: FormData): 
 // ---- Lists --------------------------------------------------------------------
 export async function saveList(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('member');
+    await actor('manager');
     const key = str(fd, 'list_key', 30);
     if (!key || !LIST_KEYS.includes(key)) throw new UserError('Unknown list.');
     const raw = String(fd.get('values') ?? '');
@@ -314,10 +314,10 @@ export async function saveList(_prev: ActionResult | null, fd: FormData): Promis
   });
 }
 
-// ---- System -------------------------------------------------------------------
+// ---- System ----------------------------------------------------------------
 export async function setAppName(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    await actor('admin');
+    await actor('super_admin');
     const name = required(fd, 'app_name', 'Name', 40);
     const sql = await db();
     await sql`insert into app_settings (key, value) values ('app_name', ${name})

@@ -3,7 +3,7 @@ import { Download, ExternalLink, FileText } from 'lucide-react';
 import type { ItemDetail } from '@/lib/data/load';
 import type { CurrentUser } from '@/lib/auth/session';
 import { fmtDateTime } from '@/lib/dates';
-import { canEdit, isAdmin } from '@/lib/domain/permissions';
+import { canEdit } from '@/lib/domain/permissions';
 import { blobAccess } from '@/lib/storage';
 import { ActionForm, SubmitButton } from '../forms';
 import { ButtonLink, cx, Panel } from '../ui';
@@ -55,7 +55,7 @@ export function ArtworkPanel({ detail, user, viewVersion }: { detail: ItemDetail
               {shown.page_count && shown.page_count > 1 ? `, ${shown.page_count} pages` : ''}
               <span className="block text-muted">Uploaded by {shown.uploaded_by ? names.get(shown.uploaded_by) ?? 'someone' : 'someone'}, {fmtDateTime(shown.uploaded_at)}</span>
             </p>
-            {isAdmin(user) && (
+            {canEdit(user) && (
               <ActionForm action={deleteVersion} confirm={`Remove v${shown.version}? Sign-off decisions for it will no longer count.`}>
                 <input type="hidden" name="version_id" value={shown.id} />
                 <SubmitButton variant="ghost" small pendingText="Removing…">Remove this version</SubmitButton>

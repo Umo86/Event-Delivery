@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { requireAdminPage } from '@/lib/auth/session';
+import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { fmtDateTime } from '@/lib/dates';
@@ -16,7 +16,7 @@ import { invitePerson, setSponsorLinks } from '@/app/actions/admin';
 export const metadata: Metadata = { title: 'Admin' };
 
 export default async function AdminPage(props: { searchParams: Promise<{ person?: string }> }) {
-  const me = await requireAdminPage();
+  const me = await requireSuperAdmin();
   const sp = await props.searchParams;
   const sql = await db();
   const event = await getCurrentEvent();
@@ -24,7 +24,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     event ? loadBundle(event.id) : Promise.resolve(null),
     sql<AdminPerson[]>`
       select u.id, u.email, u.full_name, u.job_title, u.role, u.active, u.must_change_password, u.last_login_at, u.created_at,
-             u.invited_at, inv.full_name as invited_by_name, u.temp_password_expires_at, u.locked_until, u.is_demo, u.is_super_admin
+             u.invited_at, inv.full_name as invited_by_name, u.temp_password_expires_at, u.locked_until, u.is_demo, (u.role = 'super_admin') as is_super_admin
       from users u left join users inv on inv.id = u.invited_by
       order by lower(u.full_name)`,
     sql<{ id: string; actor_name: string; message: string; created_at: Date }[]>`
@@ -65,7 +65,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
   }
   const cantSignOff = (id: string | null) => {
     const p = id ? byId.get(id) : null;
-    return p && (!p.active || p.role === 'viewer') ? p : null;
+    return p && (!p.active || p.role === 'user') ? p : null;
   };
   for (const s of stages) {
     if (s.approver_ids.length === 0) {
@@ -117,7 +117,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
                   {ACCESS_LEVELS.map((a) => (
                     <label key={a.key}
                       className="flex cursor-pointer gap-2.5 rounded-md border border-line-strong bg-white p-3 hover:border-ink has-[:checked]:border-ink has-[:checked]:bg-signal-soft has-[:checked]:ring-1 has-[:checked]:ring-ink">
-                      <input type="radio" name="role" value={a.key} defaultChecked={a.key === 'member'} className="mt-1 h-4 w-4 shrink-0 accent-[#13233b]" />
+                      <input type="radio" name="role" value={a.key} defaultChecked={a.key === 'manager'} className="mt-1 h-4 w-4 shrink-0 accent-[#13233b]" />
                       <span>
                         <span className="block text-[15px] font-semibold text-ink">{a.label}</span>
                         <span className="block text-[13px] leading-snug text-ink-2">{a.summary}</span>
@@ -163,7 +163,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
                   {ABILITIES.map((r) => (
                     <tr key={r.label} className="border-b border-line last:border-0 align-top">
                       <th scope="row" className="px-4 py-2 text-left font-normal text-ink-2">{r.label}</th>
-                      {(['admin', 'member', 'viewer'] as const).map((k) => (
+                      {(['super_admin', 'manager', 'user'] as const).map((k) => (
                         <td key={k} className={cx('px-2 py-2', r[k] === 'No' ? 'text-muted' : 'font-semibold text-ink')}>{r[k]}</td>
                       ))}
                     </tr>

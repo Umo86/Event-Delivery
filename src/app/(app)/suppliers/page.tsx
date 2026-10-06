@@ -5,7 +5,7 @@ import { requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent } from '@/lib/data/load';
 import type { SupplierRow } from '@/lib/domain/types';
-import { canEdit, isAdmin } from '@/lib/domain/permissions';
+import { canEdit } from '@/lib/domain/permissions';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { Chip, Empty, Field, inputCls, money, PageHeader, Panel, textareaCls } from '@/components/ui';
 import { deleteSupplier, saveSupplier } from '@/app/actions/settings';
@@ -138,7 +138,7 @@ export default async function SuppliersPage() {
                           <SupplierFields s={s} />
                           <SubmitButton variant="dark" small>Save</SubmitButton>
                         </ActionForm>
-                        {isAdmin(user) && (
+                        {canEdit(user) && (
                           <ActionForm action={deleteSupplier} confirm={`Remove ${s.name}?`}>
                             <input type="hidden" name="supplier_id" value={s.id} />
                             <SubmitButton variant="ghost" small pendingText="…">Remove</SubmitButton>

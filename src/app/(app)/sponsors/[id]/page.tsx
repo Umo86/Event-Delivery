@@ -5,7 +5,7 @@ import { requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { loadSchedule } from '@/lib/data/load';
 import { urgencyCompare } from '@/lib/domain/engine';
-import { canEdit, isAdmin } from '@/lib/domain/permissions';
+import { canEdit, isSuperAdmin } from '@/lib/domain/permissions';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { ItemTable } from '@/components/item-table';
 import { ButtonLink, Empty, PageHeader, Panel } from '@/components/ui';
@@ -46,8 +46,8 @@ export default async function SponsorPage(props: { params: Promise<{ id: string 
       </section>
       {canEdit(user) && (
         <Panel title="Sponsor details">
-          <SponsorForm eventId={sp.event_id} users={sched.bundle.users} sponsor={sponsor} canChooseManager={isAdmin(user)} />
-          {isAdmin(user) && (
+          <SponsorForm eventId={sp.event_id} users={sched.bundle.users} sponsor={sponsor} canChooseManager={isSuperAdmin(user)} />
+          {canEdit(user) && (
             <div className="mt-4 border-t border-line pt-4">
               <ActionForm action={deleteSponsor} confirm={`Remove ${sponsor.name}?`}>
                 <input type="hidden" name="sponsor_id" value={sponsor.id} />

@@ -54,7 +54,7 @@ async function findPerson(sql: Sql, fd: FormData): Promise<Person> {
   const id = uuidOrNull(fd, 'user_id');
   if (!id) throw new UserError('Missing person.');
   const [p] = await sql<Person[]>`
-    select id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo, is_super_admin
+    select id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo, (role = 'super_admin') as is_super_admin
     from users where id = ${id}`;
   if (!p) throw new UserError('That person no longer exists. Reload the page.');
   return p;
@@ -67,8 +67,8 @@ function guardSuperAdmin(me: CurrentUser, p: Person) {
   if (me.is_demo) throw new UserError('The demo login can’t change a super admin.');
 }
 
-async function otherActiveAdmins(sql: Sql, id: string): Promise<number> {
-  const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users where role = 'admin' and active and id <> ${id}`;
+async function otherActiveSuperAdmins(sql: Sql, id: string): Promise<number> {
+  const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users where role = 'super_admin' and active and id <> ${id}`;
   return n;
 }
 
@@ -109,7 +109,7 @@ async function messageFor(me: CurrentUser, p: Pick<Person, 'email' | 'full_name'
 
 export async function invitePerson(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const name = required(fd, 'full_name', 'Name', 120);
     const email = readEmail(fd);
     const role = readRole(fd);
@@ -125,7 +125,7 @@ export async function invitePerson(_prev: ActionResult | null, fd: FormData): Pr
     const [p] = await sql<Person[]>`
       insert into users (email, full_name, job_title, role, password_hash, must_change_password, temp_password_expires_at, invited_by, invited_at)
       values (${email}, ${name}, ${title}, ${role}, ${hash}, true, ${expiresAt}, ${me.id}, now())
-      returning id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo, is_super_admin`;
+      returning id, email, full_name, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo, (role = 'super_admin') as is_super_admin`;
     await audit(sql, me, `Invited ${name} (${email}) as ${accessLevel(role).label}`);
     refresh();
     return {
@@ -139,7 +139,7 @@ export async function invitePerson(_prev: ActionResult | null, fd: FormData): Pr
 /** A new invite for someone who hasn't signed in yet, or a password reset for someone who has. */
 export async function sendNewPassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const sql = await db();
     const p = await findPerson(sql, fd);
     if (p.id === me.id) throw new UserError('Change your own password on the Your account page.');
@@ -165,7 +165,7 @@ export async function sendNewPassword(_prev: ActionResult | null, fd: FormData):
 
 export async function cancelInvite(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const sql = await db();
     const p = await findPerson(sql, fd);
     if (p.is_demo) throw new UserError('Deactivate the demo login instead. That also takes it off the sign-in page.');
@@ -187,33 +187,32 @@ export async function cancelInvite(_prev: ActionResult | null, fd: FormData): Pr
 
 export async function changeAccess(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const sql = await db();
     const p = await findPerson(sql, fd);
     const role = readRole(fd);
-    if (p.id === me.id) throw new UserError('You can’t change your own access level. Ask another admin.');
-    if (p.is_demo && role === 'admin') throw new UserError('The demo login can’t be an admin, because anyone can use it.');
+    if (p.id === me.id) throw new UserError('You can’t change your own access level. Ask another super admin.');
+    if (p.is_demo && role === 'super_admin') throw new UserError('The demo login can’t be a Super Admin, because anyone can use it.');
     guardSuperAdmin(me, p);
-    if (p.is_super_admin && role !== 'admin') throw new UserError(`${p.full_name} is a super admin. Remove that on the super admin page first.`);
-    if (p.role === role) return { ok: true, message: `${p.full_name} is already ${role === 'admin' ? 'an' : 'a'} ${accessLevel(role).label}.` };
-    if (p.role === 'admin' && p.active && (await otherActiveAdmins(sql, p.id)) === 0) {
-      throw new UserError('There must always be at least one active admin.');
+    if (p.role === role) return { ok: true, message: `${p.full_name} is already a ${accessLevel(role).label}.` };
+    if (p.role === 'super_admin' && p.active && (await otherActiveSuperAdmins(sql, p.id)) === 0) {
+      throw new UserError('There must always be at least one active Super Admin.');
     }
     await sql`update users set role = ${role} where id = ${p.id}`;
     await audit(sql, me, `Changed ${p.full_name} from ${accessLevel(p.role).label} to ${accessLevel(role).label}`);
     let note = '';
-    if (role === 'viewer') {
+    if (role === 'user') {
       const held = await responsibilitiesOf(sql, p.id);
-      if (held.length) note = ` They still look after ${listText(held)}, but viewers can’t sign off: choose someone else below.`;
+      if (held.length) note = ` They still look after ${listText(held)}, but users can’t sign off: choose someone else below.`;
     }
     refresh();
-    return { ok: true, message: `${p.full_name} is now ${role === 'admin' ? 'an' : 'a'} ${accessLevel(role).label}.${note}` };
+    return { ok: true, message: `${p.full_name} is now a ${accessLevel(role).label}.${note}` };
   });
 }
 
 export async function updatePersonDetails(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const sql = await db();
     const p = await findPerson(sql, fd);
     const name = required(fd, 'full_name', 'Name', 120);
@@ -235,20 +234,15 @@ export async function updatePersonDetails(_prev: ActionResult | null, fd: FormDa
 
 export async function setPersonActive(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const sql = await db();
     const p = await findPerson(sql, fd);
     const active = bool(fd, 'active');
     if (p.active === active) return { ok: true };
     guardSuperAdmin(me, p);
     if (!active) {
-      if (p.id === me.id) throw new UserError('You can’t deactivate your own account. Ask another admin.');
-      if (p.role === 'admin' && (await otherActiveAdmins(sql, p.id)) === 0) throw new UserError('There must always be at least one active admin.');
-      if (p.is_super_admin) {
-        const [{ n }] = await sql<{ n: number }[]>`
-          select count(*)::int as n from users where is_super_admin and active and not is_demo and id <> ${p.id}`;
-        if (n === 0) throw new UserError('There must always be at least one active super admin.');
-      }
+      if (p.id === me.id) throw new UserError('You can’t deactivate your own account. Ask another super admin.');
+      if (p.role === 'super_admin' && (await otherActiveSuperAdmins(sql, p.id)) === 0) throw new UserError('There must always be at least one active Super Admin.');
     }
     await sql`update users set active = ${active} where id = ${p.id}`;
     if (!active) await sql`delete from sessions where user_id = ${p.id}`;
@@ -274,13 +268,13 @@ export async function setPersonActive(_prev: ActionResult | null, fd: FormData):
 
 export async function saveSignoffDuties(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const eventId = uuidOrNull(fd, 'event_id');
     if (!eventId) throw new UserError('Missing event.');
     const sql = await db();
     const p = await findPerson(sql, fd);
     if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
-    if (p.role === 'viewer') throw new UserError('Viewers can’t sign off. Change their access level to Member first.');
+    if (p.role === 'user') throw new UserError('Users can’t sign off. Change their access level to Manager first.');
     const wantStages = new Set(fd.getAll('stage_ids').filter(isUuid));
     const wantSponsors = new Set(fd.getAll('sponsor_ids').filter(isUuid));
     const changes = await sql.begin(async (tx) => {
@@ -328,7 +322,7 @@ export async function saveSignoffDuties(_prev: ActionResult | null, fd: FormData
 
 export async function setSponsorLinks(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('super_admin');
     const on = bool(fd, 'enabled');
     const sql = await db();
     await writeSetting(sql, SETTING.sponsorLinks, on ? 'on' : 'off');

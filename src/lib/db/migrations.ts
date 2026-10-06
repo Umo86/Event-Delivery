@@ -420,6 +420,24 @@ create table task_documents (
 create index task_documents_task_idx on task_documents (task_id);
 `,
   },
+  {
+    version: 9,
+    name: 'three roles: super_admin, manager, user',
+    sql: /* sql */ `
+-- Collapse the old four tiers (super-admin flag + admin / member / viewer) into three roles.
+-- Super Admins and Admins -> super_admin; Members -> manager; Viewers -> user. Nobody loses access.
+alter table users drop constraint if exists users_super_admin_is_admin;
+alter table users drop constraint if exists users_role_check;
+update users set role = case
+  when is_super_admin or role = 'admin' then 'super_admin'
+  when role = 'member' then 'manager'
+  else 'user' end;
+alter table users alter column role set default 'user';
+alter table users add constraint users_role_check check (role in ('super_admin', 'manager', 'user'));
+-- The super-admin flag is now just the super_admin role.
+alter table users drop column is_super_admin;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

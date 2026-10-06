@@ -40,7 +40,7 @@ async function authenticate(fd: FormData, opts: { superOnly?: boolean } = {}) {
     must_change_password: boolean; temp_password_expires_at: Date | null; is_demo: boolean; is_super_admin: boolean;
   }[]>`
     select id, full_name, password_hash, active, failed_logins, locked_until, must_change_password, temp_password_expires_at,
-           is_demo, is_super_admin
+           is_demo, (role = 'super_admin') as is_super_admin
     from users where lower(email) = ${email}`;
   const u = rows[0];
   if (!u || !u.active) {
@@ -126,8 +126,8 @@ export async function setupFirstAdmin(_prev: ActionResult | null, fd: FormData):
       const [{ c }] = await tx<{ c: number }[]>`select count(*)::int as c from users`;
       if (c > 0) throw new UserError('Setup is already complete. Sign in instead.');
       const [u] = await tx<{ id: string }[]>`
-        insert into users (email, full_name, job_title, role, password_hash, is_super_admin)
-        values (${email}, ${name}, ${str(fd, 'job_title', 120)}, 'admin', ${hash}, true) returning id`;
+        insert into users (email, full_name, job_title, role, password_hash)
+        values (${email}, ${name}, ${str(fd, 'job_title', 120)}, 'super_admin', ${hash}) returning id`;
       return u.id;
     });
     const [{ e }] = await sql<{ e: number }[]>`select count(*)::int as e from events`;
@@ -140,7 +140,7 @@ export async function setupFirstAdmin(_prev: ActionResult | null, fd: FormData):
 
 export async function changePassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer', { allowPasswordChange: true });
+    const me = await actor('user', { allowPasswordChange: true });
     if (me.is_demo) throw new UserError('The demo account’s password can’t be changed.');
     const current = String(fd.get('current') ?? '');
     const next = String(fd.get('password') ?? '');
@@ -165,7 +165,7 @@ export async function changePassword(_prev: ActionResult | null, fd: FormData): 
 
 export async function updateProfile(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     if (me.is_demo) throw new UserError('The demo account’s details can’t be changed.');
     const name = required(fd, 'full_name', 'Your name', 120);
     const sql = await db();

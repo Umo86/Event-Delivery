@@ -71,7 +71,12 @@ export function AppShell(p: ShellProps) {
       )}
 
       <ul className="flex-1 space-y-0.5 px-3">
-        {NAV.filter((n) => ((n.key !== 'admin' && n.key !== 'shows') || p.user.role === 'admin') && (n.key !== 'gs' || p.user.superAdmin)).map((n) => {
+        {NAV.filter((n) => {
+          const manager = p.user.role === 'super_admin' || p.user.role === 'manager';
+          if (n.key === 'admin' || n.key === 'gs') return p.user.superAdmin;
+          if (n.key === 'shows' || n.key === 'settings') return manager;
+          return true;
+        }).map((n) => {
           const active = pathname === n.href || pathname.startsWith(n.href + '/');
           const count = n.key === 'inbox' ? p.myCount : n.key === 'os' || n.key === 'ss' || n.key === 'si' ? p.counts[n.key] : null;
           return (
@@ -105,7 +110,7 @@ export function AppShell(p: ShellProps) {
           <UserRound size={18} aria-hidden />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[14.5px] font-semibold">{p.user.name}</span>
-            <span className="block text-[12px] capitalize text-white/55">{p.user.superAdmin ? 'Super admin' : p.user.role}</span>
+            <span className="block text-[12px] text-white/55">{p.user.role === 'super_admin' ? 'Super Admin' : p.user.role === 'manager' ? 'Manager' : 'User'}</span>
           </span>
         </Link>
         <form action={p.logout}>

@@ -23,22 +23,22 @@ test('changing someone’s access level takes effect straight away', async ({ br
   await loginAs(page, 'admin');
   await page.goto('/admin');
   const row = await openPerson(page, 'vic@ukcw.test');
-  await row.getByLabel('Access level', { exact: true }).selectOption('member');
+  await row.getByLabel('Access level', { exact: true }).selectOption('manager');
   await row.getByRole('button', { name: 'Save access' }).click();
-  await expect(okMessage(row, 'Vic Viewer is now a Member.')).toBeVisible();
-  await expect(row.locator('summary').getByText('Member', { exact: true })).toBeVisible();
+  await expect(okMessage(row, 'Vic Viewer is now a Manager.')).toBeVisible();
+  await expect(row.locator('summary').getByText('Manager', { exact: true })).toBeVisible();
 
   const vic = await asUser(browser, 'vic');
   await vic.page.goto('/schedule/os');
   await expect(vic.page.getByRole('link', { name: 'Add line' })).toBeVisible();
 
-  await row.getByLabel('Access level', { exact: true }).selectOption('viewer');
+  await row.getByLabel('Access level', { exact: true }).selectOption('user');
   await row.getByRole('button', { name: 'Save access' }).click();
-  await expect(okMessage(row, 'Vic Viewer is now a Viewer.')).toBeVisible();
+  await expect(okMessage(row, 'Vic Viewer is now a User.')).toBeVisible();
   await vic.page.reload();
   await expect(vic.page.getByRole('link', { name: 'Add line' })).toHaveCount(0);
   await vic.ctx.close();
-  await expect(panel(page, 'Access log')).toContainText('Changed Vic Viewer from Member to Viewer');
+  await expect(panel(page, 'Access log')).toContainText('Changed Vic Viewer from Manager to User');
 });
 
 test('sign-off responsibilities are handed over from each person’s row', async ({ page }) => {
@@ -74,18 +74,18 @@ test('sign-off responsibilities are handed over from each person’s row', async
   await expect(okMessage(amy, 'Saved. Amy is now account manager for BuildCo.')).toBeVisible();
   await expect(panel(page, 'Access log')).toContainText('Made Pete Production approver for Final sign-off and account manager for BuildCo');
 
-  // Viewers can't sign off, and making an approver a viewer is flagged
+  // Users can't sign off, and making an approver a viewer is flagged
   const vic = await openPerson(page, 'vic@ukcw.test');
-  await expect(vic).toContainText('Viewers can’t sign off.');
+  await expect(vic).toContainText('Users can’t sign off.');
   await expect(vic.getByRole('button', { name: 'Save sign-off' })).toHaveCount(0);
   const olivia = await openPerson(page, 'olivia@ukcw.test');
-  await olivia.getByLabel('Access level', { exact: true }).selectOption('viewer');
+  await olivia.getByLabel('Access level', { exact: true }).selectOption('user');
   await olivia.getByRole('button', { name: 'Save access' }).click();
-  await expect(okMessage(olivia, 'They still look after Operations stage, but viewers can’t sign off')).toBeVisible();
+  await expect(okMessage(olivia, 'They still look after Operations stage, but users can’t sign off')).toBeVisible();
   await expect(page.getByText('Olivia Ops approves Operations but is a viewer.')).toBeVisible();
-  await olivia.getByLabel('Access level', { exact: true }).selectOption('member');
+  await olivia.getByLabel('Access level', { exact: true }).selectOption('manager');
   await olivia.getByRole('button', { name: 'Save access' }).click();
-  await expect(okMessage(olivia, 'Olivia Ops is now a Member.')).toBeVisible();
+  await expect(okMessage(olivia, 'Olivia Ops is now a Manager.')).toBeVisible();
   await expect(page.getByText('Olivia Ops approves Operations but is a viewer.')).toHaveCount(0);
 });
 
@@ -185,7 +185,7 @@ test('the admin page, with an invite ready to send', async ({ page }) => {
   await page.fill('#inv-name', 'Sam Supplier');
   await page.fill('#inv-email', 'sam@ukcw.test');
   await page.fill('#inv-title', 'Print Manager');
-  await page.getByRole('radio', { name: /^Viewer/ }).check();
+  await page.getByRole('radio', { name: /^User/ }).check();
   await page.getByRole('button', { name: 'Create invite' }).click();
   await expect(panel(page, 'Invite someone').getByRole('region', { name: 'Email to send' })).toBeVisible();
   await openPerson(page, 'mark@ukcw.test');

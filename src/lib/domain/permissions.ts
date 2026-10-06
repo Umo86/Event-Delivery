@@ -7,8 +7,10 @@ export interface Actor {
   full_name: string;
 }
 
-export const isAdmin = (u: Actor | null | undefined) => u?.role === 'admin';
-export const canEdit = (u: Actor | null | undefined) => u?.role === 'admin' || u?.role === 'member';
+/** Super Admin: full control of everything. */
+export const isSuperAdmin = (u: Actor | null | undefined) => u?.role === 'super_admin';
+/** Manager or Super Admin: can add, edit and delete signage and the things around it. Users are view-only. */
+export const canEdit = (u: Actor | null | undefined) => u?.role === 'super_admin' || u?.role === 'manager';
 
 /** Is this person the named approver for the stage (or the sponsor's account manager for sponsor stages)? */
 export function isStageApprover(u: Actor, stage: StageRow, sponsor: SponsorRow | null): boolean {
@@ -16,10 +18,10 @@ export function isStageApprover(u: Actor, stage: StageRow, sponsor: SponsorRow |
   return stage.approver_ids.includes(u.id);
 }
 
-/** Admins can record any stage; members only the stages they approve. Viewers never. */
+/** Super Admins can record any stage; Managers only the stages they approve. Users never. */
 export function canDecideStage(u: Actor, stage: StageRow, sponsor: SponsorRow | null): boolean {
-  if (u.role === 'admin') return true;
-  if (u.role !== 'member') return false;
+  if (u.role === 'super_admin') return true;
+  if (u.role !== 'manager') return false;
   return isStageApprover(u, stage, sponsor);
 }
 

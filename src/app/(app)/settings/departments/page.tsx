@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { requireAdminPage } from '@/lib/auth/session';
+import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import type { DepartmentRow, UserRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -11,7 +11,7 @@ import {
 export const metadata: Metadata = { title: 'Departments' };
 
 export default async function DepartmentsPage() {
-  await requireAdminPage();
+  await requireManager();
   const sql = await db();
   const [departments, people, memberships] = await Promise.all([
     sql<DepartmentRow[]>`select id, name, position, archived from departments order by archived, position, lower(name)`,

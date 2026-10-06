@@ -299,10 +299,10 @@ describe('production and other states', () => {
 });
 
 describe('permissions', () => {
-  const ops = { id: USERS.ops, role: 'member' as const, full_name: 'Ops' };
-  const am = { id: USERS.am1, role: 'member' as const, full_name: 'AM' };
-  const viewer = { id: 'v', role: 'viewer' as const, full_name: 'V' };
-  const admin = { id: 'a', role: 'admin' as const, full_name: 'A' };
+  const ops = { id: USERS.ops, role: 'manager' as const, full_name: 'Ops' };
+  const am = { id: USERS.am1, role: 'manager' as const, full_name: 'AM' };
+  const viewer = { id: 'v', role: 'user' as const, full_name: 'V' };
+  const admin = { id: 'a', role: 'super_admin' as const, full_name: 'A' };
   it('only the named approver, the account manager for sponsor stages, or an admin can decide', () => {
     expect(canDecideStage(ops, STAGES[0], null)).toBe(true);
     expect(canDecideStage(ops, STAGES[1], null)).toBe(false);

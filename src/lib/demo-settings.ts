@@ -5,7 +5,7 @@ export interface DemoSettings {
   email: string;
   password: string;
   name: string;
-  role: 'member' | 'viewer';
+  role: 'manager' | 'user';
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,7 +20,7 @@ export function demoSettings(env: Record<string, string | undefined>): DemoSetti
     email,
     password,
     name: env.DEMO_ACCOUNT_NAME?.trim().slice(0, 120) || 'Demo User',
-    // Anyone can use this login, so it is never an admin
-    role: env.DEMO_ACCOUNT_ROLE?.trim().toLowerCase() === 'viewer' ? 'viewer' : 'member',
+    // Anyone can use this login, so it is never a super admin
+    role: ['user', 'viewer'].includes(env.DEMO_ACCOUNT_ROLE?.trim().toLowerCase() ?? '') ? 'user' : 'manager',
   };
 }

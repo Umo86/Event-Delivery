@@ -30,7 +30,7 @@ async function ownTask(sql: Sql, me: CurrentUser, taskId: string | null): Promis
 
 export async function createTask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const title = required(fd, 'title', 'Task', 200);
     const deadline = date(fd, 'deadline', 'Deadline');
     const status = fd.get('status') ? readStatus(fd) : 'todo';
@@ -46,7 +46,7 @@ export async function createTask(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function moveTask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const status = readStatus(fd);
     const sql = await db();
     const task = await ownTask(sql, me, uuidOrNull(fd, 'task_id'));
@@ -60,7 +60,7 @@ export async function moveTask(_prev: ActionResult | null, fd: FormData): Promis
 
 export async function updateTask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const title = required(fd, 'title', 'Task', 200);
     const notes = str(fd, 'notes', 2000);
     const deadline = date(fd, 'deadline', 'Deadline');
@@ -74,7 +74,7 @@ export async function updateTask(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function deleteTask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const sql = await db();
     const task = await ownTask(sql, me, uuidOrNull(fd, 'task_id'));
     const docs = await sql<{ url: string }[]>`select url from task_documents where task_id = ${task.id}`;
@@ -87,7 +87,7 @@ export async function deleteTask(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function addSubtask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const title = required(fd, 'title', 'Sub-task', 200);
     const sql = await db();
     const task = await ownTask(sql, me, uuidOrNull(fd, 'task_id'));
@@ -99,7 +99,7 @@ export async function addSubtask(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function toggleSubtask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const id = uuidOrNull(fd, 'subtask_id');
     if (!id) throw new UserError('Missing sub-task.');
     const done = bool(fd, 'done');
@@ -116,7 +116,7 @@ export async function toggleSubtask(_prev: ActionResult | null, fd: FormData): P
 
 export async function deleteSubtask(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const id = uuidOrNull(fd, 'subtask_id');
     if (!id) throw new UserError('Missing sub-task.');
     const sql = await db();
@@ -132,7 +132,7 @@ export async function deleteSubtask(_prev: ActionResult | null, fd: FormData): P
 /** Records a file the browser has already uploaded to Blob storage against a task. */
 export async function attachDocument(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const url = str(fd, 'url', 1000);
     const name = required(fd, 'name', 'File name', 300);
     if (!url || !isStoreUrl(url)) throw new UserError('That file could not be saved.');
@@ -150,7 +150,7 @@ export async function attachDocument(_prev: ActionResult | null, fd: FormData): 
 
 export async function removeDocument(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const id = uuidOrNull(fd, 'document_id');
     if (!id) throw new UserError('Missing file.');
     const sql = await db();

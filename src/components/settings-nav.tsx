@@ -5,19 +5,19 @@ import { usePathname } from 'next/navigation';
 import { cx } from './ui';
 
 const ITEMS = [
-  { href: '/settings', label: 'Event', admin: true },
-  { href: '/settings/stages', label: 'Sign-off stages', admin: true },
-  { href: '/settings/departments', label: 'Departments', admin: true },
-  { href: '/settings/lists', label: 'Dropdown lists', admin: false },
-  { href: '/settings/events', label: 'Events', admin: true },
-  { href: '/settings/system', label: 'System', admin: true },
+  { href: '/settings', label: 'Event', super: false },
+  { href: '/settings/stages', label: 'Sign-off stages', super: false },
+  { href: '/settings/departments', label: 'Departments', super: false },
+  { href: '/settings/lists', label: 'Dropdown lists', super: false },
+  { href: '/settings/events', label: 'Events', super: false },
+  { href: '/settings/system', label: 'System', super: true },
 ];
 
-export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
+export function SettingsNav({ superAdmin }: { superAdmin: boolean }) {
   const pathname = usePathname();
   return (
     <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-line" aria-label="Settings">
-      {ITEMS.filter((i) => isAdmin || !i.admin).map((i) => {
+      {ITEMS.filter((i) => superAdmin || !i.super).map((i) => {
         const on = pathname === i.href;
         return (
           <Link key={i.href} href={i.href} aria-current={on ? 'page' : undefined}

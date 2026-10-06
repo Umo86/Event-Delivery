@@ -21,7 +21,7 @@ test('the super admin page has its own sign-in, for super admins only', async ({
   await gsSignIn(page, ADMIN.email, ADMIN.password);
   await expect(page.getByText(`Signed in as ${ADMIN.name}. Platform-wide controls`)).toBeVisible();
   await expect(page.locator('main ul li').filter({ hasText: 'Active people' })).toContainText(/\d+/);
-  const admins = panel(page, 'Admins and super admins');
+  const admins = panel(page, 'Managers and super admins');
   await expect(admins.locator('li', { hasText: `${ADMIN.name} (you)` })).toContainText('Super admin');
   await expect(panel(page, 'Audit trail')).toContainText(`${ADMIN.name}: Signed in to the super admin panel`);
   await page.getByRole('link', { name: 'Back to the platform' }).click();
@@ -37,44 +37,38 @@ test('people who aren’t super admins can’t open the panel', async ({ page })
   await expect(page.getByRole('button', { name: 'Sign everyone else out' })).toHaveCount(0);
 });
 
-test('only super admins can change a super admin', async ({ browser, page }) => {
-  await loginAs(page, 'admin');
-  await page.goto('/admin');
-  const fionaRow = await openPerson(page, 'fiona@ukcw.test');
-  await fionaRow.getByLabel('Access level', { exact: true }).selectOption('admin');
-  await fionaRow.getByRole('button', { name: 'Save access' }).click();
-  await expect(okMessage(fionaRow, 'Fiona Final is now an Admin.')).toBeVisible();
-
-  // Fiona is an admin, but can't touch the super admin
+test('managers can’t manage people, but a super admin can promote and demote them', async ({ browser, page }) => {
+  // Fiona is a Manager: she can’t open the Admin page or the super admin panel
   const fiona = await asUser(browser, 'fiona');
   await fiona.page.goto('/admin');
-  const boss = await openPerson(fiona.page, ADMIN.email);
-  await expect(boss.locator('summary')).toContainText('Super admin');
-  await expect(boss).toContainText('only another super admin can change their sign-in, access or details');
-  await expect(boss.getByRole('button', { name: 'Deactivate' })).toHaveCount(0);
-  await expect(boss.getByRole('button', { name: 'Reset password' })).toHaveCount(0);
-  await expect(boss.getByRole('button', { name: 'Save access' })).toHaveCount(0);
+  await expect(fiona.page).toHaveURL(/\/dashboard/);
   await fiona.page.goto('/gs');
   await expect(fiona.page.getByText('You’re signed in as Fiona Final, who isn’t a super admin.')).toBeVisible();
 
-  // A super admin can make her one, and take it away again
+  // A super admin can make her one from the super admin panel, and take it away again
+  await loginAs(page, 'admin');
   await page.goto('/gs');
-  const row = panel(page, 'Admins and super admins').locator('li', { hasText: 'fiona@ukcw.test' });
+  const row = panel(page, 'Managers and super admins').locator('li', { hasText: 'fiona@ukcw.test' });
   acceptNextDialog(page);
   await row.getByRole('button', { name: 'Make super admin' }).click();
   await expect(okMessage(row, 'Fiona Final is now a super admin.')).toBeVisible();
   await fiona.page.reload();
   await expect(fiona.page.getByText('Signed in as Fiona Final. Platform-wide controls')).toBeVisible();
+  // Now she can open the Admin page
+  await fiona.page.goto('/admin');
+  await expect(fiona.page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible();
   acceptNextDialog(page);
   await row.getByRole('button', { name: 'Remove super admin' }).click();
-  await expect(okMessage(row, 'Fiona Final is no longer a super admin, but is still an admin.')).toBeVisible();
+  await expect(okMessage(row, 'Fiona Final is now a Manager.')).toBeVisible();
   await fiona.ctx.close();
 
+  // And the access dropdown on the Admin page can set the three roles directly
   await page.goto('/admin');
   const again = await openPerson(page, 'fiona@ukcw.test');
-  await again.getByLabel('Access level', { exact: true }).selectOption('member');
+  await expect(again.getByLabel('Access level', { exact: true }).locator('option')).toHaveText(['Super Admin', 'Manager', 'User']);
+  await again.getByLabel('Access level', { exact: true }).selectOption('manager');
   await again.getByRole('button', { name: 'Save access' }).click();
-  await expect(okMessage(again, 'Fiona Final is now a Member.')).toBeVisible();
+  await expect(okMessage(again, 'Fiona Final is already a Manager.')).toBeVisible();
 });
 
 test('maintenance mode lets only super admins in', async ({ browser, page }) => {

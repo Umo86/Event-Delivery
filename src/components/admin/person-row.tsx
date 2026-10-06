@@ -29,7 +29,7 @@ export interface AdminPerson {
   is_super_admin: boolean;
 }
 
-const ROLE_TONE = { admin: 'blue', member: 'teal', viewer: 'grey' } as const;
+const ROLE_TONE = { super_admin: 'blue', manager: 'teal', user: 'grey' } as const;
 
 const h3 = 'mb-2 text-[15px] font-semibold text-ink';
 const help = 'text-[13px] text-muted';
@@ -154,11 +154,10 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
           {/* Access level */}
           <section aria-label={`Access level for ${u.full_name}`} className="min-w-0">
             <h3 className={h3}>Access level</h3>
-            {isMe || protectedSuper || u.is_super_admin ? (
+            {isMe || protectedSuper ? (
               <p className={help}>
-                {isMe ? 'You’re an admin. Another admin would need to change your access level.'
-                  : protectedSuper ? 'Only another super admin can change a super admin’s access.'
-                    : `${first} is a super admin. To make them anything other than an admin, remove that on the super admin page first.`}
+                {isMe ? 'You can’t change your own access level. Another super admin would need to.'
+                  : 'Only another super admin can change a super admin’s access.'}
               </p>
             ) : (
               <ActionForm action={changeAccess} className="flex flex-wrap items-end gap-2">
@@ -166,7 +165,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
                 <div className="min-w-[200px] flex-1">
                   <label htmlFor={`ar-${u.id}`} className="sr-only">Access level</label>
                   <select key={u.role} id={`ar-${u.id}`} name="role" defaultValue={u.role} className={inputCls}>
-                    {ACCESS_LEVELS.filter((a) => !u.is_demo || a.key !== 'admin').map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+                    {ACCESS_LEVELS.filter((a) => !u.is_demo || a.key !== 'super_admin').map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
                   </select>
                 </div>
                 <SubmitButton variant="dark" small>Save access</SubmitButton>
@@ -202,10 +201,10 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
           {event && (
             <section aria-label={`Sign-off for ${u.full_name}`} className="min-w-0">
               <h3 className={h3}>Signs off in {event.name}</h3>
-              {!u.active || u.role === 'viewer' ? (
+              {!u.active || u.role === 'user' ? (
                 <>
                   <p className={help}>
-                    {!u.active ? 'Reactivate them to change what they sign off.' : 'Viewers can’t sign off. Give them Member access to choose their stages and sponsors.'}
+                    {!u.active ? 'Reactivate them to change what they sign off.' : 'Users can’t sign off. Give them Manager access to choose their stages and sponsors.'}
                   </p>
                   {duties.length > 0 && (
                     <p className="mt-1.5 text-[13.5px] font-semibold text-red-700">

@@ -6,20 +6,20 @@ export const TEMP_PASSWORD_DAYS = 7;
 
 export const ACCESS_LEVELS: { key: Role; label: string; summary: string; email: string }[] = [
   {
-    key: 'admin',
-    label: 'Admin',
-    summary: 'Everything, including inviting people, access levels and settings.',
-    email: 'You can do everything, including inviting people and changing settings',
+    key: 'super_admin',
+    label: 'Super Admin',
+    summary: 'Full control of everything, including people, access levels and platform settings.',
+    email: 'You have full control of everything, including inviting people and changing settings',
   },
   {
-    key: 'member',
-    label: 'Member',
-    summary: 'Adds and edits lines, uploads artwork, and signs off the stages and sponsors they look after.',
-    email: 'You can add and edit lines, upload artwork and sign off the stages you look after',
+    key: 'manager',
+    label: 'Manager',
+    summary: 'Adds, edits and deletes signage, changes status, creates events, manages sponsors, suppliers and sign-off setup, and signs off their stages.',
+    email: 'You can add, edit and remove signage, change status, create events and sign off the stages you look after',
   },
   {
-    key: 'viewer',
-    label: 'Viewer',
+    key: 'user',
+    label: 'User',
     summary: 'Sees everything and can comment, but can’t change anything.',
     email: 'You can see everything and add comments, but not change anything',
   },
@@ -30,15 +30,15 @@ export function accessLevel(role: Role) {
 }
 
 /** What each access level can do, for the table on the admin page. */
-export const ABILITIES: { label: string; admin: string; member: string; viewer: string }[] = [
-  { label: 'See schedules, proofs and the dashboard', admin: 'Yes', member: 'Yes', viewer: 'Yes' },
-  { label: 'Comment on lines', admin: 'Yes', member: 'Yes', viewer: 'Yes' },
-  { label: 'Add and edit lines, upload artwork', admin: 'Yes', member: 'Yes', viewer: 'No' },
-  { label: 'Sign off', admin: 'Any stage', member: 'Their stages', viewer: 'No' },
-  { label: 'Send sponsor approval links', admin: 'Yes', member: 'Their sponsors', viewer: 'No' },
-  { label: 'Suppliers and dropdown lists', admin: 'Yes', member: 'Add and edit', viewer: 'No' },
-  { label: 'Delete lines and sponsors', admin: 'Yes', member: 'No', viewer: 'No' },
-  { label: 'Event settings, people and access', admin: 'Yes', member: 'No', viewer: 'No' },
+export const ABILITIES: { label: string; super_admin: string; manager: string; user: string }[] = [
+  { label: 'See schedules, proofs and the dashboard', super_admin: 'Yes', manager: 'Yes', user: 'Yes' },
+  { label: 'Comment on lines', super_admin: 'Yes', manager: 'Yes', user: 'Yes' },
+  { label: 'Add, edit and delete lines, upload artwork', super_admin: 'Yes', manager: 'Yes', user: 'No' },
+  { label: 'Change production status', super_admin: 'Yes', manager: 'Yes', user: 'No' },
+  { label: 'Sign off', super_admin: 'Any stage', manager: 'Their stages', user: 'No' },
+  { label: 'Create and manage events', super_admin: 'Yes', manager: 'Yes', user: 'No' },
+  { label: 'Sponsors, suppliers, sign-off setup, dropdown lists', super_admin: 'Yes', manager: 'Yes', user: 'No' },
+  { label: 'People, access levels, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },
 ];
 
 export type PersonStatus = 'active' | 'invited' | 'invite_expired' | 'temp_password' | 'temp_expired' | 'deactivated';

@@ -34,7 +34,7 @@ test('uploading artwork starts sign-off, with a preview and thumbnail', async ({
   await expectStatus(page, 'With Operations');
   await expect(waitingOn(page)).toContainText('Olivia Ops');
   await expectImagesLoaded(page, 'img[alt="Artwork v1 for OS-001"]');
-  await expect(signoffStage(page, 'Operations')).toContainText('Only Olivia Ops or an admin can record this stage.');
+  await expect(signoffStage(page, 'Operations')).toContainText('Only Olivia Ops or a super admin can record this stage.');
   await expect(signoffStage(page, 'Sponsor')).toContainText('Not used for organiser signage.');
   await expect(signoffStage(page, 'Marketing')).toContainText('Opens when the stages before it approve.');
 
@@ -53,7 +53,7 @@ test('each approver signs off in turn and can ask for changes', async ({ browser
   await expectStatus(olivia.page, 'With Marketing');
   // Olivia can reopen her own stage, but not decide Marketing
   await expect(signoffStage(olivia.page, 'Operations').getByRole('button', { name: 'Change this decision' })).toBeVisible();
-  await expect(signoffStage(olivia.page, 'Marketing')).toContainText('Only Mark Marketing or an admin can record this stage.');
+  await expect(signoffStage(olivia.page, 'Marketing')).toContainText('Only Mark Marketing or a super admin can record this stage.');
   await olivia.ctx.close();
 
   const mark = await asUser(browser, 'mark');
@@ -165,7 +165,7 @@ test('artwork files open and download for signed-in people only', async ({ page,
 test('admins can record on behalf of others; holds and rejections', async ({ browser, page }) => {
   await loginAs(page, 'admin');
   await page.goto(`/items/${itemId('os2')}`);
-  await expect(signoffStage(page, 'Operations')).toContainText('You’re recording this as an admin on behalf of Olivia Ops.');
+  await expect(signoffStage(page, 'Operations')).toContainText('You’re recording this as a super admin on behalf of Olivia Ops.');
   await decide(page, 'Operations', 'Put on hold', 'Waiting for the final floorplan');
   await expectStatus(page, 'On hold · Operations');
   await expect(waitingOn(page)).toContainText('Olivia Ops');
@@ -217,10 +217,10 @@ test('a sponsor approves through a private link', async ({ browser, page }) => {
   await decideAs(browser, 'olivia', 'ss1', 'Operations', 'Approve');
   await decideAs(browser, 'mark', 'ss1', 'Marketing', 'Approve');
 
-  // Only the account manager (or an admin) can sign off or send the sponsor a link
+  // Only the account manager (or a super admin) can sign off or send the sponsor a link
   const pete = await asUser(browser, 'pete');
   await pete.page.goto(`/items/${itemId('ss1')}`);
-  await expect(signoffStage(pete.page, 'Sponsor')).toContainText('Only Amy Account or an admin can record this stage.');
+  await expect(signoffStage(pete.page, 'Sponsor')).toContainText('Only Amy Account or a super admin can record this stage.');
   await expect(pete.page.getByRole('button', { name: 'Create approval link' })).toHaveCount(0);
   await pete.ctx.close();
 

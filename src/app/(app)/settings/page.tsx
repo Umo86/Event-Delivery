@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { Check } from 'lucide-react';
-import { requireUser } from '@/lib/auth/session';
+import { requireManager } from '@/lib/auth/session';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { VENUES } from '@/lib/domain/labels';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -14,14 +13,13 @@ import { setEventDepartments } from '@/app/actions/departments';
 export const metadata: Metadata = { title: 'Event settings' };
 
 export default async function EventSettingsPage(props: { searchParams: Promise<{ welcome?: string; created?: string }> }) {
-  const user = await requireUser();
-  if (user.role !== 'admin') redirect('/settings/lists');
+  await requireManager();
   const sp = await props.searchParams;
   const event = await getCurrentEvent();
   if (!event) return <NoEvent />;
   const bundle = await loadBundle(event.id);
   if (!bundle) return <NoEvent />;
-  const people = bundle.users.filter((u) => u.active && u.role !== 'viewer');
+  const people = bundle.users.filter((u) => u.active && u.role !== 'user');
   const e = event;
 
   const steps = [

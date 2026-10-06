@@ -34,8 +34,8 @@ export function SignoffRoute({ detail, user, sponsorLinks = true }: { detail: It
           : approverNames.length ? approverNames.join(', ') : 'the approver';
         const allowed = allowedDecisions(state, s.stage.id);
         const mayDecide = allowed.length > 0 && canDecideStage(user, s.stage, sponsor);
-        const onBehalf = mayDecide && user.role === 'admin' && !isStageApprover(user, s.stage, sponsor)
-          ? `You’re recording this as an admin on behalf of ${approverShort}.` : undefined;
+        const onBehalf = mayDecide && user.role === 'super_admin' && !isStageApprover(user, s.stage, sponsor)
+          ? `You’re recording this as a super admin on behalf of ${approverShort}.` : undefined;
         const d = s.decision;
         const marker = s.kind === 'approved'
           ? <span className="flex h-7 w-7 items-center justify-center rounded-full bg-green-600 text-white"><Check size={16} strokeWidth={3} aria-label="Approved" /></span>
@@ -75,7 +75,7 @@ export function SignoffRoute({ detail, user, sponsorLinks = true }: { detail: It
                   reopen={s.kind === 'approved'} onBehalf={onBehalf} />
               )}
               {!mayDecide && (s.kind === 'current' || s.kind === 'stale') && canEdit(user) && (
-                <p className="mt-1.5 text-[12.5px] text-muted">Only {approverShort} or an admin can record this stage.</p>
+                <p className="mt-1.5 text-[12.5px] text-muted">Only {approverShort} or a super admin can record this stage.</p>
               )}
               {sponsorLinks && (s.kind === 'current' || s.kind === 'stale') && s.stage.uses_account_manager && !item.cancelled && canDecideStage(user, s.stage, sponsor) && (
                 <SharePanel detail={detail} stageId={s.stage.id} />

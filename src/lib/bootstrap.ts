@@ -31,8 +31,8 @@ export async function bootstrapAdmin(sql: Sql): Promise<void> {
     const [{ c }] = await tx<{ c: number }[]>`select count(*)::int as c from users`;
     if (c > 0) return; // another server instance got there first
     const [u] = await tx<{ id: string }[]>`
-      insert into users (email, full_name, job_title, role, password_hash, must_change_password, is_super_admin)
-      values (${email}, ${name}, ${title}, 'admin', ${hash}, false, true) returning id`;
+      insert into users (email, full_name, job_title, role, password_hash, must_change_password)
+      values (${email}, ${name}, ${title}, 'super_admin', ${hash}, false) returning id`;
     const t = tx as unknown as Sql;
     const [{ e }] = await t<{ e: number }[]>`select count(*)::int as e from events`;
     if (e === 0) await createDefaultEvent(t, u.id);
@@ -72,7 +72,7 @@ export async function ensureDemoAccount(sql: Sql): Promise<boolean> {
       await tx`insert into app_settings (key, value) values (${madeHere}, 'created')
                on conflict (key) do update set value = excluded.value, updated_at = now()`;
       await logActivity(tx as unknown as Sql, { eventId: null, itemId: null, userId: created.id, actorName: 'Deployment settings', kind: 'access',
-        message: `Created the shared demo login ${d.name} (${d.email}) as ${d.role === 'viewer' ? 'Viewer' : 'Member'}` });
+        message: `Created the shared demo login ${d.name} (${d.email}) as ${d.role === 'user' ? 'User' : 'Manager'}` });
       id = created.id;
     } else {
       if (!u.is_demo) {

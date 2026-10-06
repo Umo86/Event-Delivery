@@ -27,7 +27,7 @@ test('signed-out visitors are sent to sign in, then back to the page they wanted
   expect((await upload.json()).error).toContain('signed in');
 });
 
-test('viewers can look but not change anything', async ({ page }) => {
+test('users can look but not change anything', async ({ page }) => {
   await loginAs(page, 'vic');
   await page.goto('/schedule/os');
   await expect(page.getByRole('link', { name: 'Add line' })).toHaveCount(0);
@@ -43,51 +43,57 @@ test('viewers can look but not change anything', async ({ page }) => {
   await expect(page.locator('#signoff textarea')).toHaveCount(0);
   await expect(page.locator('#production_status')).toBeDisabled();
 
-  await page.goto('/suppliers'); // suppliers has its own tab now, read-only for viewers
+  await page.goto('/suppliers'); // suppliers has its own tab now, read-only for users
   await expect(page.getByRole('heading', { name: 'Suppliers', level: 1 })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add supplier' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
-  await page.goto('/settings');
-  await expect(page).toHaveURL(/\/settings\/lists$/);
-  expect(await settingsTabs(page)).toEqual(['Dropdown lists']);
-  await page.goto('/settings/lists');
-  await expect(page.locator('#list-zone')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Save list' })).toHaveCount(0);
-  for (const path of ['/admin', '/shows', '/settings/team']) {
+
+  // Users can't reach any of the settings or management pages
+  for (const path of ['/admin', '/shows', '/settings', '/settings/lists', '/settings/stages', '/settings/team']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
-    await expect(page.getByText('That page is for admins only.')).toBeVisible();
+    await expect(page.getByText('You don’t have access to that page.')).toBeVisible();
   }
   const mainNav = page.getByRole('navigation', { name: 'Main' }).first();
   await expect(mainNav.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0);
   await expect(mainNav.getByRole('link', { name: 'All shows' })).toHaveCount(0);
+  await expect(mainNav.getByRole('link', { name: 'Settings' })).toHaveCount(0);
   await page.goto('/sponsors');
   await expect(page.getByRole('heading', { name: 'Add a sponsor' })).toHaveCount(0);
 
-  // The upload service refuses viewers too
+  // The upload service refuses users too
   const res = await page.request.post('/api/upload', {
     data: { type: 'blob.generate-client-token', payload: { pathname: 'artwork/x/y/z.png', clientPayload: JSON.stringify({ itemId: itemId('os4'), kind: 'original' }), multipart: false } },
   });
   expect(res.status()).toBe(400);
 });
 
-test('members can work on lines but not reach admin settings', async ({ page }) => {
+test('managers can run signage and settings, but not user management or system', async ({ page }) => {
   await loginAs(page, 'mark');
-  for (const path of ['/admin', '/shows', '/settings/team', '/settings/stages', '/settings/events', '/settings/system']) {
+  // Super-admin-only pages are off limits
+  for (const path of ['/admin', '/settings/team', '/settings/system']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
   }
+  // But managers can reach the operational settings and the shows overview
+  await page.goto('/shows');
+  await expect(page.getByRole('heading', { name: /shows/i, level: 1 })).toBeVisible();
+  await page.goto('/settings/stages');
+  await expect(page).toHaveURL(/\/settings\/stages$/);
+  await page.goto('/settings/events');
+  await expect(page).toHaveURL(/\/settings\/events$/);
   await page.goto('/settings');
-  expect(await settingsTabs(page)).toEqual(['Dropdown lists']);
-  await page.goto('/suppliers'); // members can add and edit suppliers, but not remove them
+  expect(await settingsTabs(page)).toEqual(['Event', 'Sign-off stages', 'Departments', 'Dropdown lists', 'Events']); // no System
+
+  await page.goto('/suppliers'); // managers can add, edit and remove suppliers
   await expect(page.getByRole('button', { name: 'Add supplier' })).toBeVisible();
   await page.locator('li[id^="supplier-"]').first().getByText('Edit', { exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Remove' })).toHaveCount(0); // removing suppliers is for admins
+  await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
 
   await page.goto(`/items/${itemId('os4')}`);
   await expect(page.locator('input[type=file]')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Cancel line' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Delete permanently' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete permanently' })).toBeVisible(); // managers can delete lines
 });
 
 test('the server refuses a decision from someone who is not the approver', async ({ browser, page }) => {
@@ -107,7 +113,7 @@ test('the server refuses a decision from someone who is not the approver', async
   await form.locator('input[name=stage_id]').evaluate((el, v) => ((el as HTMLInputElement).value = v), opsStageId);
   await form.locator('textarea').fill('Trying to change the Operations stage');
   await form.getByRole('button', { name: 'Request changes' }).click();
-  await expect(errorMessage(marketing, 'Only the approver for this stage (or an admin) can record it.')).toBeVisible();
+  await expect(errorMessage(marketing, 'Only the approver for this stage (or a super admin) can record it.')).toBeVisible();
   await page.reload();
   await expect(signoffStage(page, 'Operations')).toContainText('Approved by Olivia Ops');
 });

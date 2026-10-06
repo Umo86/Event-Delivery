@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'member' | 'viewer';
+export type Role = 'super_admin' | 'manager' | 'user';
 export type Category = 'organiser_signage' | 'sponsor_signage' | 'sponsor_item';
 export type ArtworkBy = 'in_house' | 'sponsor' | 'supplier' | 'not_required';
 export type ProductionStatus = 'sent_to_supplier' | 'in_production' | 'delivered' | 'installed';

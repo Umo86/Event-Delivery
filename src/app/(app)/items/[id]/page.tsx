@@ -8,7 +8,7 @@ import { sponsorLinksEnabled } from '@/lib/settings';
 import { fmtDate, fmtDateTime, relativeDue } from '@/lib/dates';
 import { defaultArtworkDue, defaultPrintDeadline } from '@/lib/domain/engine';
 import { artworkByLabel, categoryInfo } from '@/lib/domain/labels';
-import { canEdit, isAdmin } from '@/lib/domain/permissions';
+import { canEdit } from '@/lib/domain/permissions';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { ButtonLink, cx, FlagChip, money, Notice, Panel, Plate, StatusChip } from '@/components/ui';
 import { ArtworkPanel } from '@/components/item/artwork-panel';
@@ -143,7 +143,7 @@ export default async function ItemPage(props: {
                   <input type="hidden" name="cancel" value={item.cancelled ? '0' : '1'} />
                   <SubmitButton variant="secondary" small>{item.cancelled ? 'Restore line' : 'Cancel line'}</SubmitButton>
                 </ActionForm>
-                {isAdmin(user) && (
+                {canEdit(user) && (
                   <ActionForm action={deleteItem} confirm={`Delete ${row.code} permanently, including its artwork and history? This can’t be undone.`}>
                     <input type="hidden" name="item_id" value={item.id} />
                     <SubmitButton variant="danger" small pendingText="Deleting…">Delete permanently</SubmitButton>

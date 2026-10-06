@@ -94,14 +94,14 @@ test('sponsor pages: details, account manager and removal rules', async ({ page 
   await buildco.getByRole('link', { name: 'BuildCo' }).click();
   await expect(page.getByText('No account manager set.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Their lines (1)' })).toBeVisible();
-  // Members can edit sponsor details, but the account manager (who signs off for the sponsor) is chosen by an admin
+  // Managers can edit sponsor details, but the account manager (who signs off for the sponsor) is chosen by a super admin
   await expect(page.locator('[id$="-am"]')).toBeDisabled();
   await page.locator('[id$="-cname"]').fill('Ben Builder');
   await page.getByRole('button', { name: 'Save sponsor' }).click();
   await expect(okMessage(page, 'Saved.')).toBeVisible();
   await expect(page.getByText('No account manager set. Contact: Ben Builder.')).toBeVisible();
-  // Only admins can remove sponsors
-  await expect(page.getByRole('button', { name: 'Remove sponsor' })).toHaveCount(0);
+  // Managers can remove sponsors
+  await expect(page.getByRole('button', { name: 'Remove sponsor' })).toBeVisible();
 
   await loginAs(page, 'admin');
   await page.goto('/sponsors');

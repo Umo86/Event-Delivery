@@ -41,7 +41,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           };
         }
 
-        if (me.role === 'viewer') throw new Error('You need to be signed in as a member to upload.');
+        if (me.role === 'user') throw new Error('You need to be a Manager or Super Admin to upload.');
         if (!payload.itemId || !/^[0-9a-f-]{36}$/i.test(payload.itemId)) throw new Error('Missing line.');
         const sql = await db();
         const [item] = await sql<{ id: string; event_id: string; cancelled: boolean }[]>`

@@ -66,9 +66,9 @@ export const FLAGS: { key: Flag; label: string; tone: Tone }[] = [
 export const flagInfo = (k: Flag) => FLAGS.find((f) => f.key === k)!;
 
 export const ROLES: { key: Role; label: string; help: string }[] = [
-  { key: 'admin', label: 'Admin', help: 'Everything, including settings and team' },
-  { key: 'member', label: 'Member', help: 'Add and edit lines, upload artwork, sign off their stages' },
-  { key: 'viewer', label: 'Viewer', help: 'Read only' },
+  { key: 'super_admin', label: 'Super Admin', help: 'Full control of everything, including people and settings' },
+  { key: 'manager', label: 'Manager', help: 'Add, edit and remove signage, change status, create events, sign off their stages' },
+  { key: 'user', label: 'User', help: 'Read only' },
 ];
 
 export const VENUES = ['ExCeL London', 'NEC Birmingham', 'Other'] as const;

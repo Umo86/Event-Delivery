@@ -76,7 +76,7 @@ async function readItemFields(fd: FormData, eventId: string, category: Category)
 
 export async function createItem(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const eventId = uuidOrNull(fd, 'event_id');
     const category = str(fd, 'category', 40) as Category;
     if (!eventId || !CATS.includes(category)) throw new UserError('Missing event or category.');
@@ -104,7 +104,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 export async function updateItem(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const itemId = uuidOrNull(fd, 'item_id');
     if (!itemId) throw new UserError('Missing line.');
     const detail = await loadItem(itemId);
@@ -119,8 +119,8 @@ export async function updateItem(_prev: ActionResult | null, fd: FormData): Prom
     if (!changed.length) redirect(`/items/${itemId}`);
     const sql = await db();
     const sponsorChanged = changed.includes('sponsor_id');
-    if (sponsorChanged && me.role !== 'admin' && detail.decisions.length > 0) {
-      throw new UserError('Sign-off has started on this line, so only an admin can move it to another sponsor.');
+    if (sponsorChanged && me.role !== 'super_admin' && detail.decisions.length > 0) {
+      throw new UserError('Sign-off has started on this line, so only a super admin can move it to another sponsor.');
     }
     await sql`update items set ${sql(f as never, ...(changed as never[]))} where id = ${itemId}`;
     // Approval links belong to the old sponsor
@@ -134,7 +134,7 @@ export async function updateItem(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function updateProduction(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const itemId = uuidOrNull(fd, 'item_id');
     if (!itemId) throw new UserError('Missing line.');
     const detail = await loadItem(itemId);
@@ -176,7 +176,7 @@ export async function updateProduction(_prev: ActionResult | null, fd: FormData)
 
 export async function setCancelled(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const itemId = uuidOrNull(fd, 'item_id');
     const cancel = bool(fd, 'cancel');
     if (!itemId) throw new UserError('Missing line.');
@@ -195,7 +195,7 @@ export async function setCancelled(_prev: ActionResult | null, fd: FormData): Pr
 
 export async function deleteItem(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const itemId = uuidOrNull(fd, 'item_id');
     if (!itemId) throw new UserError('Missing line.');
     const sql = await db();
@@ -214,7 +214,7 @@ export async function deleteItem(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function addComment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('viewer');
+    const me = await actor('user');
     const itemId = uuidOrNull(fd, 'item_id');
     const text = required(fd, 'comment', 'Comment', 2000);
     if (!itemId) throw new UserError('Missing line.');
@@ -229,7 +229,7 @@ export async function addComment(_prev: ActionResult | null, fd: FormData): Prom
 
 export async function recordDecision(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const itemId = uuidOrNull(fd, 'item_id');
     const stageId = uuidOrNull(fd, 'stage_id');
     const decision = str(fd, 'decision', 30) as DecisionValue;
@@ -243,8 +243,8 @@ export async function recordDecision(_prev: ActionResult | null, fd: FormData): 
     if (!stage) throw new UserError('That sign-off stage no longer exists.');
     if (!canDecideStage(me, stage, sponsor)) {
       throw new UserError(stage.uses_account_manager
-        ? 'Only the sponsor’s account manager (or an admin) can record this stage.'
-        : 'Only the approver for this stage (or an admin) can record it.');
+        ? 'Only the sponsor’s account manager (or a super admin) can record this stage.'
+        : 'Only the approver for this stage (or a super admin) can record it.');
     }
     const allowed = allowedDecisions(state, stageId);
     if (!allowed.includes(decision)) {
@@ -270,7 +270,7 @@ export async function commitArtwork(input: {
   fileName: string; widthPx: number | null; heightPx: number | null; pageCount: number | null; note: string | null;
 }): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     if (!isUuid(input.itemId)) throw new UserError('Missing line.');
     const sql = await db();
     const [item] = await sql<{ id: string; event_id: string; cancelled: boolean; production_status: ProductionStatus | null }[]>`
@@ -324,7 +324,7 @@ export async function commitArtwork(input: {
 
 export async function deleteVersion(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('admin');
+    const me = await actor('manager');
     const versionId = uuidOrNull(fd, 'version_id');
     if (!versionId) throw new UserError('Missing version.');
     const sql = await db();
@@ -346,7 +346,7 @@ export async function deleteVersion(_prev: ActionResult | null, fd: FormData): P
 
 export async function createShareLink(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const itemId = uuidOrNull(fd, 'item_id');
     if (!itemId) throw new UserError('Missing line.');
     const detail = await loadItem(itemId);
@@ -357,7 +357,7 @@ export async function createShareLink(_prev: ActionResult | null, fd: FormData):
       throw new UserError('A sponsor link can be sent when the line is at the sponsor sign-off stage.');
     }
     if (!sponsor) throw new UserError('Choose the sponsor for this line first.');
-    if (!canDecideStage(me, stage, sponsor)) throw new UserError('Only the sponsor’s account manager (or an admin) can send an approval link.');
+    if (!canDecideStage(me, stage, sponsor)) throw new UserError('Only the sponsor’s account manager (or a super admin) can send an approval link.');
     if (!(await sponsorLinksEnabled())) throw new UserError('Sponsor approval links are turned off. An admin can turn them back on in Admin.');
     const token = randomToken(24);
     const expires = new Date(Date.now() + 30 * 86400000);
@@ -374,7 +374,7 @@ export async function createShareLink(_prev: ActionResult | null, fd: FormData):
 
 export async function revokeShareLink(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('member');
+    const me = await actor('manager');
     const linkId = uuidOrNull(fd, 'link_id');
     if (!linkId) throw new UserError('Missing link.');
     const sql = await db();

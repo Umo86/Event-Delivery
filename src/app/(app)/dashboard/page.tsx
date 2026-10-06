@@ -128,7 +128,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ den
     <>
       <PageHeader title="Dashboard"
         subtitle={<>{event.name}, {event.venue}.{daysToOpen !== null && daysToOpen >= 0 ? ` ${daysToOpen} days until doors open.` : ''}</>} />
-      {sp.denied && <div className="mb-4"><Notice tone="warn">That page is for admins only.</Notice></div>}
+      {sp.denied && <div className="mb-4"><Notice tone="warn">You don’t have access to that page.</Notice></div>}
       {unassigned.length > 0 && (
         <div className="mb-4">
           <Notice tone="warn">

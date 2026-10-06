@@ -6,12 +6,12 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 const PEOPLE = [
-  { key: 'olivia', name: 'Olivia Ops', email: 'olivia@ukcw.test', title: 'Operations Manager', role: 'member' },
-  { key: 'mark', name: 'Mark Marketing', email: 'mark@ukcw.test', title: 'Marketing Manager', role: 'member' },
-  { key: 'amy', name: 'Amy Account', email: 'amy@ukcw.test', title: 'Account Manager', role: 'member' },
-  { key: 'fiona', name: 'Fiona Final', email: 'fiona@ukcw.test', title: 'Event Director', role: 'member' },
-  { key: 'pete', name: 'Pete Production', email: 'pete@ukcw.test', title: 'Production Manager', role: 'member' },
-  { key: 'vic', name: 'Vic Viewer', email: 'vic@ukcw.test', title: 'Finance', role: 'viewer' },
+  { key: 'olivia', name: 'Olivia Ops', email: 'olivia@ukcw.test', title: 'Operations Manager', role: 'manager' },
+  { key: 'mark', name: 'Mark Marketing', email: 'mark@ukcw.test', title: 'Marketing Manager', role: 'manager' },
+  { key: 'amy', name: 'Amy Account', email: 'amy@ukcw.test', title: 'Account Manager', role: 'manager' },
+  { key: 'fiona', name: 'Fiona Final', email: 'fiona@ukcw.test', title: 'Event Director', role: 'manager' },
+  { key: 'pete', name: 'Pete Production', email: 'pete@ukcw.test', title: 'Production Manager', role: 'manager' },
+  { key: 'vic', name: 'Vic Viewer', email: 'vic@ukcw.test', title: 'Finance', role: 'user' },
 ] as const;
 
 const asAdmin = (page: Page) => login(page, ADMIN.email, ADMIN.password);
@@ -27,7 +27,7 @@ test('admin invites the team and gets a ready-made email to send each person', a
   await expect(page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible();
   const invitePanel = panel(page, 'Invite someone');
   for (const p of PEOPLE) {
-    const level = p.role === 'viewer' ? 'Viewer' : 'Member';
+    const level = p.role === 'user' ? 'User' : 'Manager';
     await page.fill('#inv-name', p.name);
     await page.fill('#inv-email', p.email);
     await page.fill('#inv-title', p.title);
@@ -53,7 +53,7 @@ test('admin invites the team and gets a ready-made email to send each person', a
   await expect(page.getByText(`1 active, ${PEOPLE.length} waiting to sign in`)).toBeVisible();
   const vic = personRow(page, 'vic@ukcw.test').locator('summary');
   await expect(vic.getByText('Invited', { exact: true })).toBeVisible();
-  await expect(vic.getByText('Viewer', { exact: true })).toBeVisible();
+  await expect(vic.getByText('User', { exact: true })).toBeVisible();
 
   // The same email can't be invited twice
   await page.fill('#inv-name', 'Olivia Again');
@@ -63,8 +63,8 @@ test('admin invites the team and gets a ready-made email to send each person', a
   await expect(page.locator('#inv-name')).toHaveValue('Olivia Again'); // what was typed is kept after an error
 
   const log = panel(page, 'Access log');
-  await expect(log).toContainText('Invited Vic Viewer (vic@ukcw.test) as Viewer');
-  await expect(log).toContainText('Invited Olivia Ops (olivia@ukcw.test) as Member');
+  await expect(log).toContainText('Invited Vic Viewer (vic@ukcw.test) as User');
+  await expect(log).toContainText('Invited Olivia Ops (olivia@ukcw.test) as Manager');
 });
 
 test('an invite can be cancelled before it is used, and its password is never shown again', async ({ page }) => {

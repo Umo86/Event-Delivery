@@ -79,14 +79,14 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
       : filter === 'lines' ? sql`where a.item_id is not null` : sql``;
   const [[c], admins, signedIn, trail, linksOn, maintenance] = await Promise.all([
     sql<{
-      active: number; waiting: number; deactivated: number; admins: number; supers: number; events: number; archived: number;
+      active: number; waiting: number; deactivated: number; managers: number; supers: number; events: number; archived: number;
       lines: number; files: number; bytes: number; people_in: number; sessions: number; schema: number;
     }[]>`select
       (select count(*)::int from users where active and not is_demo and not (must_change_password and last_login_at is null)) as active,
       (select count(*)::int from users where active and must_change_password and last_login_at is null) as waiting,
       (select count(*)::int from users where not active) as deactivated,
-      (select count(*)::int from users where role = 'admin' and active) as admins,
-      (select count(*)::int from users where is_super_admin and active) as supers,
+      (select count(*)::int from users where role = 'manager' and active) as managers,
+      (select count(*)::int from users where role = 'super_admin' and active) as supers,
       (select count(*)::int from events where not archived) as events,
       (select count(*)::int from events where archived) as archived,
       (select count(*)::int from items) as lines,
@@ -96,10 +96,10 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
       (select count(*)::int from sessions where expires_at > now()) as sessions,
       (select coalesce(max(version), 0)::int from schema_migrations) as schema`,
     sql<{ id: string; full_name: string; email: string; active: boolean; is_super_admin: boolean; is_demo: boolean; last_login_at: Date | null }[]>`
-      select id, full_name, email, active, is_super_admin, is_demo, last_login_at from users
-      where role = 'admin' order by is_super_admin desc, active desc, lower(full_name)`,
+      select id, full_name, email, active, (role = 'super_admin') as is_super_admin, is_demo, last_login_at from users
+      where role in ('manager', 'super_admin') order by (role = 'super_admin') desc, active desc, lower(full_name)`,
     sql<{ id: string; full_name: string; role: string; is_super_admin: boolean; is_demo: boolean; n: number; latest: Date }[]>`
-      select u.id, u.full_name, u.role, u.is_super_admin, u.is_demo, count(*)::int as n, max(s.created_at) as latest
+      select u.id, u.full_name, u.role, (u.role = 'super_admin') as is_super_admin, u.is_demo, count(*)::int as n, max(s.created_at) as latest
       from sessions s join users u on u.id = s.user_id where s.expires_at > now()
       group by u.id order by max(s.created_at) desc limit 100`,
     sql<{ id: string; actor_name: string; kind: string; message: string; created_at: Date; event_name: string | null }[]>`
@@ -114,7 +114,7 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
 
   const tiles: { label: string; value: string | number; sub?: string }[] = [
     { label: 'Active people', value: c.active, sub: [c.waiting ? `${c.waiting} waiting to sign in` : null, c.deactivated ? `${c.deactivated} deactivated` : null].filter(Boolean).join(', ') || undefined },
-    { label: 'Admins', value: c.admins, sub: `${c.supers} super admin${c.supers === 1 ? '' : 's'}` },
+    { label: 'Super admins', value: c.supers, sub: `${c.managers} manager${c.managers === 1 ? '' : 's'}` },
     { label: 'Signed in now', value: c.people_in, sub: `${c.sessions} session${c.sessions === 1 ? '' : 's'}` },
     { label: 'Events', value: c.events, sub: c.archived ? `${c.archived} archived` : undefined },
     { label: 'Lines', value: c.lines },
@@ -165,10 +165,10 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-6">
-            <Panel title="Admins and super admins" padded={false}
+            <Panel title="Managers and super admins" padded={false}
               actions={<Link href="/admin" className="text-[13.5px] font-semibold text-ink underline underline-offset-2">Invite or change people on the Admin page</Link>}>
               <p className="border-b border-line px-4 py-2.5 text-[13.5px] text-muted">
-                Super admins can open this page and change other super admins. Admins can’t change a super admin’s access, sign-in or details.
+                Promote a manager to super admin, or drop a super admin back to manager. Only super admins can change another super admin’s access, sign-in or details.
               </p>
               <ul>
                 {admins.map((a) => (
@@ -186,7 +186,7 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
                     </div>
                     {a.id !== me.id && !a.is_demo && !me.is_demo && (a.is_super_admin || a.active) && (
                       <ActionForm action={setSuperAdmin}
-                        confirm={a.is_super_admin ? `Remove ${a.full_name}’s super admin rights? They stay an admin.` : `Make ${a.full_name} a super admin?`}>
+                        confirm={a.is_super_admin ? `Remove ${a.full_name}’s super admin rights? They become a Manager.` : `Make ${a.full_name} a super admin?`}>
                         <input type="hidden" name="user_id" value={a.id} />
                         <input type="hidden" name="make" value={a.is_super_admin ? '0' : '1'} />
                         <SubmitButton variant={a.is_super_admin ? 'danger' : 'secondary'} small>
@@ -212,7 +212,7 @@ async function SuperAdminPanel({ me, appName, log }: { me: CurrentUser; appName:
                       <div className="min-w-0 flex-1">
                         <p className="text-[15px] font-semibold text-ink">
                           {s.full_name}{s.id === me.id ? ' (you)' : ''}
-                          <span className="ml-2 text-[13px] font-normal capitalize text-muted">{s.is_super_admin ? 'Super admin' : s.role}{s.is_demo ? ', demo login' : ''}</span>
+                          <span className="ml-2 text-[13px] font-normal text-muted">{s.role === 'super_admin' ? 'Super admin' : s.role === 'manager' ? 'Manager' : 'User'}{s.is_demo ? ', demo login' : ''}</span>
                         </p>
                         <p className="text-[13px] text-muted">
                           {s.n} session{s.n === 1 ? '' : 's'}, latest sign-in {fmtDateTime(s.latest)}

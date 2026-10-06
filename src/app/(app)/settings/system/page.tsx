@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { requireAdminPage } from '@/lib/auth/session';
+import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getAppName } from '@/lib/data/load';
 import { LATEST_VERSION } from '@/lib/db/migrations';
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'System' };
 const FREE_BLOB_BYTES = 1024 ** 3;
 
 export default async function SystemPage() {
-  await requireAdminPage();
+  await requireSuperAdmin();
   const sql = await db();
   const [stats] = await sql<{ files: number; bytes: number; items: number; users: number; v: number }[]>`
     select (select count(*)::int from artwork_versions) as files,

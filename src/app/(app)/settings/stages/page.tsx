@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { requireAdminPage } from '@/lib/auth/session';
+import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { ActionForm, SubmitButton } from '@/components/forms';
@@ -11,12 +11,12 @@ import { addStage, moveStage, removeStage, saveStage } from '@/app/actions/setti
 export const metadata: Metadata = { title: 'Sign-off stages' };
 
 export default async function StagesPage() {
-  await requireAdminPage();
+  await requireManager();
   const event = await getCurrentEvent();
   if (!event) return <NoEvent />;
   const bundle = await loadBundle(event.id);
   if (!bundle) return <NoEvent />;
-  const people = bundle.users.filter((u) => u.active && u.role !== 'viewer');
+  const people = bundle.users.filter((u) => u.active && u.role !== 'user');
   const sql = await db();
   const memberships = await sql<{ user_id: string; department_id: string }[]>`select user_id, department_id from user_departments`;
   const inDept = new Map<string, Set<string>>();
