@@ -379,6 +379,38 @@ insert into event_departments (event_id, department_id)
   select distinct event_id, department_id from stages where department_id is not null on conflict do nothing;
 `,
   },
+  {
+    version: 8,
+    name: 'personal task boards',
+    sql: /* sql */ `
+-- Each person's to-do board for a show (the My actions page): their own tasks in three columns,
+-- to do, in progress and complete. A task can point at a schedule line.
+create table tasks (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  item_id uuid references items(id) on delete set null,
+  title text not null,
+  notes text,
+  due date,
+  status text not null default 'to_do' check (status in ('to_do', 'in_progress', 'complete')),
+  position int not null default 0,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index tasks_board_idx on tasks (user_id, event_id, status, position);
+
+-- Schedule lines waiting on a person appear on their board by themselves. A row here means the person has
+-- moved that line to "in progress"; once the line no longer waits on them it shows as complete until cleared.
+create table item_progress (
+  user_id uuid not null references users(id) on delete cascade,
+  item_id uuid not null references items(id) on delete cascade,
+  started_at timestamptz not null default now(),
+  primary key (user_id, item_id)
+);
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

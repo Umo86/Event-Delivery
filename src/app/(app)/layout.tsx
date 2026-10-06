@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/auth/session';
 import { getAppName, getCurrentEvent, listEvents, loadSchedule } from '@/lib/data/load';
+import { countOpenTasks } from '@/lib/data/tasks';
 import { fmtDate } from '@/lib/dates';
 import { AppShell } from '@/components/shell';
 import { logout, switchEvent } from '@/app/actions/auth';
@@ -10,7 +11,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   let myCount = 0;
   const counts = { os: 0, ss: 0, si: 0 };
   if (current) {
-    const sched = await loadSchedule(current.id);
+    const [sched, openTasks] = await Promise.all([loadSchedule(current.id), countOpenTasks(current.id, user.id)]);
+    myCount += openTasks; // the person's own tasks on their board, as well as lines waiting on them
     for (const r of sched?.rows ?? []) {
       if (r.state.group === 'cancelled') continue;
       if (r.state.waitingOnUserIds.includes(user.id)) myCount += 1;

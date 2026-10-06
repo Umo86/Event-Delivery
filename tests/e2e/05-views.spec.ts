@@ -3,19 +3,20 @@ import { acceptNextDialog, errorMessage, expectImagesLoaded, itemId, loginAs, ok
 
 test.describe.configure({ mode: 'serial' });
 
-test('my actions shows what is waiting on me, grouped by kind of work', async ({ page }) => {
+test('my actions is a board: lines waiting on me appear in To do, most urgent first', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto('/inbox');
-  await expect(page.getByText('3 things waiting on you in UKCW London 2027, most urgent first.')).toBeVisible();
+  await expect(page.getByText('3 lines waiting on you and 0 open tasks in UKCW London 2027.')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Main' }).first();
   await expect(nav.getByRole('link', { name: /My actions/ })).toContainText('3');
-  const artwork = page.locator('section').filter({ has: page.getByRole('heading', { name: /Artwork to create, chase or revise/ }) });
-  await expect(artwork.getByRole('heading')).toContainText('(2)');
-  await expect(artwork).toContainText('Upload new artwork (rejected by Marketing)');
-  await expect(artwork).toContainText('Create the artwork');
-  const production = page.locator('section').filter({ has: page.getByRole('heading', { name: /Production and delivery/ }) });
-  await expect(production).toContainText('Acme Steel feature area banner');
-  await expect(production).toContainText('Send to supplier / place order');
+  const todo = page.locator('section[data-column="to_do"]');
+  await expect(todo.getByRole('heading', { name: /To do/ })).toContainText('(3)');
+  await expect(todo.getByRole('article')).toHaveCount(3);
+  await expect(todo).toContainText('Upload new artwork (rejected by Marketing)');
+  await expect(todo).toContainText('Create the artwork');
+  await expect(todo.getByRole('article', { name: /Acme Steel feature area banner/ })).toContainText('Send to supplier / place order');
+  await expect(page.locator('section[data-column="in_progress"]')).toContainText('Move a card here when you start on it.');
+  await expect(page.locator('section[data-column="complete"]').getByRole('article')).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Whole team' }).click();
   await expect(page).toHaveURL(/view=team/);
@@ -129,7 +130,7 @@ test('sponsor pages: details, account manager and removal rules', async ({ page 
 test('my actions updates when a sponsor gets an account manager', async ({ page }) => {
   await loginAs(page, 'amy');
   await page.goto('/inbox');
-  await expect(page.getByRole('link', { name: 'Waiting on me (1)' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My board (1)' })).toBeVisible();
   await expect(page.locator('main')).toContainText('BuildCo branded lanyards');
   await expect(page.locator('main')).toContainText('Chase artwork from BuildCo');
 });
