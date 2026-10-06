@@ -72,7 +72,6 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
           <ChevronRight size={16} aria-hidden className="shrink-0 text-muted transition-transform group-open:rotate-90" />
           <span className="text-[16px] font-semibold text-ink">{u.full_name}{isMe ? ' (you)' : ''}</span>
           <Chip tone={ROLE_TONE[u.role]}>{accessLevel(u.role).label}</Chip>
-          {u.is_super_admin && <Chip tone="violet">Super admin</Chip>}
           {u.is_demo && <Chip tone="yellow">Demo login</Chip>}
           {status !== 'active' && <Chip tone={info.tone}>{info.label}</Chip>}
           {locked && <Chip tone="red">Locked out</Chip>}

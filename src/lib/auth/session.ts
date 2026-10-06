@@ -18,7 +18,7 @@ export interface CurrentUser {
   must_change_password: boolean;
   /** The shared demo login: its password and details can't be changed. */
   is_demo: boolean;
-  /** Derived: role === 'super_admin'. Full control, including the super admin panel (/gs). */
+  /** Derived: role === 'super_admin'. Full control, including the Admin pages and the super admin sign-in (/gs). */
   is_super_admin: boolean;
 }
 
@@ -84,14 +84,14 @@ export async function requireManager(): Promise<CurrentUser> {
   return user;
 }
 
-/** For pages only super admins can open (user management, system, the super admin panel). */
+/** For pages only super admins can open (the Admin pages: people, platform, activity). */
 export async function requireSuperAdmin(): Promise<CurrentUser> {
   const user = await requireUser();
   if (user.role !== 'super_admin') redirect('/dashboard?denied=1');
   return user;
 }
 
-/** For server actions on the super admin panel. */
+/** For server actions only super admins can run (platform switches, signing people out). */
 export async function superActor(): Promise<CurrentUser> {
   return actor('super_admin');
 }

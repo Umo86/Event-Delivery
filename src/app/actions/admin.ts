@@ -38,7 +38,7 @@ async function audit(sql: Sql, me: CurrentUser, message: string, eventId: string
 }
 
 function readRole(fd: FormData): Role {
-  const r = str(fd, 'role', 10);
+  const r = str(fd, 'role', 20);
   const lvl = ACCESS_LEVELS.find((a) => a.key === r);
   if (!lvl) throw new UserError('Choose an access level.');
   return lvl.key;

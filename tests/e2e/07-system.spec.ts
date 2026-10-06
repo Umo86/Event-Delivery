@@ -5,9 +5,10 @@ test.describe.configure({ mode: 'serial' });
 
 const SELFTEST_TOKEN = process.env.SELFTEST_TOKEN ?? 'local-selftest-token';
 
-test('the system page shows health and runs a full check', async ({ page }) => {
+test('Admin › Platform shows health and runs a full check', async ({ page }) => {
   await loginAs(page, 'admin');
-  await page.goto('/settings/system');
+  await page.goto('/settings/system'); // the old address still works
+  await expect(page).toHaveURL(/\/admin\/platform$/);
   const health = panel(page, 'Health');
   await expect(health).toContainText('Connected (schema v9, up to date)');
   await expect(health).toContainText('Connected (private store)');
@@ -37,7 +38,7 @@ test('the self-test endpoint runs the same check for monitoring', async ({ reque
 
 test('the platform can be renamed', async ({ page }) => {
   await loginAs(page, 'admin');
-  await page.goto('/settings/system');
+  await page.goto('/admin/platform');
   await page.fill('#app_name', 'UKCW Signage');
   await panel(page, 'Platform name').getByRole('button', { name: 'Save' }).click();
   await expect(okMessage(page, 'Saved.')).toBeVisible();
@@ -150,7 +151,7 @@ test.describe('on a phone', () => {
     await loginAs(page, 'admin');
     const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/schedule/ss/new', '/sponsors',
       `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/admin',
-      '/suppliers', '/settings/lists', '/settings/events', '/settings/system', '/account', '/gs'];
+      '/suppliers', '/settings/lists', '/settings/events', '/admin/platform', '/admin/activity', '/account', '/gs'];
     const wide: string[] = [];
     for (const p of pages) {
       await page.goto(p);

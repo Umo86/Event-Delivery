@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  CalendarRange, Gauge, Handshake, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, ShieldCheck, Signpost, Flag, Truck, UserRound, X,
+  CalendarRange, Gauge, Handshake, History, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, Signpost, Flag, Truck, UserRound, UsersRound, X,
 } from 'lucide-react';
 import { Mark } from './brand';
 import { cx } from './ui';
@@ -12,6 +12,8 @@ import { cx } from './ui';
 export interface ShellProps {
   appName: string;
   user: { name: string; role: string; superAdmin: boolean };
+  /** Maintenance mode is on (only super admins can be signed in while it is). */
+  maintenance: boolean;
   events: { id: string; name: string; archived: boolean }[];
   currentEvent: { id: string; name: string; detail: string } | null;
   myCount: number;
@@ -45,8 +47,9 @@ function navFor(role: string): { group: string; items: NavItem[] }[] {
   ];
   if (role === 'super_admin') {
     groups.push({ group: 'Admin', items: [
-      { href: '/admin', label: 'People', icon: ShieldCheck, key: 'admin' },
-      { href: '/gs', label: 'Platform', icon: Gauge, key: 'platform' },
+      { href: '/admin', label: 'People', icon: UsersRound, key: 'admin' },
+      { href: '/admin/platform', label: 'Platform', icon: Gauge, key: 'platform' },
+      { href: '/admin/activity', label: 'Activity', icon: History, key: 'activity' },
     ] });
   }
   return groups;
@@ -180,6 +183,14 @@ export function AppShell(p: ShellProps) {
         </div>
       )}
 
+      {p.maintenance && (
+        <div className="no-print hazard px-4 py-1.5 text-center text-[13.5px] font-bold">
+          <span>
+            Maintenance mode is on: only super admins can use the platform.{' '}
+            {pathname !== '/admin/platform' && <Link href="/admin/platform" className="underline underline-offset-2">Turn it off</Link>}
+          </span>
+        </div>
+      )}
       <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{p.children}</main>
     </div>
   );

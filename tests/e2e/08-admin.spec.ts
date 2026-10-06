@@ -148,13 +148,16 @@ test('sponsor approval links can be switched off and back on', async ({ browser,
   await expect(g.getByRole('heading', { name: 'Please review this artwork' })).toBeVisible();
   const fileHref = (await g.getByRole('link', { name: /Open the full file/ }).getAttribute('href'))!;
 
-  await page.goto('/admin');
-  const links = panel(page, 'Sponsor approval links');
-  await expect(links).toContainText(/On\. \d+ links? (is|are) waiting for a sponsor’s answer\./);
+  await page.goto('/admin/platform');
+  const links = page.getByRole('region', { name: 'Sponsor approval links' });
+  await expect(links).toContainText('On');
+  await expect(links).toContainText(/\d+ links? (is|are) waiting for a sponsor’s answer\./);
   acceptNextDialog(page);
   await links.getByRole('button', { name: 'Turn links off' }).click();
   await expect(okMessage(links, 'Sponsor approval links are off. Every existing link has stopped working.')).toBeVisible();
-  await expect(links).toContainText('Off. Sponsors can’t open links');
+  await expect(links).toContainText('Sponsors can’t open links, and lines don’t offer them.');
+  await page.goto('/dashboard'); // the Control centre flags it
+  await expect(panel(page, /^Needs your attention/)).toContainText('Sponsor approval links are switched off');
 
   await g.reload();
   await expect(g.getByText('Approval links are switched off at the moment.')).toBeVisible();
@@ -164,9 +167,10 @@ test('sponsor approval links can be switched off and back on', async ({ browser,
   await expect(signoffStage(page, 'Sponsor')).toContainText('Waiting for a decision');
   await expect(page.getByText('Ask Acme Steel to approve it themselves')).toHaveCount(0);
 
+  await page.goto('/admin/platform');
+  await links.getByRole('button', { name: 'Turn links on' }).click();
+  await expect(okMessage(links, 'Sponsor approval links are on.')).toBeVisible();
   await page.goto('/admin');
-  await panel(page, 'Sponsor approval links').getByRole('button', { name: 'Turn links on' }).click();
-  await expect(okMessage(panel(page, 'Sponsor approval links'), 'Sponsor approval links are on.')).toBeVisible();
   await expect(panel(page, 'Access log')).toContainText('Turned sponsor approval links off');
   await g.reload();
   await expect(g.getByRole('heading', { name: 'Please review this artwork' })).toBeVisible();

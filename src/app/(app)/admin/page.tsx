@@ -5,23 +5,22 @@ import { db } from '@/lib/db';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { fmtDateTime } from '@/lib/dates';
 import { ABILITIES, ACCESS_LEVELS, personStatus, TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
-import { sponsorLinksEnabled } from '@/lib/settings';
 import { loadAttention } from '@/lib/data/attention';
-import { ActionForm, SubmitButton } from '@/components/forms';
-import { cx, Field, inputCls, PageHeader, Panel } from '@/components/ui';
+import { SubmitButton } from '@/components/forms';
+import { cx, Field, inputCls, Intro, Panel } from '@/components/ui';
 import { DetailsForm } from '@/components/admin/details-form';
 import { PersonRow, type AdminPerson } from '@/components/admin/person-row';
 import type { DepartmentRow } from '@/lib/domain/types';
-import { invitePerson, setSponsorLinks } from '@/app/actions/admin';
+import { invitePerson } from '@/app/actions/admin';
 
-export const metadata: Metadata = { title: 'Admin' };
+export const metadata: Metadata = { title: 'People' };
 
 export default async function AdminPage(props: { searchParams: Promise<{ person?: string }> }) {
   const me = await requireSuperAdmin();
   const sp = await props.searchParams;
   const sql = await db();
   const event = await getCurrentEvent();
-  const [bundle, people, log, linksOn, [{ openLinks }], departments, memberships] = await Promise.all([
+  const [bundle, people, log, departments, memberships] = await Promise.all([
     event ? loadBundle(event.id) : Promise.resolve(null),
     sql<AdminPerson[]>`
       select u.id, u.email, u.full_name, u.job_title, u.role, u.active, u.must_change_password, u.last_login_at, u.created_at,
@@ -30,9 +29,6 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
       order by lower(u.full_name)`,
     sql<{ id: string; actor_name: string; message: string; created_at: Date }[]>`
       select id, actor_name, message, created_at from activity where kind = 'access' order by created_at desc limit 40`,
-    sponsorLinksEnabled(),
-    sql<{ openLinks: number }[]>`
-      select count(*)::int as "openLinks" from share_links where revoked_at is null and used_at is null and expires_at > now()`,
     sql<DepartmentRow[]>`select id, name, position, archived from departments where not archived order by position, lower(name)`,
     sql<{ user_id: string; department_id: string }[]>`select user_id, department_id from user_departments`,
   ]);
@@ -50,12 +46,12 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
     else counts.active += 1;
   }
 
-  // Things a super admin should sort out, most important first (shared with the Control centre)
-  const attention = await loadAttention(sql, event?.id ?? null);
+  // Things to sort out about people and sign-off (platform switches are on the Platform tab)
+  const attention = (await loadAttention(sql, event?.id ?? null)).filter((a) => a.area !== 'platform');
 
   return (
     <>
-      <PageHeader title="Admin" subtitle="Only people you invite can sign in. Choose each person’s access level and what they sign off." />
+      <Intro>Only people you invite can sign in. Choose each person’s access level and what they sign off.</Intro>
 
       {attention.length > 0 && (
         <section aria-labelledby="attention-title" className="mb-6 rounded-[10px] border border-amber-300 bg-signal-soft px-4 py-3">
@@ -142,24 +138,8 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
             </div>
           </Panel>
 
-          <Panel title="Sponsor approval links">
-            <p className="text-[14px] text-ink-2">
-              Private links let a sponsor approve their own artwork without an account. They’re the only way in for people you haven’t invited.
-              Each link works once, for one version, for 30 days.
-            </p>
-            <p className="mt-2 text-[14px]">
-              {linksOn
-                ? <><b className="text-green-700">On.</b> {openLinks} link{openLinks === 1 ? ' is' : 's are'} waiting for a sponsor’s answer.</>
-                : <><b className="text-red-700">Off.</b> Sponsors can’t open links, and lines don’t offer them.</>}
-            </p>
-            <ActionForm action={setSponsorLinks} className="mt-3"
-              confirm={linksOn ? 'Turn sponsor approval links off? Every existing link stops working until you turn them back on.' : undefined}>
-              <input type="hidden" name="enabled" value={linksOn ? '0' : '1'} />
-              <SubmitButton variant={linksOn ? 'danger' : 'secondary'} small>{linksOn ? 'Turn links off' : 'Turn links on'}</SubmitButton>
-            </ActionForm>
-          </Panel>
-
-          <Panel title="Access log" padded={false}>
+          <Panel title="Access log" padded={false}
+            actions={<Link href="/admin/activity?log=access" className="text-[13.5px] font-semibold text-ink underline underline-offset-2">See all</Link>}>
             {log.length === 0 ? <p className="p-4 text-[14px] text-muted">Nothing yet.</p> : (
               <ol className="max-h-[520px] overflow-y-auto">
                 {log.map((l) => (

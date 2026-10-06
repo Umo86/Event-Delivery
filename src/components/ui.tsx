@@ -80,6 +80,11 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
   );
 }
 
+/** One plain line under a page's tabs saying what this page is for. */
+export function Intro({ children }: { children: ReactNode }) {
+  return <p className="-mt-2 mb-5 max-w-[80ch] text-[14.5px] text-muted">{children}</p>;
+}
+
 export function Panel({ title, actions, children, className, padded = true, id }: {
   title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; padded?: boolean; id?: string;
 }) {

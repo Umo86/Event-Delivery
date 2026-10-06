@@ -49,7 +49,7 @@ test('users can look but not change anything', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
 
   // Users can't reach any of the settings or management pages
-  for (const path of ['/admin', '/shows', '/settings', '/settings/lists', '/settings/stages', '/settings/team']) {
+  for (const path of ['/admin', '/admin/platform', '/admin/activity', '/shows', '/settings', '/settings/lists', '/settings/stages', '/settings/team']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
     await expect(page.getByText('You don’t have access to that page.')).toBeVisible();
@@ -71,7 +71,7 @@ test('users can look but not change anything', async ({ page }) => {
 test('managers can run signage and settings, but not user management or system', async ({ page }) => {
   await loginAs(page, 'mark');
   // Super-admin-only pages are off limits
-  for (const path of ['/admin', '/settings/team', '/settings/system']) {
+  for (const path of ['/admin', '/admin/platform', '/admin/activity', '/settings/team', '/settings/system']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
   }

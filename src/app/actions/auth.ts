@@ -86,21 +86,16 @@ export async function login(_prev: ActionResult | null, fd: FormData): Promise<A
   });
 }
 
-/** The sign-in on the super admin page (/gs): super admins only. */
+/** The super admin sign-in (/gs): super admins only, and it works during maintenance. They land on the Control centre. */
 export async function superAdminLogin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const u = await authenticate(fd, { superOnly: true });
     await destroySession(); // replaces whoever was signed in on this browser
     await createSession(u.id);
     const sql = await db();
-    await logActivity(sql, { eventId: null, itemId: null, userId: u.id, actorName: u.full_name, kind: 'access', message: 'Signed in to the super admin panel' });
-    redirect('/gs');
+    await logActivity(sql, { eventId: null, itemId: null, userId: u.id, actorName: u.full_name, kind: 'access', message: 'Signed in on the super admin sign-in' });
+    redirect('/dashboard');
   });
-}
-
-export async function superAdminLogout(): Promise<void> {
-  await destroySession();
-  redirect('/gs');
 }
 
 export async function logout(): Promise<void> {

@@ -1,12 +1,13 @@
 import { requireUser } from '@/lib/auth/session';
 import { getAppName, getCurrentEvent, listEvents, loadSchedule } from '@/lib/data/load';
 import { fmtDate } from '@/lib/dates';
+import { maintenanceOn } from '@/lib/settings';
 import { AppShell } from '@/components/shell';
 import { logout, switchEvent } from '@/app/actions/auth';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser({ allowPasswordChange: true });
-  const [events, current, appName] = await Promise.all([listEvents(), getCurrentEvent(), getAppName()]);
+  const [events, current, appName, maintenance] = await Promise.all([listEvents(), getCurrentEvent(), getAppName(), maintenanceOn()]);
   let myCount = 0;
   const counts = { os: 0, ss: 0, si: 0 };
   if (current) {
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       appName={appName}
       user={{ name: user.full_name, role: user.role, superAdmin: user.is_super_admin }}
+      maintenance={maintenance && user.is_super_admin}
       events={events.map((e) => ({ id: e.id, name: e.name, archived: e.archived }))}
       currentEvent={current ? { id: current.id, name: current.name, detail } : null}
       myCount={myCount}

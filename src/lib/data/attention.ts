@@ -4,10 +4,11 @@ import { loadBundle } from './load';
 import { personStatus } from '@/lib/domain/access';
 import { maintenanceOn, sponsorLinksEnabled } from '@/lib/settings';
 
-export interface AttentionItem { text: string; href: string; action: string }
+/** Where it belongs: a platform switch, a person's access, or how the current show is set up. */
+export interface AttentionItem { text: string; href: string; action: string; area: 'platform' | 'people' | 'show' }
 
 /** Where platform switches live. */
-export const PLATFORM_HREF = '/gs';
+export const PLATFORM_HREF = '/admin/platform';
 export const personHref = (id: string) => `/admin?person=${id}#person-${id}`;
 
 /**
@@ -26,16 +27,16 @@ export async function loadAttention(sql: Sql, eventId: string | null): Promise<A
   ]);
   const out: AttentionItem[] = [];
 
-  if (maintenance) out.push({ text: 'Maintenance mode is on, so only super admins can sign in.', href: PLATFORM_HREF, action: 'Turn off' });
-  if (!linksOn) out.push({ text: 'Sponsor approval links are switched off, so sponsors can’t approve their own artwork.', href: PLATFORM_HREF, action: 'Turn on' });
+  if (maintenance) out.push({ text: 'Maintenance mode is on, so only super admins can sign in.', href: PLATFORM_HREF, action: 'Turn off', area: 'platform' });
+  if (!linksOn) out.push({ text: 'Sponsor approval links are switched off, so sponsors can’t approve their own artwork.', href: PLATFORM_HREF, action: 'Turn on', area: 'platform' });
 
   for (const p of people) {
     if (p.is_demo && p.active) {
-      out.push({ text: `The demo login is on the sign-in page, so anyone with the link can sign in as ${p.full_name}.`, href: personHref(p.id), action: 'Open' });
+      out.push({ text: `The demo login is on the sign-in page, so anyone with the link can sign in as ${p.full_name}.`, href: personHref(p.id), action: 'Open', area: 'people' });
     }
-    if (personStatus(p) === 'invite_expired') out.push({ text: `${p.full_name}’s invite has expired.`, href: personHref(p.id), action: 'New invite' });
+    if (personStatus(p) === 'invite_expired') out.push({ text: `${p.full_name}’s invite has expired.`, href: personHref(p.id), action: 'New invite', area: 'people' });
     if (p.active && p.locked_until && new Date(p.locked_until) > new Date()) {
-      out.push({ text: `${p.full_name} is locked out after too many wrong passwords.`, href: personHref(p.id), action: 'Open' });
+      out.push({ text: `${p.full_name} is locked out after too many wrong passwords.`, href: personHref(p.id), action: 'Open', area: 'people' });
     }
   }
 
@@ -46,20 +47,20 @@ export async function loadAttention(sql: Sql, eventId: string | null): Promise<A
   };
   for (const s of (bundle?.stages ?? []).filter((x) => !x.uses_account_manager)) {
     if (s.approver_ids.length === 0) {
-      out.push({ text: `The ${s.name} stage has no approver.`, href: '/settings/stages', action: 'Choose' });
+      out.push({ text: `The ${s.name} stage has no approver.`, href: '/settings/stages', action: 'Choose', area: 'show' });
       continue;
     }
     for (const aid of s.approver_ids) {
       const p = cantSignOff(aid);
-      if (p) out.push({ text: `${p.full_name} approves ${s.name} but ${p.active ? 'is a User' : 'is deactivated'}.`, href: personHref(p.id), action: 'Open' });
+      if (p) out.push({ text: `${p.full_name} approves ${s.name} but ${p.active ? 'is a User' : 'is deactivated'}.`, href: personHref(p.id), action: 'Open', area: 'people' });
     }
   }
   const sponsors = bundle?.sponsors ?? [];
   const noManager = sponsors.filter((s) => !s.account_manager_id).length;
-  if (noManager) out.push({ text: `${noManager} sponsor${noManager === 1 ? ' has' : 's have'} no account manager.`, href: '/sponsors', action: 'View' });
+  if (noManager) out.push({ text: `${noManager} sponsor${noManager === 1 ? ' has' : 's have'} no account manager.`, href: '/sponsors', action: 'View', area: 'show' });
   for (const s of sponsors) {
     const p = cantSignOff(s.account_manager_id);
-    if (p) out.push({ text: `${p.full_name} manages ${s.name} but ${p.active ? 'is a User' : 'is deactivated'}.`, href: personHref(p.id), action: 'Open' });
+    if (p) out.push({ text: `${p.full_name} manages ${s.name} but ${p.active ? 'is a User' : 'is deactivated'}.`, href: personHref(p.id), action: 'Open', area: 'people' });
   }
   return out;
 }

@@ -9,7 +9,7 @@ import { SESSION_COOKIE, superActor, type CurrentUser } from '@/lib/auth/session
 import { logActivity } from '@/lib/activity';
 import { SETTING, writeSetting } from '@/lib/settings';
 
-// The super admin panel (/gs): platform-wide controls that only super admins have. Every change goes in the access log.
+// Platform-wide controls on Admin › Platform that only super admins have. Every change goes in the access log.
 
 const refresh = () => revalidatePath('/', 'layout');
 
@@ -24,30 +24,6 @@ async function person(sql: Sql, fd: FormData) {
     select id, full_name, role, active, (role = 'super_admin') as is_super_admin, is_demo from users where id = ${id}`;
   if (!p) throw new UserError('That person no longer exists. Reload the page.');
   return p;
-}
-
-export async function setSuperAdmin(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
-  return run(async () => {
-    const me = await superActor();
-    if (me.is_demo) throw new UserError('The demo login can’t change who is a super admin.');
-    const sql = await db();
-    const p = await person(sql, fd);
-    const make = bool(fd, 'make');
-    if (p.id === me.id) throw new UserError('You can’t change your own super admin rights. Ask another super admin.');
-    if (p.is_super_admin === make) return { ok: true };
-    if (make) {
-      if (p.is_demo) throw new UserError('The demo login can’t be a super admin, because anyone can use it.');
-      if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
-    } else {
-      const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from users where role = 'super_admin' and active and id <> ${p.id}`;
-      if (n === 0) throw new UserError('There must always be at least one active Super Admin.');
-    }
-    // Promoting makes them a Super Admin; demoting drops them to Manager.
-    await sql`update users set role = ${make ? 'super_admin' : 'manager'} where id = ${p.id}`;
-    await audit(sql, me, `${make ? 'Made' : 'Removed'} ${p.full_name} ${make ? 'a super admin' : 'as a super admin'}`);
-    refresh();
-    return { ok: true, message: make ? `${p.full_name} is now a super admin.` : `${p.full_name} is now a Manager.` };
-  });
 }
 
 export async function signOutPerson(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
