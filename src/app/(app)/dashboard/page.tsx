@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { getCurrentUser, requireUser } from '@/lib/auth/session';
 import { getCurrentEvent, loadSchedule, type ScheduleRow } from '@/lib/data/load';
 import { loadAttention, type AttentionItem } from '@/lib/data/attention';
@@ -10,7 +10,7 @@ import { addDays, daysBetween, fmtDateTime, overdueBy, relativeDue } from '@/lib
 import { urgencyCompare } from '@/lib/domain/engine';
 import { ACTION_KIND, actionKind, CATEGORIES, itemCode } from '@/lib/domain/labels';
 import type { Category, EventRow, StageRow } from '@/lib/domain/types';
-import { btn, Chip, cx, inputCls, money, Notice, PageHeader, Panel } from '@/components/ui';
+import { btn, ButtonLink, Chip, cx, inputCls, money, Notice, PageHeader, Panel } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 import { switchEvent } from '@/app/actions/auth';
 
@@ -63,7 +63,7 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
       from activity a left join items i on i.id = a.item_id
       where a.event_id = ${event.id} order by a.created_at desc limit 12`,
     sql<{ open: number }[]>`select count(*)::int as open from tasks where user_id = ${user.id} and event_id = ${event.id} and status <> 'complete'`,
-    role === 'super_admin' ? loadShowSummaries() : Promise.resolve([] as ShowSummary[]),
+    canWork ? loadShowSummaries() : Promise.resolve([] as ShowSummary[]),
     role === 'super_admin' ? loadAttention(sql, event.id) : Promise.resolve([] as AttentionItem[]),
   ]);
 
@@ -78,24 +78,28 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
   ) : null;
 
   const show = { event, active, bundle, today, names, userId: user.id };
+  const liveShows = shows.filter((s) => !s.e.archived);
+  const workingIn = (
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-t border-line pt-6">
+      <div>
+        <h2 className="text-[22px] font-semibold leading-tight text-ink">{event.name}</h2>
+        <p className="text-[14px] text-muted">The show you’re working in. {event.venue}.{when}</p>
+      </div>
+      <span className="text-[13.5px] text-muted">Pick another show above or from the menu</span>
+    </div>
+  );
 
   if (role === 'super_admin') {
     return (
       <>
         <PageHeader title="Control centre" subtitle="Every show and the whole platform, in one place." />
         {denied}
-        <ShowStrip shows={shows.filter((s) => !s.e.archived)} currentId={event.id} />
+        <ShowStrip shows={liveShows} currentId={event.id} />
         <div className="mb-8 grid gap-6 xl:grid-cols-2">
           <AttentionPanel items={attention} />
           <YourActions rows={mine} openTasks={open} today={today} />
         </div>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-t border-line pt-6">
-          <div>
-            <h2 className="text-[22px] font-semibold leading-tight text-ink">{event.name}</h2>
-            <p className="text-[14px] text-muted">The show you’re working in. {event.venue}.{when}</p>
-          </div>
-          <span className="text-[13.5px] text-muted">Switch shows from the menu</span>
-        </div>
+        {workingIn}
         {unassignedNote}
         <Tiles {...show} />
         <WhereEverythingIs active={active} />
@@ -116,8 +120,10 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
   if (role === 'manager') {
     return (
       <>
-        <PageHeader title="Dashboard" subtitle={<>{event.name}, {event.venue}.{when}</>} />
+        <PageHeader title="Dashboard" subtitle="Every show at a glance, then everything in the show you’re working in." />
         {denied}
+        <ShowStrip shows={liveShows} currentId={event.id} />
+        {workingIn}
         {unassignedNote}
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <YourActions rows={mine} openTasks={open} today={today} />
@@ -174,7 +180,12 @@ const lineCost = (r: ScheduleRow) => (r.item.unit_cost ?? 0) * (r.item.qty && r.
 function ShowStrip({ shows, currentId }: { shows: ShowSummary[]; currentId: string }) {
   return (
     <Panel title="Your shows" className="mb-6" padded={false}
-      actions={<Link href="/shows" className="text-[14px] font-semibold underline">All shows</Link>}>
+      actions={
+        <>
+          <ButtonLink href="/shows/new" variant="secondary" small><Plus size={15} aria-hidden /> New show</ButtonLink>
+          <Link href="/shows" className="text-[14px] font-semibold underline">All shows</Link>
+        </>
+      }>
       {shows.length === 0 ? <p className="p-4 text-[14px] text-muted">No live shows yet.</p> : (
         <div className="overflow-hidden rounded-b-[10px]">
         <ul className="-mb-px -mr-px flex flex-wrap">

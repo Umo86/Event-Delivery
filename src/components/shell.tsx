@@ -32,6 +32,8 @@ function navFor(role: string): { group: string; items: NavItem[] }[] {
   const groups: { group: string; items: NavItem[] }[] = [
     { group: 'Home', items: [
       { href: '/dashboard', label: home, icon: LayoutDashboard, key: 'dashboard' },
+      // Every show at a glance, and where new shows are created (managers and super admins)
+      ...(manager ? [{ href: '/shows', label: 'All shows', icon: CalendarRange, key: 'shows' }] : []),
       { href: '/inbox', label: manager ? 'My actions' : 'My tasks', icon: Inbox, key: 'inbox' },
     ] },
     { group: 'Signage', items: [
@@ -92,12 +94,6 @@ export function AppShell(p: ShellProps) {
           </select>
           <p className="mt-0.5 text-[12.5px] text-white/60">{p.currentEvent.detail}</p>
           <noscript><button className="mt-2 text-[12px] underline">Switch</button></noscript>
-          {(p.user.role === 'super_admin' || p.user.role === 'manager') && (
-            <Link href="/shows" aria-current={pathname === '/shows' ? 'page' : undefined}
-              className={cx('mt-2 flex items-center gap-1.5 text-[13px] font-semibold', pathname === '/shows' ? 'text-signal' : 'text-white/75 hover:text-white')}>
-              <CalendarRange size={14} aria-hidden /> All shows
-            </Link>
-          )}
         </form>
       )}
 
