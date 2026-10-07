@@ -16,7 +16,7 @@ test('a super admin lands on the Control centre, with every show and what needs 
   await expect(panel(page, /^Your actions/)).toBeVisible();
   await expect(panel(page, 'Where everything is')).toBeVisible();
   // One menu, grouped, with the admin tools in it
-  for (const name of ['Control centre', 'My actions', 'Organiser signage', 'Sponsors', 'Show setup', 'People', 'Platform', 'All shows']) {
+  for (const name of ['Control centre', 'My actions', 'Organiser signage', 'Sponsors', 'Team', 'Show setup', 'People', 'Platform', 'All shows']) {
     await expect(menu(page).getByRole('link', { name: new RegExp(`^${name}( \\d+)?$`) })).toBeVisible();
   }
   await page.screenshot({ path: test.info().outputPath('control-centre.png'), fullPage: true });
@@ -38,6 +38,7 @@ test('a manager lands on their dashboard, with their actions first', async ({ pa
   await expect(mine.getByRole('link', { name: /Acme Steel feature area banner/ })).toContainText('Production');
   await expect(panel(page, 'Coming up')).toBeVisible();
   await expect(menu(page).getByRole('link', { name: 'Show setup', exact: true })).toBeVisible();
+  await expect(menu(page).getByRole('link', { name: 'Team', exact: true })).toBeVisible();
   await expect(menu(page).getByRole('link', { name: 'People', exact: true })).toHaveCount(0);
   await expect(menu(page).getByRole('link', { name: 'Platform', exact: true })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('manager-dashboard.png'), fullPage: true });
@@ -82,6 +83,7 @@ test('a user lands on a read-only overview and can find any line', async ({ page
   await expect(panel(page, /^Your actions/)).toHaveCount(0); // users can't be given work
   await expect(menu(page).getByRole('link', { name: 'My tasks', exact: true })).toBeVisible();
   await expect(menu(page).getByRole('link', { name: 'Show setup', exact: true })).toHaveCount(0);
+  await expect(menu(page).getByRole('link', { name: 'Team', exact: true })).toHaveCount(0);
   await expect(menu(page).getByRole('link', { name: 'All shows' })).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('user-overview.png'), fullPage: true });
 

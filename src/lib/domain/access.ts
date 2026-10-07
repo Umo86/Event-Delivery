@@ -14,8 +14,8 @@ export const ACCESS_LEVELS: { key: Role; label: string; summary: string; email: 
   {
     key: 'manager',
     label: 'Manager',
-    summary: 'Adds, edits and deletes signage, changes status, creates shows, manages sponsors, suppliers and sign-off setup, and signs off their stages.',
-    email: 'You can add, edit and remove signage, change status, create shows and sign off the stages you look after',
+    summary: 'Adds, edits and deletes signage, changes status, creates shows, adds people to the team, manages sponsors, suppliers and sign-off setup, and signs off their stages.',
+    email: 'You can add, edit and remove signage, change status, create shows, add people to the team and sign off the stages you look after',
   },
   {
     key: 'user',
@@ -29,6 +29,13 @@ export function accessLevel(role: Role) {
   return ACCESS_LEVELS.find((a) => a.key === role) ?? ACCESS_LEVELS[1];
 }
 
+/** The access levels someone can give: managers add Managers and Users; only super admins make Super Admins. */
+export function levelsFor(superAdmin: boolean) {
+  return superAdmin ? ACCESS_LEVELS : ACCESS_LEVELS.filter((a) => a.key !== 'super_admin');
+}
+
+export const ROLE_TONE: Record<Role, Tone> = { super_admin: 'blue', manager: 'teal', user: 'grey' };
+
 /** What each access level can do, for the table on the admin page. */
 export const ABILITIES: { label: string; super_admin: string; manager: string; user: string }[] = [
   { label: 'See schedules, proofs and the dashboard', super_admin: 'Yes', manager: 'Yes', user: 'Yes' },
@@ -39,7 +46,8 @@ export const ABILITIES: { label: string; super_admin: string; manager: string; u
   { label: 'Mark sponsorship items sold', super_admin: 'Yes', manager: 'Yes', user: 'Yes, unless external' },
   { label: 'Create and manage shows', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Sponsors, suppliers, sign-off setup, dropdown lists', super_admin: 'Yes', manager: 'Yes', user: 'No' },
-  { label: 'People, access levels, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },
+  { label: 'Add people, choose their departments and what they approve', super_admin: 'Yes', manager: 'As Managers or Users', user: 'No' },
+  { label: 'Super Admins, password resets, deactivating people, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },
 ];
 
 export type PersonStatus = 'active' | 'invited' | 'invite_expired' | 'temp_password' | 'temp_expired' | 'deactivated';

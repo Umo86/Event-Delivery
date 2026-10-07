@@ -4,14 +4,12 @@ import { requireSuperAdmin } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { fmtDateTime } from '@/lib/dates';
-import { ABILITIES, ACCESS_LEVELS, personStatus, TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
+import { ABILITIES, ACCESS_LEVELS, personStatus } from '@/lib/domain/access';
 import { loadAttention } from '@/lib/data/attention';
-import { SubmitButton } from '@/components/forms';
-import { cx, Field, inputCls, Intro, Panel } from '@/components/ui';
-import { DetailsForm } from '@/components/admin/details-form';
+import { cx, Intro, Panel } from '@/components/ui';
 import { PersonRow, type AdminPerson } from '@/components/admin/person-row';
+import { InviteForm } from '@/components/team/invite-form';
 import type { DepartmentRow } from '@/lib/domain/types';
-import { invitePerson } from '@/app/actions/admin';
 
 export const metadata: Metadata = { title: 'People' };
 
@@ -51,7 +49,10 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
 
   return (
     <>
-      <Intro>Only people you invite can sign in. Choose each person’s access level and what they sign off.</Intro>
+      <Intro>
+        Only people who are invited can sign in. Choose each person’s access level and what they sign off. Managers can add
+        people too, as Managers or Users, from <Link href="/team" className="font-semibold text-ink underline underline-offset-2">Team</Link>.
+      </Intro>
 
       {attention.length > 0 && (
         <section aria-labelledby="attention-title" className="mb-6 rounded-[10px] border border-amber-300 bg-signal-soft px-4 py-3">
@@ -70,35 +71,11 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
           <Panel title="Invite someone" id="invite">
-            <DetailsForm action={invitePerson} resetOnSuccess className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <Field label="Name" htmlFor="inv-name"><input id="inv-name" name="full_name" required autoComplete="off" className={inputCls} /></Field>
-                <Field label="Email" htmlFor="inv-email"><input id="inv-email" name="email" type="email" required autoComplete="off" className={inputCls} /></Field>
-                <Field label="Job title (optional)" htmlFor="inv-title"><input id="inv-title" name="job_title" placeholder="e.g. Marketing Manager" className={inputCls} /></Field>
-              </div>
-              <fieldset>
-                <legend className="mb-1.5 text-[13.5px] font-semibold text-ink-2">Access level</legend>
-                <div className="grid gap-2 md:grid-cols-3">
-                  {ACCESS_LEVELS.map((a) => (
-                    <label key={a.key}
-                      className="flex cursor-pointer gap-2.5 rounded-md border border-line-strong bg-white p-3 hover:border-ink has-[:checked]:border-ink has-[:checked]:bg-signal-soft has-[:checked]:ring-1 has-[:checked]:ring-ink">
-                      <input type="radio" name="role" value={a.key} defaultChecked={a.key === 'manager'} className="mt-1 h-4 w-4 shrink-0 accent-[#13233b]" />
-                      <span>
-                        <span className="block text-[15px] font-semibold text-ink">{a.label}</span>
-                        <span className="block text-[13px] leading-snug text-ink-2">{a.summary}</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <SubmitButton pendingText="Creating…">Create invite</SubmitButton>
-                <p className="max-w-[60ch] text-[13.5px] text-muted">
-                  You’ll get an email to send them from your own email, with a temporary password that works for {TEMP_PASSWORD_DAYS} days.
-                  They choose their own password when they first sign in.
-                </p>
-              </div>
-            </DetailsForm>
+            <InviteForm
+              levels={ACCESS_LEVELS.map(({ key, label, summary }) => ({ key, label, summary }))}
+              departments={departments.map(({ id, name, external }) => ({ id, name, external }))}
+              event={event ? { id: event.id, name: event.name } : null}
+              stages={stages.map((s) => ({ id: s.id, name: s.name, approvers: s.approver_ids.map((id) => names.get(id) ?? 'someone') }))} />
           </Panel>
 
           <Panel title={`People (${people.length})`} padded={false}

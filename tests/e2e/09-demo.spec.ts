@@ -22,6 +22,12 @@ test.describe('shared demo login @demo', () => {
     const nav = page.getByRole('navigation', { name: 'Main' }).first();
     await expect(nav.getByText('Demo User')).toBeVisible();
     await expect(nav.getByRole('link', { name: 'People', exact: true })).toHaveCount(0);
+    // It can see the team, but anyone can use it, so it can't add people or change their access
+    await nav.getByRole('link', { name: 'Team', exact: true }).click();
+    await expect(page.getByText('You’re using the shared demo login, which can’t add people.')).toBeVisible();
+    await expect(page.locator('#inv-name')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save access' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'New invite' })).toHaveCount(0);
     await page.goto('/account');
     await expect(page.getByText('You’re using the shared demo account')).toBeVisible();
     await expect(page.locator('#password')).toHaveCount(0); // its password can't be changed

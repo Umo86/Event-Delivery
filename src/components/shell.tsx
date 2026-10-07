@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  CalendarRange, Gauge, Handshake, History, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, Signpost, Flag, Truck, UserRound, UsersRound, X,
+  CalendarRange, Gauge, Handshake, History, Inbox, LayoutDashboard, LogOut, Menu, Package, Settings, Signpost, Flag, Truck, UserCog, UserRound, UsersRound, X,
 } from 'lucide-react';
 import { Mark } from './brand';
 import { cx } from './ui';
@@ -44,12 +44,16 @@ function navFor(role: string): { group: string; items: NavItem[] }[] {
     { group: 'Show', items: [
       { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
       { href: '/suppliers', label: 'Suppliers', icon: Truck, key: 'suppliers' },
-      ...(manager ? [{ href: '/settings', label: 'Show setup', icon: Settings, key: 'settings' }] : []),
+      // Who's on the team, their departments and what they approve; managers add people here
+      ...(manager ? [
+        { href: '/team', label: 'Team', icon: UsersRound, key: 'team' },
+        { href: '/settings', label: 'Show setup', icon: Settings, key: 'settings' },
+      ] : []),
     ] },
   ];
   if (role === 'super_admin') {
     groups.push({ group: 'Admin', items: [
-      { href: '/admin', label: 'People', icon: UsersRound, key: 'admin' },
+      { href: '/admin', label: 'People', icon: UserCog, key: 'admin' },
       { href: '/admin/platform', label: 'Platform', icon: Gauge, key: 'platform' },
       { href: '/admin/activity', label: 'Activity', icon: History, key: 'activity' },
     ] });

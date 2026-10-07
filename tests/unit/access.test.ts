@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { firstName, inviteMessage, mailtoLink } from '@/lib/invite-message';
-import { canCancelInvite, personStatus } from '@/lib/domain/access';
+import { firstName, inviteMessage, mailtoLink, teamNote } from '@/lib/invite-message';
+import { canCancelInvite, levelsFor, personStatus } from '@/lib/domain/access';
+import { listText } from '@/lib/text';
 
 const base = {
   kind: 'invite' as const,
@@ -45,6 +46,30 @@ describe('the invite email the admin sends', () => {
     expect(url.searchParams.get('body')).toBe(m.body.replace(/\n/g, '\r\n'));
   });
 
+  it('tells new people their departments and what they sign off, show by show', () => {
+    expect(teamNote([], [])).toBe('');
+    expect(teamNote(['Marketing'], [])).toBe('Your department: Marketing.');
+    expect(teamNote(['Marketing', 'Content'], [{ show: 'UKCW London 2027', stage: 'Marketing' }]))
+      .toBe('Your departments: Marketing and Content. You sign off Marketing in UKCW London 2027.');
+    expect(teamNote([], [
+      { show: 'UKCW London 2027', stage: 'Marketing' }, { show: 'UKCW London 2027', stage: 'Final sign-off' },
+      { show: 'UKCW Birmingham 2028', stage: 'Marketing' },
+    ])).toBe('You sign off Marketing and Final sign-off in UKCW London 2027 and Marketing in UKCW Birmingham 2028.');
+
+    const m = inviteMessage({ ...base, teamNote: 'Your department: Marketing. You sign off Marketing in UKCW London 2027.' });
+    expect(m.body).toContain('Your access: Member. You can add and edit lines.\nYour department: Marketing. You sign off Marketing in UKCW London 2027.\n\nThanks,');
+    expect(inviteMessage({ ...base, teamNote: '' }).body).toContain('You can add and edit lines.\n\nThanks,');
+    expect(inviteMessage({ ...base, kind: 'reset', teamNote: 'Your department: Marketing.' }).body).not.toContain('Your department');
+  });
+
+  it('lists things the way people write them', () => {
+    expect(listText([])).toBe('');
+    expect(listText(['A'])).toBe('A');
+    expect(listText(['A', 'B'])).toBe('A and B');
+    expect(listText(['A', 'B', 'C'])).toBe('A, B and C');
+    expect(listText(['A', 'B', 'C', 'D', 'E', 'F'])).toBe('A, B, C and 3 more');
+  });
+
   it('keeps odd characters from breaking the link', () => {
     const link = mailtoLink('jo+ukcw@example.com', 'A & B?', 'Line one\nLine two #3');
     expect(link).toBe('mailto:jo%2Bukcw@example.com?subject=A%20%26%20B%3F&body=Line%20one%0D%0ALine%20two%20%233');
@@ -71,5 +96,10 @@ describe('where someone is with their invite', () => {
   it('only invites nobody has used can be cancelled', () => {
     expect(canCancelInvite(p)).toBe(true);
     expect(canCancelInvite({ ...p, last_login_at: earlier })).toBe(false);
+  });
+
+  it('managers can add Managers and Users; only super admins add Super Admins', () => {
+    expect(levelsFor(true).map((l) => l.key)).toEqual(['super_admin', 'manager', 'user']);
+    expect(levelsFor(false).map((l) => l.key)).toEqual(['manager', 'user']);
   });
 });

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { fmtDateTime } from '@/lib/dates';
-import { ACCESS_LEVELS, accessLevel, canCancelInvite, personStatus, STATUS_INFO } from '@/lib/domain/access';
+import { ACCESS_LEVELS, accessLevel, canCancelInvite, personStatus, ROLE_TONE, STATUS_INFO } from '@/lib/domain/access';
 import type { DepartmentRow, Role, SponsorRow, StageRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { Chip, Field, inputCls } from '@/components/ui';
@@ -28,8 +28,6 @@ export interface AdminPerson {
   is_demo: boolean;
   is_super_admin: boolean;
 }
-
-const ROLE_TONE = { super_admin: 'blue', manager: 'teal', user: 'grey' } as const;
 
 const h3 = 'mb-2 text-[15px] font-semibold text-ink';
 const help = 'text-[13px] text-muted';

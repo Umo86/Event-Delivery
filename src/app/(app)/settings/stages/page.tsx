@@ -75,7 +75,7 @@ export default async function StagesPage() {
               {!s.uses_account_manager && (
                 <fieldset>
                   <legend className="mb-1 text-[13.5px] font-semibold text-ink-2">Approvers (any one can sign off)</legend>
-                  {ordered.length === 0 ? <p className="text-[13px] text-muted">Nobody to choose yet. A super admin invites people in Admin › People.</p> : (
+                  {ordered.length === 0 ? <p className="text-[13px] text-muted">Nobody to choose yet. Add people on the <Link href="/team" className="font-semibold text-ink underline">Team</Link> page.</p> : (
                     <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
                       {ordered.map((u) => (
                         <li key={u.id}>

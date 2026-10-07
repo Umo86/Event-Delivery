@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-// People and access moved to the Admin page.
+// The team (people, their departments and what they approve) has its own page under Show.
 export default function TeamPage() {
-  redirect('/admin');
+  redirect('/team');
 }

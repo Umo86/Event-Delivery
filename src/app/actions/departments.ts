@@ -5,6 +5,7 @@ import { db, type Sql } from '@/lib/db';
 import { isUuid, required, run, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor, type CurrentUser } from '@/lib/auth/session';
 import { logActivity } from '@/lib/activity';
+import { listText } from '@/lib/text';
 
 // Departments: the teams people belong to. A shared catalogue, managed by admins.
 
@@ -118,26 +119,35 @@ export async function setDepartmentMembers(_prev: ActionResult | null, fd: FormD
   });
 }
 
-/** Sets which departments a person is in (from the Admin page). */
+/**
+ * Sets which departments a person is in (Admin › People, Show › Team). Only departments in use are offered there,
+ * so memberships of archived departments are left alone.
+ */
 export async function setPersonDepartments(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const me = await actor('manager');
     const userId = uuidOrNull(fd, 'user_id');
     if (!userId) throw new UserError('Missing person.');
-    const want = new Set(fd.getAll('department_ids').filter(isUuid));
+    const asked = new Set(fd.getAll('department_ids').filter(isUuid));
     const sql = await db();
     const [u] = await sql<{ full_name: string }[]>`select full_name from users where id = ${userId}`;
     if (!u) throw new UserError('That person no longer exists.');
-    const changed = await sql.begin(async (tx) => {
-      const have = new Set((await tx<{ department_id: string }[]>`select department_id from user_departments where user_id = ${userId}`).map((r) => r.department_id));
+    const { changed, names } = await sql.begin(async (tx) => {
+      const live = await tx<{ id: string; name: string }[]>`select id, name from departments where not archived order by position, lower(name)`;
+      const want = new Set(live.filter((d) => asked.has(d.id)).map((d) => d.id));
+      const have = new Set((await tx<{ department_id: string }[]>`
+        select ud.department_id from user_departments ud join departments d on d.id = ud.department_id
+        where ud.user_id = ${userId} and not d.archived`).map((r) => r.department_id));
       let n = 0;
       for (const did of want) if (!have.has(did)) { await tx`insert into user_departments (user_id, department_id) values (${userId}, ${did}) on conflict do nothing`; n++; }
       for (const did of have) if (!want.has(did)) { await tx`delete from user_departments where user_id = ${userId} and department_id = ${did}`; n++; }
-      return n;
+      return { changed: n, names: live.filter((d) => want.has(d.id)).map((d) => d.name) };
     });
-    if (changed) await log(sql, me, `Changed ${u.full_name}’s departments`);
+    if (!changed) return { ok: true, message: 'No changes to save.' };
+    await log(sql, me, `Changed ${u.full_name}’s departments`);
     refresh();
-    return { ok: true, message: changed ? 'Saved.' : 'No changes to save.' };
+    const first = u.full_name.trim().split(/\s+/)[0];
+    return { ok: true, message: `Saved. ${names.length ? `${first} is in ${listText(names)}.` : `${first} isn’t in a department now.`}` };
   });
 }
 

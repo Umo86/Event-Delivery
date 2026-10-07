@@ -49,7 +49,7 @@ test('users can look but not change anything', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Edit' })).toHaveCount(0);
 
   // Users can't reach any of the settings or management pages
-  for (const path of ['/admin', '/admin/platform', '/admin/activity', '/shows', '/settings', '/settings/lists', '/settings/stages', '/settings/team']) {
+  for (const path of ['/admin', '/admin/platform', '/admin/activity', '/shows', '/team', '/settings', '/settings/lists', '/settings/stages', '/settings/team']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
     await expect(page.getByText('You don’t have access to that page.')).toBeVisible();
@@ -57,6 +57,7 @@ test('users can look but not change anything', async ({ page }) => {
   const mainNav = page.getByRole('navigation', { name: 'Main' }).first();
   await expect(mainNav.getByRole('link', { name: 'People', exact: true })).toHaveCount(0);
   await expect(mainNav.getByRole('link', { name: 'All shows' })).toHaveCount(0);
+  await expect(mainNav.getByRole('link', { name: 'Team', exact: true })).toHaveCount(0);
   await expect(mainNav.getByRole('link', { name: 'Show setup' })).toHaveCount(0);
   await page.goto('/sponsors');
   await expect(page.getByRole('heading', { name: 'Add a sponsor' })).toHaveCount(0);
@@ -68,14 +69,17 @@ test('users can look but not change anything', async ({ page }) => {
   expect(res.status()).toBe(400);
 });
 
-test('managers can run signage and settings, but not user management or system', async ({ page }) => {
+test('managers can run signage, settings and the team, but not the admin pages', async ({ page }) => {
   await loginAs(page, 'mark');
   // Super-admin-only pages are off limits
-  for (const path of ['/admin', '/admin/platform', '/admin/activity', '/settings/team', '/settings/system']) {
+  for (const path of ['/admin', '/admin/platform', '/admin/activity', '/settings/system']) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/dashboard\?denied=1$/);
   }
-  // But managers can reach the operational settings and the shows overview
+  // But managers can reach the operational settings, the team and the shows overview
+  await page.goto('/settings/team'); // the old address for people goes to the team
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByRole('heading', { name: 'Team', level: 1 })).toBeVisible();
   await page.goto('/shows');
   await expect(page.getByRole('heading', { name: /shows/i, level: 1 })).toBeVisible();
   await page.goto('/settings/stages');

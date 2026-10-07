@@ -2,6 +2,8 @@
 // The platform never sends email itself: it writes the message, and the admin sends it.
 // No server-only imports, so it can be unit tested.
 
+import { listText } from './text';
+
 export type InviteKind = 'invite' | 'reset';
 
 export interface InviteMessageInput {
@@ -16,6 +18,22 @@ export interface InviteMessageInput {
   roleHelp: string;
   signInUrl: string;
   expiresAt: Date;
+  /** Invites only: their departments and what they sign off (see teamNote). */
+  teamNote?: string;
+}
+
+/**
+ * One line for an invite saying which departments someone is in and which stages they sign off, show by show.
+ * Empty when they're in no department and approve nothing.
+ */
+export function teamNote(departments: string[], approvals: { show: string; stage: string }[]): string {
+  const parts: string[] = [];
+  if (departments.length) parts.push(`Your ${departments.length === 1 ? 'department' : 'departments'}: ${listText(departments)}.`);
+  const byShow = new Map<string, string[]>();
+  for (const a of approvals) (byShow.get(a.show) ?? byShow.set(a.show, []).get(a.show)!).push(a.stage);
+  const signs = [...byShow].map(([show, stages]) => `${listText(stages)} in ${show}`);
+  if (signs.length) parts.push(`You sign off ${listText(signs)}.`);
+  return parts.join(' ');
 }
 
 export interface InviteMessage {
@@ -58,6 +76,7 @@ export function inviteMessage(m: InviteMessageInput): InviteMessage {
       `When you first sign in, you’ll be asked to choose your own password. The temporary password stops working on ${expiry}.`,
       '',
       `Your access: ${m.roleLabel}. ${m.roleHelp}.`,
+      ...(m.teamNote ? [m.teamNote] : []),
       '',
       'Thanks,',
       firstName(m.senderName),

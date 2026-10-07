@@ -1,21 +1,21 @@
 # Event Delivery
 
-Signage and sponsorship delivery for UK Construction Week: organiser signage, sponsor signage and sponsor items in one schedule, with artwork proofs, a sign-off route (Operations → Marketing → Sponsor → Final sign-off), sponsor approval links and production tracking.
+Signage and sponsorship delivery for UK Construction Week: organiser signage, sponsor signage and sponsorship items in one schedule, with artwork proofs, a sign-off route (Operations → Marketing → Sponsor → Final sign-off), sponsor approval links and production tracking.
 
 Built with Next.js, a Neon Postgres database and Vercel Blob for artwork files. Everything runs on Vercel's free tier.
 
 ## What it does
 
-- **Three schedules**: organiser signage (OS-001…), sponsor signage (SS-001…) and sponsor items (SI-001…), with search, filters and CSV export.
+- **Three schedules**: organiser signage (OS-001…), sponsor signage (SS-001…) and sponsorship items (SI-001…), with search, filters and CSV export. Sponsorship items start for sale; anyone in the company can mark one sold, with its sale price.
 - **Artwork proofs**: upload PDF or image proofs; previews and thumbnails are made in the browser. Every version is kept, and a new version restarts sign-off.
 - **Sign-off route**: stages run in order, each with a named approver. The sponsor stage is signed off by the sponsor's account manager, or by the sponsor themselves through a private approval link (no account needed).
 - **My actions**: each person sees what is waiting on them, most urgent first. The dashboard shows progress, overdue lines, workload, cost against budget and sponsors needing attention.
 - **Production**: once fully approved, track supplier, PO, delivery and install. If artwork changes after production starts, the line is flagged.
-- **Invite-only access**: nobody can sign up. Admins invite people from the **Admin** page, which creates the account and writes the invite email for the admin to send from their own email (one click opens it in Outlook or any email app). It holds a temporary password that works for 7 days; people choose their own at first sign-in. The platform itself never sends email.
-- **Access levels**: admins (everything), members (work on lines, sign off their own stages and sponsors) and viewers (read and comment). The Admin page also sets who approves each stage and manages each sponsor, makes new invites, resets passwords, deactivates people and keeps an access log.
-- **Sponsor link switch**: sponsor approval links are the only way in without an account, and an admin can turn them all off in one click.
-- **Optional demo login**: a shared demo account whose details are shown on the sign-in page (set up in the deployment settings, removed by deactivating it on the Admin page).
-- **Super admin panel** at `/gs`, with its own sign-in: platform overview, who is signed in (sign anyone out, or everyone), maintenance mode (only super admins can use the platform while it's on), the sponsor link and demo login switches, and a full audit trail. The first admin is the first super admin; only super admins can make or remove super admins, and admins can't change a super admin's access, sign-in or details.
+- **Invite-only access**: nobody can sign up. Managers and super admins add people from **Show › Team** (super admins also from **Admin › People**), choosing their access level, departments and the stages they approve. That creates the account and writes the invite email to send from your own email (one click opens it in Outlook or any email app). It holds a temporary password that works for 7 days; people choose their own at first sign-in. The platform itself never sends email.
+- **Access levels**: Super Admins (everything), Managers (work on lines, run shows, add people as Managers or Users, sign off their own stages) and Users (read, comment and mark sponsorship items sold). **Show › Team** shows everyone's departments and what they approve in the current show. **Admin › People** (super admins only) also chooses account managers, resets passwords, deactivates people and keeps an access log.
+- **Sponsor link switch**: sponsor approval links are the only way in without an account, and a super admin can turn them all off in one click.
+- **Optional demo login**: a shared demo account whose details are shown on the sign-in page (set up in the deployment settings, removed by deactivating it in Admin › People). It can't add people or change anyone's access.
+- **Admin pages** for super admins, with their own sign-in at `/gs`: People, Platform (who is signed in, maintenance mode so only super admins can use the platform, the sponsor link and demo login switches, health) and Activity (a full audit trail). The first account is the first super admin; only super admins can make or remove super admins, and nobody else can change a super admin's access, sign-in or details.
 
 ## Deploy on Vercel
 
@@ -26,14 +26,14 @@ Built with Next.js, a Neon Postgres database and Vercel Blob for artwork files. 
 5. Create the first admin, either way:
    - open `/setup` on your site and use the setup code you were given (it stops working once the first account exists), or
    - set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME` and `BOOTSTRAP_ADMIN_PASSWORD_HASH` (a scrypt hash made with `node scripts/hash-password.mjs`, never the password itself) and redeploy. The account is created the first time the site is opened, and only while there are no accounts at all. Remove the variables afterwards.
-6. Follow the checklist on the Settings page: invite your team from **Admin**, choose approvers, add sponsors and suppliers.
+6. Add your team from **Show › Team** (with their departments and the stages they approve), then set up the show in **Show setup** and add sponsors and suppliers.
 
 The database tables are created automatically the first time the app connects. `vercel.json` runs the app in London (`lhr1`) to sit next to the database.
 
 ### Checking it works
 
 - `/api/health` shows whether the database and file storage are connected.
-- **Settings → System → Run system check** runs a temporary line through the database, file storage and every sign-off stage, then deletes it.
+- **Admin › Platform → Run system check** runs a temporary line through the database, file storage and every sign-off stage, then deletes it.
 - `/api/selftest?token=…` runs the same check for monitoring. Set your own token with the `SELFTEST_TOKEN` environment variable.
 
 ### Optional environment variables
@@ -82,4 +82,4 @@ npm run test:e2e       # end-to-end: builds the app, resets the local stack and 
                        # then restarts with a demo login configured and runs the demo tests
 ```
 
-The end-to-end suite covers setup, sign-in and lockout, invitations (the ready-made email, cancelled and expired invites), access levels and sign-off responsibilities, the access log, the sponsor link switch, stages, event settings, suppliers, lists, sponsors, adding and editing lines, artwork uploads (PNG and PDF), every sign-off decision, admin decisions on behalf of others, sponsor approval links, production, cancelling and deleting, exports, the dashboard, proof sheets, permissions, events and phone layouts.
+The end-to-end suite covers setup, sign-in and lockout, invitations (the ready-made email, cancelled and expired invites), access levels and sign-off responsibilities, the team page (managers adding people with their departments and approvals), the access log, the sponsor link switch, stages, event settings, suppliers, lists, sponsors, adding and editing lines, artwork uploads (PNG and PDF), every sign-off decision, admin decisions on behalf of others, sponsor approval links, production, cancelling and deleting, exports, the dashboard, proof sheets, permissions, events and phone layouts.

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { requireManager } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import type { DepartmentRow, UserRow } from '@/lib/domain/types';
@@ -73,7 +74,7 @@ export default async function DepartmentsPage() {
               <ActionForm action={setDepartmentMembers}>
                 <input type="hidden" name="department_id" value={d.id} />
                 <span className="mb-1.5 block text-[13.5px] font-semibold text-ink-2">People in {d.name}</span>
-                {people.length === 0 ? <p className="text-[13px] text-muted">Nobody to add yet. A super admin invites people in Admin › People.</p> : (
+                {people.length === 0 ? <p className="text-[13px] text-muted">Nobody to add yet. Add people on the <Link href="/team" className="font-semibold text-ink underline">Team</Link> page.</p> : (
                   <ul className="mb-3 grid max-h-64 gap-x-6 gap-y-1 overflow-y-auto pr-1 sm:grid-cols-2">
                     {people.map((u) => (
                       <li key={u.id}>

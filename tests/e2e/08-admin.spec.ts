@@ -14,9 +14,9 @@ test('the admin page is for signed-in admins only', async ({ page }) => {
   await page.getByRole('navigation', { name: 'Main' }).first().getByRole('link', { name: 'People', exact: true }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible();
-  // The old team page now lives here
+  // The old team page address goes to Show › Team
   await page.goto('/settings/team');
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/team$/);
 });
 
 test('changing someone’s access level takes effect straight away', async ({ browser, page }) => {
