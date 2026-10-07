@@ -52,7 +52,7 @@ test('the dashboard summarises progress, workload, cost and sponsors', async ({ 
   await expect(cost).toContainText('£6,020');
   await expect(cost).toContainText('of £25,000 budget');
   await expect(cost.locator('tr', { hasText: 'Organiser signage' })).toContainText('£1,470');
-  await expect(cost.locator('tr', { hasText: 'Sponsor items' })).toContainText('£4,250');
+  await expect(cost.locator('tr', { hasText: 'Sponsorship items' })).toContainText('£4,250');
   await expect(cost.locator('tr', { hasText: 'Remaining' })).toContainText('£18,980');
 
   const sponsors = panel(page, 'Sponsors needing attention');

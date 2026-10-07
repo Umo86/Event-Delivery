@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: 'Suppliers' };
 const LISTS = [
   { key: 'works_on_os', label: 'Organiser signage' },
   { key: 'works_on_ss', label: 'Sponsor signage' },
-  { key: 'works_on_si', label: 'Sponsor items' },
+  { key: 'works_on_si', label: 'Sponsorship items' },
 ] as const;
 
 const SCOPE_EXAMPLE = 'e.g. Print and install all hall entrance and hanging banners (PVC and mesh). Deliver to ExCeL by 8 May, install during build-up, remove at breakdown. Prices as quote Q-1042.';

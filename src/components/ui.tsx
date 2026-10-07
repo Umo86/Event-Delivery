@@ -160,5 +160,6 @@ export function Field({ label, htmlFor, help, children, className }: { label: st
 
 export function money(n: number | null | undefined, decimals = 0): string {
   if (n === null || n === undefined || Number.isNaN(n)) return '';
-  return '£' + n.toLocaleString('en-GB', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const abs = Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return (n < 0 ? '−£' : '£') + abs; // −£150, not £-150
 }

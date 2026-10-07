@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ScheduleRow } from '@/lib/data/load';
 import { fmtDate, relativeDue } from '@/lib/dates';
 import { categoryInfo } from '@/lib/domain/labels';
-import { cx, FlagChip, Plate, StatusChip, Thumb } from './ui';
+import { cx, FlagChip, money, Plate, StatusChip, Thumb } from './ui';
 
 export function thumbUrl(r: ScheduleRow): string | null {
   return r.version?.thumb_url ? `/api/files/${r.version.id}/thumb` : null;
@@ -10,6 +10,19 @@ export function thumbUrl(r: ScheduleRow): string | null {
 
 function location(r: ScheduleRow) {
   return [r.item.zone, r.item.location_detail].filter(Boolean).join(', ');
+}
+
+/** Sponsorship items: what it sold for, or its rate card while it's for sale, and how it's handed out. */
+function SaleNote({ r }: { r: ScheduleRow }) {
+  const it = r.item;
+  return (
+    <>
+      {it.sponsor_id
+        ? it.sale_price !== null && <span className="font-medium text-ink-2">Sold for {money(it.sale_price)}</span>
+        : it.rate_card_price !== null && <span>Rate card {money(it.rate_card_price)}</span>}
+      {it.distribution_method && <span>{it.distribution_method}</span>}
+    </>
+  );
 }
 
 export function ItemTable({ rows, today, showCategory = false, showAction = false, empty }: {
@@ -53,6 +66,7 @@ export function ItemTable({ rows, today, showCategory = false, showAction = fals
                       {r.item.hall && <Plate tone="light" className="text-[11.5px]">{r.item.hall}</Plate>}
                       {location(r) && <span className="truncate">{location(r)}</span>}
                       {r.item.qty && r.item.qty > 1 ? <span>×{r.item.qty.toLocaleString('en-GB')}</span> : null}
+                      {r.item.category === 'sponsor_item' && <SaleNote r={r} />}
                     </span>
                   </Link>
                 </td>

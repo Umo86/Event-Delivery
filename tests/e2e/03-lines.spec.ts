@@ -113,11 +113,12 @@ test('sponsor lines are linked to the sponsor and their account manager', async 
   await expect(waitingOn(page)).toContainText('Amy Account');
   await expect(page.getByText('Chase artwork from Acme Steel', { exact: true })).toBeVisible();
 
-  // A sponsor item for a sponsor with no account manager, with an artwork date already past
+  // A sponsorship item already sold to a sponsor with no account manager, with an artwork date already past
   await page.goto('/schedule/si/new');
+  await expect(page.getByRole('heading', { name: 'Add a sponsorship item', level: 1 })).toBeVisible();
   await fillLine(page, { description: 'BuildCo branded lanyards', sponsor_id: 'BuildCo', item_type: 'Lanyards', qty: '5000', unit_cost: '0.85', artwork_due: '2026-09-01' });
-  await page.getByRole('button', { name: 'Add line' }).click();
-  await expect(page.getByText('Line SI-001 added.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add item' }).click();
+  await expect(page.getByText('Line SI-001 added, sold to BuildCo.')).toBeVisible();
   saveItem('si1', idFromUrl(page));
   await expect(waitingOn(page)).toContainText('Account manager not set');
   await expect(page.locator('main header').getByText('Overdue', { exact: true })).toBeVisible();

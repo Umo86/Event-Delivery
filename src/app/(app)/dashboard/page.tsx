@@ -7,7 +7,7 @@ import { loadAttention, type AttentionItem } from '@/lib/data/attention';
 import { loadShowSummaries, WHEN_TONE, type ShowSummary } from '@/lib/data/shows';
 import { db } from '@/lib/db';
 import { addDays, daysBetween, fmtDateTime, overdueBy, relativeDue } from '@/lib/dates';
-import { urgencyCompare } from '@/lib/domain/engine';
+import { inWorkflow, urgencyCompare } from '@/lib/domain/engine';
 import { ACTION_KIND, actionKind, CATEGORIES, itemCode } from '@/lib/domain/labels';
 import type { Category, EventRow, StageRow } from '@/lib/domain/types';
 import { btn, ButtonLink, Chip, cx, inputCls, money, Notice, PageHeader, Panel } from '@/components/ui';
@@ -32,6 +32,9 @@ const PHASES = [
   { key: 4, label: 'Approved or in production', color: '#0284c7', status: 'production' },
   { key: 5, label: 'Installed', color: '#15803d', status: 'installed' },
 ] as const;
+// Sponsorship items nobody has bought yet: shown on their own bar only, in a neutral grey (they aren't late or stuck).
+const FOR_SALE = { key: 0, label: 'For sale', color: '#64748b', status: 'for_sale' } as const;
+type Phase = { key: number; label: string; color: string; status: string };
 
 export default async function HomePage(props: { searchParams: Promise<{ denied?: string }> }) {
   const user = await requireUser();
@@ -43,7 +46,9 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
   const { bundle } = sched;
   const today = bundle.ctx.today;
   const names = bundle.ctx.userNames;
-  const active = sched.rows.filter((r) => r.state.group !== 'cancelled');
+  // Every live line, including sponsorship items still for sale; and the ones in sign-off and production
+  const lines = sched.rows.filter((r) => r.state.group !== 'cancelled');
+  const active = lines.filter((r) => inWorkflow(r.state.group));
   const daysToOpen = event.show_open ? daysBetween(today, event.show_open) : null;
   const when = daysToOpen !== null && daysToOpen >= 0 ? ` ${daysToOpen} day${daysToOpen === 1 ? '' : 's'} until doors open.` : '';
   const role = user.role;
@@ -102,7 +107,7 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
         {workingIn}
         {unassignedNote}
         <Tiles {...show} />
-        <WhereEverythingIs active={active} />
+        <WhereEverythingIs lines={lines} />
         <StageTable {...show} />
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Workload {...show} />
@@ -110,9 +115,12 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
         </div>
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Cost {...show} />
-          <Sponsors {...show} />
+          <SponsorshipSales lines={lines} />
         </div>
-        <Activity recent={recent} />
+        <div className="mb-6 grid gap-6 xl:grid-cols-2">
+          <Sponsors {...show} />
+          <Activity recent={recent} />
+        </div>
       </>
     );
   }
@@ -130,7 +138,7 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
           <ComingUp rows={comingUp} today={today} names={names} />
         </div>
         <Tiles {...show} />
-        <WhereEverythingIs active={active} />
+        <WhereEverythingIs lines={lines} />
         <StageTable {...show} />
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Workload {...show} />
@@ -138,8 +146,9 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
         </div>
         <div className="mb-6 grid gap-6 xl:grid-cols-2">
           <Cost {...show} />
-          <Activity recent={recent} />
+          <SponsorshipSales lines={lines} />
         </div>
+        <Activity recent={recent} />
       </>
     );
   }
@@ -155,15 +164,16 @@ export default async function HomePage(props: { searchParams: Promise<{ denied?:
         <button type="submit" className={cx(btn.base, btn.dark)}><Search size={16} aria-hidden /> Search</button>
       </form>
       <Tiles {...show} />
-      <WhereEverythingIs active={active} />
+      <WhereEverythingIs lines={lines} />
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
         <ComingUp rows={comingUp} today={today} names={names} />
         <Activity recent={recent} />
       </div>
       <div className="mb-6 grid gap-6 xl:grid-cols-2">
         <Cost {...show} readOnly />
-        <Sponsors {...show} />
+        <SponsorshipSales lines={lines} />
       </div>
+      <Sponsors {...show} />
     </>
   );
 }
@@ -328,13 +338,13 @@ function Tiles({ event, active, today }: ShowData) {
   );
 }
 
-function PhaseBar({ rows, href }: { rows: ScheduleRow[]; href: (status: string) => string }) {
+function PhaseBar({ rows, href, phases }: { rows: ScheduleRow[]; href: (status: string) => string; phases: readonly Phase[] }) {
   const total = rows.length;
   if (!total) return <div className="h-7 rounded-[4px] bg-paper" aria-label="No lines" />;
   return (
     <div className="flex h-7 w-full gap-[2px] overflow-hidden rounded-[4px]" role="img"
-      aria-label={PHASES.map((p) => `${p.label} ${rows.filter((r) => r.state.phase === p.key).length}`).join(', ')}>
-      {PHASES.map((p) => {
+      aria-label={phases.map((p) => `${p.label} ${rows.filter((r) => r.state.phase === p.key).length}`).join(', ')}>
+      {phases.map((p) => {
         const n = rows.filter((r) => r.state.phase === p.key).length;
         if (!n) return null;
         return (
@@ -356,29 +366,87 @@ function MiniBar({ value, max, tone = '#13233b' }: { value: number; max: number;
   );
 }
 
-function WhereEverythingIs({ active }: { active: ScheduleRow[] }) {
+function WhereEverythingIs({ lines }: { lines: ScheduleRow[] }) {
+  const forSale = lines.filter((r) => r.state.group === 'for_sale').length;
+  const legend: readonly Phase[] = forSale ? [FOR_SALE, ...PHASES] : PHASES;
   return (
     <Panel title="Where everything is" className="mb-6">
       <div className="space-y-4">
         {CATEGORIES.map((c) => {
-          const rows = active.filter((r) => r.item.category === c.key);
+          const rows = lines.filter((r) => r.item.category === c.key);
           return (
             <div key={c.key} className="grid items-center gap-2 sm:grid-cols-[180px_minmax(0,1fr)_60px]">
               <Link href={`/schedule/${c.slug}`} className="font-semibold text-ink hover:underline">{c.label}</Link>
-              <PhaseBar rows={rows} href={(st) => `/schedule/${c.slug}${st ? `?status=${st}` : '?sort=due'}`} />
+              <PhaseBar rows={rows} phases={c.key === 'sponsor_item' ? [FOR_SALE, ...PHASES] : PHASES}
+                href={(st) => `/schedule/${c.slug}${st ? `?status=${st}` : '?sort=due'}`} />
               <span className="text-right text-[14px] text-muted">{rows.length} line{rows.length === 1 ? '' : 's'}</span>
             </div>
           );
         })}
       </div>
       <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-line pt-3 text-[13.5px] text-ink-2" aria-label="Legend">
-        {PHASES.map((p) => (
+        {legend.map((p) => (
           <li key={p.key} className="flex items-center gap-1.5">
             <span className="h-3 w-3 rounded-[3px]" style={{ background: p.color }} aria-hidden />
-            {p.label} <b className="text-ink">{active.filter((r) => r.state.phase === p.key).length}</b>
+            {p.label} <b className="text-ink">{lines.filter((r) => r.state.phase === p.key).length}</b>
           </li>
         ))}
       </ul>
+    </Panel>
+  );
+}
+
+/** What sponsorship items have sold for, what they cost, and what's still for sale. */
+function SponsorshipSales({ lines }: { lines: ScheduleRow[] }) {
+  const items = lines.filter((r) => r.item.category === 'sponsor_item');
+  const sold = items.filter((r) => r.item.sponsor_id);
+  const forSale = items.filter((r) => !r.item.sponsor_id);
+  const priced = sold.filter((r) => r.item.sale_price !== null);
+  const sales = priced.reduce((s, r) => s + r.item.sale_price!, 0);
+  const cost = sold.reduce((s, r) => s + lineCost(r), 0);
+  // Margin only where the sale price is known, so a missing price doesn't look like a loss
+  const margin = priced.reduce((s, r) => s + r.item.sale_price! - lineCost(r), 0);
+  const unpriced = sold.length - priced.length;
+  const unsold = forSale.reduce((s, r) => s + (r.item.rate_card_price ?? 0), 0);
+  return (
+    <Panel title="Sponsorship sales" actions={<Link href="/schedule/si" className="text-[14px] font-semibold underline">All items</Link>}>
+      {items.length === 0 ? (
+        <p className="text-[14px] text-muted">No sponsorship items on this show yet.</p>
+      ) : (
+        <>
+          <p className="text-[15px] text-ink-2">
+            Sold <b className="font-display text-[24px] text-ink">{money(sales)}</b>, {sold.length} of {items.length} item{items.length === 1 ? '' : 's'}
+          </p>
+          <div className="mt-2 h-3 w-full rounded-full bg-paper" role="img" aria-label={`${sold.length} of ${items.length} items sold`}>
+            <div className="h-3 rounded-full bg-ink" style={{ width: `${(sold.length / items.length) * 100}%` }} />
+          </div>
+          <table className="mt-4 w-full text-[14px]">
+            <tbody>
+              <tr className="border-t border-line">
+                <td className="py-1.5 text-ink-2">Cost of the sold items</td>
+                <td className="py-1.5 text-right font-semibold text-ink">{money(cost)}</td>
+              </tr>
+              <tr className="border-t border-line">
+                <td className="py-1.5 text-ink-2">Margin{unpriced ? ' on the priced ones' : ''}</td>
+                <td className={cx('py-1.5 text-right font-semibold', margin < 0 ? 'text-red-700' : 'text-ink')}>{money(margin)}</td>
+              </tr>
+              <tr className="border-t border-line">
+                <td className="py-1.5 text-ink-2">Still for sale</td>
+                <td className="py-1.5 text-right font-semibold text-ink">
+                  <Link href="/schedule/si?status=for_sale" className="hover:underline">
+                    {forSale.length} item{forSale.length === 1 ? '' : 's'}{unsold ? `, ${money(unsold)} at rate card` : ''}
+                  </Link>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          {unpriced > 0 && (
+            <p className="mt-2 text-[13px] text-muted">
+              <Link href="/schedule/si?status=sold" className="underline underline-offset-2">{unpriced} sold item{unpriced === 1 ? ' has' : 's have'} no sale price yet.</Link>
+            </p>
+          )}
+        </>
+      )}
     </Panel>
   );
 }

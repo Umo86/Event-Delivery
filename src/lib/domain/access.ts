@@ -20,8 +20,8 @@ export const ACCESS_LEVELS: { key: Role; label: string; summary: string; email: 
   {
     key: 'user',
     label: 'User',
-    summary: 'Sees everything and can comment, but can’t change anything.',
-    email: 'You can see everything and add comments, but not change anything',
+    summary: 'Sees everything and can comment. Can mark sponsorship items sold, but can’t change anything else.',
+    email: 'You can see everything, add comments and mark sponsorship items sold, but not change anything else',
   },
 ];
 
@@ -36,6 +36,7 @@ export const ABILITIES: { label: string; super_admin: string; manager: string; u
   { label: 'Add, edit and delete lines, upload artwork', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Change production status', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Sign off', super_admin: 'Any stage', manager: 'Their stages', user: 'No' },
+  { label: 'Mark sponsorship items sold', super_admin: 'Yes', manager: 'Yes', user: 'Yes, unless external' },
   { label: 'Create and manage shows', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Sponsors, suppliers, sign-off setup, dropdown lists', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'People, access levels, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },

@@ -10,7 +10,7 @@ test('Admin › Platform shows health and runs a full check', async ({ page }) =
   await page.goto('/settings/system'); // the old address still works
   await expect(page).toHaveURL(/\/admin\/platform$/);
   const health = panel(page, 'Health');
-  await expect(health).toContainText('Connected (schema v9, up to date)');
+  await expect(health).toContainText(/Connected \(schema v\d+, up to date\)/);
   await expect(health).toContainText('Connected (private store)');
   await expect(health).toContainText(/\d+ versions, [\d.]+ MB of originals/);
 

@@ -1,10 +1,11 @@
 import { getCurrentUser } from '@/lib/auth/session';
 import { getCurrentEvent, loadSchedule } from '@/lib/data/load';
 import { applyFilters, readFilters } from '@/lib/data/filter';
-import { artworkByLabel, categoryBySlug, categoryInfo, decisionLabel, productionLabel } from '@/lib/domain/labels';
+import { artworkByLabel, categoryBySlug, categoryInfo, decisionLabel, productionLabelFor } from '@/lib/domain/labels';
 
 function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : ''; // numbers (even negative margins) are never formulas
   const s = String(v);
   // Neutralise spreadsheet formulas and quote when needed
   const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
@@ -31,11 +32,16 @@ export async function GET(request: Request, ctx: { params: Promise<{ cat: string
   const header = ['ID', 'List', 'Description', 'Status', 'Waiting on', 'Next deadline', 'Flag', 'Days waiting', 'Sponsor', 'Account manager',
     'Type', 'Wording', 'Hall', 'Zone', 'Location', 'Position', 'Width mm', 'Height mm', 'Sides', 'Qty', 'Material', 'Artwork by',
     'Artwork due', 'Artwork version', 'Artwork link', ...stages.map((s) => `${s.name} sign-off`), 'Supplier', 'Print/order deadline',
-    'Production status', 'PO number', 'Delivery date', 'Install date', 'Unit cost', 'Total cost', 'Cancelled', 'Notes'];
+    'Production status', 'PO number', 'Delivery date', 'Install date', 'Unit cost', 'Total cost',
+    // Sponsorship items
+    'Rate card price', 'Sold', 'Sale price', 'Margin', 'Sold on', 'Sold by', 'Distribution method',
+    'Cancelled', 'Notes'];
   const lines = [header.map(csvCell).join(',')];
   for (const r of rows) {
     const it = r.item;
     const total = it.unit_cost ? it.unit_cost * (it.qty && it.qty > 0 ? it.qty : 1) : null;
+    const si = it.category === 'sponsor_item';
+    const margin = si && it.sponsor_id && it.sale_price !== null ? it.sale_price - (total ?? 0) : null;
     const so = stages.map((s) => {
       const st = r.state.stages.find((x) => x.stage.id === s.id);
       if (!st || !st.applies) return 'N/A';
@@ -49,8 +55,12 @@ export async function GET(request: Request, ctx: { params: Promise<{ cat: string
       r.sponsor?.account_manager_id ? names.get(r.sponsor.account_manager_id) : '', it.item_type, it.wording, it.hall, it.zone,
       it.location_detail, it.position, it.width_mm, it.height_mm, it.sides, it.qty, it.material, artworkByLabel(it.artwork_by),
       it.artwork_due, r.version?.version ?? '', it.artwork_link, ...so, it.supplier_id ? suppliers.get(it.supplier_id) : '',
-      it.print_deadline, it.production_status ? productionLabel(it.production_status) : '', it.po_number, it.delivery_date,
-      it.install_date, it.unit_cost, total, it.cancelled ? 'Yes' : '', it.notes,
+      it.print_deadline, it.production_status ? productionLabelFor(it.production_status, it.category) : '', it.po_number, it.delivery_date,
+      it.install_date, it.unit_cost, total,
+      si ? it.rate_card_price : '', si ? (it.sponsor_id ? 'Yes' : 'For sale') : '', si ? it.sale_price : '', margin,
+      si && it.sold_at ? new Date(it.sold_at).toISOString().slice(0, 10) : '', si && it.sold_by ? names.get(it.sold_by) : '',
+      si ? it.distribution_method : '',
+      it.cancelled ? 'Yes' : '', it.notes,
     ].map(csvCell).join(','));
   }
   const fname = `${event.name.replace(/[^A-Za-z0-9]+/g, '-')}-${category?.slug ?? 'all'}-${new Date().toISOString().slice(0, 10)}.csv`;

@@ -25,8 +25,8 @@ export function readFilters(sp: Record<string, string | string[] | undefined>): 
 }
 
 /** Status filters that aren't a single group: needs attention, still open, approved and beyond, approved but not
- *  yet installed, and sign-offs waiting longer than the show's target. */
-export const STATUS_SETS = ['attention', 'open', 'approved_plus', 'production', 'slow'] as const;
+ *  yet installed, sign-offs waiting longer than the show's target, and sponsorship items that have been sold. */
+export const STATUS_SETS = ['attention', 'open', 'approved_plus', 'production', 'slow', 'sold'] as const;
 
 export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string, turnaroundDays = Infinity): ScheduleRow[] {
   const q = f.q?.toLowerCase();
@@ -39,6 +39,7 @@ export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string, turn
       if (f.status === 'approved_plus' && s.phase !== 4 && s.phase !== 5) return false;
       if (f.status === 'production' && s.phase !== 4) return false;
       if (f.status === 'slow' && !((s.group === 'in_signoff' || s.group === 'on_hold') && (s.daysWaiting ?? 0) > turnaroundDays)) return false;
+      if (f.status === 'sold' && !(r.item.category === 'sponsor_item' && r.item.sponsor_id)) return false;
       if (!(STATUS_SETS as readonly string[]).includes(f.status) && s.group !== f.status) return false;
     }
     if (f.waiting) {
@@ -60,7 +61,7 @@ export function applyFilters(rows: ScheduleRow[], f: Filters, meId: string, turn
     if (f.hall && r.item.hall !== f.hall) return false;
     if (q) {
       const hay = [r.code, r.item.description, r.item.wording, r.item.item_type, r.item.hall, r.item.zone, r.item.location_detail,
-        r.sponsor?.name, r.item.po_number, r.item.notes].filter(Boolean).join(' ').toLowerCase();
+        r.sponsor?.name, r.item.po_number, r.item.notes, r.item.distribution_method].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;

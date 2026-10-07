@@ -438,6 +438,38 @@ alter table users add constraint users_role_check check (role in ('super_admin',
 alter table users drop column is_super_admin;
 `,
   },
+  {
+    version: 10,
+    name: 'sponsorship items: for sale, sold, prices and distribution',
+    sql: /* sql */ `
+-- Sponsorship items (category sponsor_item) are opportunities the show sells. A line is for sale until someone
+-- marks it sold to a sponsor (its sponsor_id); the sale price, who sold it and when are kept here.
+alter table items add column sale_price numeric(12,2) check (sale_price is null or sale_price >= 0);
+alter table items add column rate_card_price numeric(12,2) check (rate_card_price is null or rate_card_price >= 0);
+alter table items add column distribution_method text;
+alter table items add column sold_at timestamptz;
+alter table items add column sold_by uuid references users(id) on delete set null;
+-- Every existing sponsorship item was added for a sponsor, so it counts as sold from when it was added.
+update items set sold_at = created_at, sold_by = created_by where category = 'sponsor_item' and sponsor_id is not null;
+
+-- People outside the company (agencies, contractors) sit in an external department. They can't mark items sold.
+alter table departments add column external boolean not null default false;
+update departments set external = true where lower(name) = 'external';
+
+-- How sponsorship items reach visitors (editable in Show setup › Dropdown lists).
+insert into list_options (list_key, value, sort) values
+  ('distribution', 'Handed out at registration', 0),
+  ('distribution', 'In the show bag', 1),
+  ('distribution', 'Seat drop in theatres', 2),
+  ('distribution', 'Collection point', 3),
+  ('distribution', 'Handed out by staff on the floor', 4),
+  ('distribution', 'Placed on stands', 5),
+  ('distribution', 'In the VIP / partner lounge', 6),
+  ('distribution', 'Digital (email, app or website)', 7),
+  ('distribution', 'Other', 8)
+on conflict do nothing;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

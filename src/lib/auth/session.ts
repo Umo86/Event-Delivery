@@ -20,6 +20,8 @@ export interface CurrentUser {
   is_demo: boolean;
   /** Derived: role === 'super_admin'. Full control, including the Admin pages and the super admin sign-in (/gs). */
   is_super_admin: boolean;
+  /** In a department marked external (agencies, contractors): can't mark sponsorship items sold. */
+  is_external: boolean;
 }
 
 function cookieSecure() {
@@ -57,6 +59,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const sql = await db();
   const rows = await sql<(Omit<CurrentUser, 'is_super_admin'> & { maintenance: string | null })[]>`
     select u.id, u.email, u.full_name, u.job_title, u.role, u.must_change_password, u.is_demo,
+           exists(select 1 from user_departments ud join departments d on d.id = ud.department_id
+                  where ud.user_id = u.id and d.external and not d.archived) as is_external,
            (select value from app_settings where key = 'maintenance') as maintenance
     from sessions s join users u on u.id = s.user_id
     where s.token_hash = ${sha256(token)} and s.expires_at > now() and u.active

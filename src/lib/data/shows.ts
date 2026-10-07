@@ -1,5 +1,6 @@
 import 'server-only';
 import { listEvents, loadSchedule } from './load';
+import { inWorkflow } from '@/lib/domain/engine';
 import { daysBetween, fmtDate, londonDate } from '@/lib/dates';
 import type { EventRow } from '@/lib/domain/types';
 
@@ -12,6 +13,10 @@ export interface ShowSummary {
   approved: number;
   overdue: number;
   cost: number;
+  /** Sponsorship items sold and still for sale, and what the sold ones went for. */
+  sold: number;
+  forSale: number;
+  sales: number;
   departments: string[];
   when: { label: string; tone: 'now' | 'soon' | 'future' | 'past' | 'none' };
 }
@@ -51,7 +56,9 @@ export async function loadShowSummaries(): Promise<ShowSummary[]> {
   const today = londonDate();
   return Promise.all(events.map(async (e) => {
     const sched = await loadSchedule(e.id);
-    const rows = (sched?.rows ?? []).filter((r) => r.state.group !== 'cancelled');
+    // Progress counts lines in sign-off and production; sponsorship items still for sale are counted as sales instead.
+    const rows = (sched?.rows ?? []).filter((r) => inWorkflow(r.state.group));
+    const sponsorship = (sched?.rows ?? []).filter((r) => r.item.category === 'sponsor_item' && r.state.group !== 'cancelled');
     const b = sched?.bundle;
     const departments = b ? b.departments.filter((d) => b.eventDepartmentIds.includes(d.id)).map((d) => d.name) : [];
     return {
@@ -63,6 +70,9 @@ export async function loadShowSummaries(): Promise<ShowSummary[]> {
       approved: rows.filter((r) => r.state.phase >= 4).length,
       overdue: rows.filter((r) => r.state.flag === 'overdue' || r.state.flag === 'not_signed_off').length,
       cost: rows.reduce((s, r) => s + (r.item.unit_cost ? r.item.unit_cost * Math.max(r.item.qty ?? 1, 1) : 0), 0),
+      sold: sponsorship.filter((r) => r.item.sponsor_id).length,
+      forSale: sponsorship.filter((r) => !r.item.sponsor_id).length,
+      sales: sponsorship.reduce((s, r) => s + (r.item.sponsor_id ? r.item.sale_price ?? 0 : 0), 0),
       when: when(e, today),
     };
   }));
@@ -78,6 +88,7 @@ export function showTotals(live: ShowSummary[]) {
     attention: live.reduce((n, s) => n + s.attention, 0),
     approved,
     pct: lines ? Math.round((approved / lines) * 100) : 0,
+    sales: live.reduce((n, s) => n + s.sales, 0),
   };
 }
 

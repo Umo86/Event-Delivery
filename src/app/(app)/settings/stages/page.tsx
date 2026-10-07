@@ -67,7 +67,7 @@ export default async function StagesPage() {
                   <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-[14px]">
                     <label className="flex items-center gap-1.5"><input type="checkbox" name="applies_os" defaultChecked={s.applies_os} className={check} /> Organiser signage</label>
                     <label className="flex items-center gap-1.5"><input type="checkbox" name="applies_ss" defaultChecked={s.applies_ss} className={check} /> Sponsor signage</label>
-                    <label className="flex items-center gap-1.5"><input type="checkbox" name="applies_si" defaultChecked={s.applies_si} className={check} /> Sponsor items</label>
+                    <label className="flex items-center gap-1.5"><input type="checkbox" name="applies_si" defaultChecked={s.applies_si} className={check} /> Sponsorship items</label>
                   </div>
                 </div>
               </div>

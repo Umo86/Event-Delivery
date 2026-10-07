@@ -184,7 +184,7 @@ test('sign-off stages: approvers, adding, reordering and removing', async ({ pag
 
   // A stage must apply to at least one list
   const ops = stage('Operations');
-  for (const l of ['Organiser signage', 'Sponsor signage', 'Sponsor items']) await ops.getByLabel(l, { exact: true }).uncheck();
+  for (const l of ['Organiser signage', 'Sponsor signage', 'Sponsorship items']) await ops.getByLabel(l, { exact: true }).uncheck();
   await ops.getByRole('button', { name: 'Save stage' }).click();
   await expect(errorMessage(ops, 'Tick at least one list')).toBeVisible();
   await page.reload();
@@ -232,8 +232,8 @@ test('show details: owners, budget and suggested deadlines', async ({ page }) =>
   await expect(page.getByLabel('Organiser signage artwork due')).toHaveValue('2027-03-30');
   await expect(page.getByLabel('Organiser signage print deadline')).toHaveValue('2027-04-20');
   await expect(page.getByLabel('Sponsor signage artwork due')).toHaveValue('2027-03-16');
-  await expect(page.getByLabel('Sponsor items artwork due')).toHaveValue('2027-03-02');
-  await expect(page.getByLabel('Sponsor items print deadline')).toHaveValue('2027-03-16');
+  await expect(page.getByLabel('Sponsorship items artwork due')).toHaveValue('2027-03-02');
+  await expect(page.getByLabel('Sponsorship items print deadline')).toHaveValue('2027-03-16');
 });
 
 test('suppliers are added with their scope of work, and edited', async ({ page }) => {
@@ -245,12 +245,12 @@ test('suppliers are added with their scope of work, and edited', async ({ page }
   await page.fill('#sp-new-name', 'Signs Express');
   await page.fill('#sp-new-contact', 'Sam Print');
   await page.fill('#sp-new-email', 'sam@signsexpress.test');
-  await add.getByLabel('Sponsor items').uncheck();
+  await add.getByLabel('Sponsorship items').uncheck();
   await page.fill('#sp-new-scope', 'Print and install all hall entrance and hanging banners.\nRemove everything at breakdown.');
   await page.fill('#sp-new-link', 'https://sharepoint.example/sow/signs-express.pdf');
   await page.getByRole('button', { name: 'Add supplier' }).click();
   await expect(okMessage(page, 'Signs Express added.')).toBeVisible();
-  await expect(add.getByLabel('Sponsor items')).toBeChecked(); // the form resets for the next supplier
+  await expect(add.getByLabel('Sponsorship items')).toBeChecked(); // the form resets for the next supplier
 
   await page.fill('#sp-new-name', 'Promo Direct');
   await page.fill('#sp-new-contact', 'Pat Promo');
@@ -268,14 +268,14 @@ test('suppliers are added with their scope of work, and edited', async ({ page }
   await expect(signs.getByRole('list', { name: 'Works on' }).getByRole('listitem')).toHaveText(['Organiser signage', 'Sponsor signage']);
   await expect(signs.getByRole('link', { name: 'Signed scope of work' })).toHaveAttribute('href', 'https://sharepoint.example/sow/signs-express.pdf');
   await expect(page.locator('li[id^="supplier-"]').filter({ hasText: 'Promo Direct' }).getByRole('list', { name: 'Works on' }).getByRole('listitem'))
-    .toHaveText(['Sponsor items']);
+    .toHaveText(['Sponsorship items']);
 
   // A supplier must work on at least one list, and names can't be used twice
   await page.fill('#sp-new-name', 'signs express');
-  for (const l of ['Organiser signage', 'Sponsor signage', 'Sponsor items']) await add.getByLabel(l).uncheck();
+  for (const l of ['Organiser signage', 'Sponsor signage', 'Sponsorship items']) await add.getByLabel(l).uncheck();
   await page.getByRole('button', { name: 'Add supplier' }).click();
   await expect(errorMessage(page, 'Tick at least one list they work on.')).toBeVisible();
-  await add.getByLabel('Sponsor items').check();
+  await add.getByLabel('Sponsorship items').check();
   await page.getByRole('button', { name: 'Add supplier' }).click();
   await expect(errorMessage(page, 'signs express is already on the list.')).toBeVisible();
 

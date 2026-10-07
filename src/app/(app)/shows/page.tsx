@@ -28,12 +28,13 @@ export default async function ShowsPage() {
     <>
       <PageHeader title="All shows" subtitle="Every show at a glance. Open one to work in it, or set up the next one."
         actions={<ButtonLink href="/shows/new" variant="primary"><Plus size={16} aria-hidden /> New show</ButtonLink>} />
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {tile('Live shows', totals.shows)}
         {tile('Lines across all', totals.lines)}
         {tile('Needs attention', totals.attention, true)}
         {tile('Overdue', totals.overdue, true)}
         {tile('Approved', `${totals.pct}%`)}
+        {tile('Sponsorship sales', money(totals.sales))}
       </div>
 
       <Panel title="Shows" padded={false}>
@@ -85,6 +86,7 @@ function Row({ s, here, canArchive }: { s: ShowSummary; here: boolean; canArchiv
               <Stat label="Overdue" value={s.overdue} danger={s.overdue > 0} />
               <Stat label="Approved" value={s.total ? `${Math.round((s.approved / s.total) * 100)}%` : '–'} />
               <Stat label="Cost" value={s.cost ? money(s.cost) : '–'} />
+              <Stat label="Sales" value={s.sold || s.forSale ? money(s.sales) : '–'} />
             </span>
             <ArrowRight size={18} className="ml-auto shrink-0 text-muted" aria-hidden />
           </span>

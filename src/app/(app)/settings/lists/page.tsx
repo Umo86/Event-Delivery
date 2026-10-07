@@ -10,7 +10,8 @@ export const metadata: Metadata = { title: 'Dropdown lists' };
 
 const LISTS = [
   { key: 'sign_type', title: 'Sign types', help: 'Type suggestions for organiser and sponsor signage.' },
-  { key: 'item_type', title: 'Sponsor item types', help: 'Type suggestions for sponsor items.' },
+  { key: 'item_type', title: 'Sponsorship item types', help: 'Type suggestions for sponsorship items.' },
+  { key: 'distribution', title: 'Distribution methods', help: 'How sponsorship items reach visitors.' },
   { key: 'zone', title: 'Zones and areas', help: 'Show areas, features and theatres.' },
   { key: 'material', title: 'Materials', help: '' },
   { key: 'position', title: 'Positions', help: 'How a sign is fixed or displayed.' },

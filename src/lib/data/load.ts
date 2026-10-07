@@ -56,7 +56,7 @@ export const loadBundle = cache(async (eventId: string): Promise<Bundle | null> 
     sql<SponsorRow[]>`select * from sponsors where event_id = ${eventId} order by lower(name)`,
     sql<SupplierRow[]>`select * from suppliers order by lower(name)`,
     sql<UserRow[]>`select id, email, full_name, job_title, role, active, must_change_password, last_login_at, created_at from users order by lower(full_name)`,
-    sql<DepartmentRow[]>`select id, name, position, archived from departments where not archived order by position, lower(name)`,
+    sql<DepartmentRow[]>`select id, name, position, archived, external from departments where not archived order by position, lower(name)`,
     sql<{ department_id: string }[]>`select department_id from event_departments where event_id = ${eventId}`,
     sql<{ list_key: string; value: string }[]>`select list_key, value from list_options order by list_key, sort, lower(value)`,
   ]);

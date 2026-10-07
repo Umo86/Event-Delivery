@@ -5,7 +5,7 @@ import type { DepartmentRow, UserRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
 import { Chip, Field, inputCls, Intro, Panel } from '@/components/ui';
 import {
-  addDepartment, moveDepartment, renameDepartment, setDepartmentArchived, setDepartmentMembers,
+  addDepartment, moveDepartment, renameDepartment, setDepartmentArchived, setDepartmentExternal, setDepartmentMembers,
 } from '@/app/actions/departments';
 
 export const metadata: Metadata = { title: 'Departments' };
@@ -14,7 +14,7 @@ export default async function DepartmentsPage() {
   await requireManager();
   const sql = await db();
   const [departments, people, memberships] = await Promise.all([
-    sql<DepartmentRow[]>`select id, name, position, archived from departments order by archived, position, lower(name)`,
+    sql<DepartmentRow[]>`select id, name, position, archived, external from departments order by archived, position, lower(name)`,
     sql<UserRow[]>`select id, email, full_name, job_title, role, active, must_change_password, last_login_at, created_at from users where active order by lower(full_name)`,
     sql<{ user_id: string; department_id: string }[]>`select user_id, department_id from user_departments`,
   ]);
@@ -40,7 +40,7 @@ export default async function DepartmentsPage() {
         const mine = members.get(d.id) ?? new Set<string>();
         return (
           <Panel key={d.id}
-            title={<span className="flex items-center gap-2">{d.name} <Chip tone="grey">{mine.size} {mine.size === 1 ? 'person' : 'people'}</Chip></span>}
+            title={<span className="flex flex-wrap items-center gap-2">{d.name} <Chip tone="grey">{mine.size} {mine.size === 1 ? 'person' : 'people'}</Chip>{d.external && <Chip tone="orange">Outside the company</Chip>}</span>}
             actions={
               <div className="flex items-center gap-1">
                 {i > 0 && <ActionForm action={moveDepartment}><input type="hidden" name="department_id" value={d.id} /><input type="hidden" name="dir" value="up" /><SubmitButton variant="ghost" small pendingText="…">Move up</SubmitButton></ActionForm>}
@@ -52,11 +52,23 @@ export default async function DepartmentsPage() {
               </div>
             }>
             <div className="grid gap-5 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
-              <ActionForm action={renameDepartment} className="flex items-end gap-2">
-                <input type="hidden" name="department_id" value={d.id} />
-                <Field label="Name" htmlFor={`dn-${d.id}`} className="flex-1"><input id={`dn-${d.id}`} name="name" required defaultValue={d.name} className={inputCls} /></Field>
-                <SubmitButton variant="dark" small>Rename</SubmitButton>
-              </ActionForm>
+              <div className="space-y-4">
+                <ActionForm action={renameDepartment} className="flex items-end gap-2">
+                  <input type="hidden" name="department_id" value={d.id} />
+                  <Field label="Name" htmlFor={`dn-${d.id}`} className="flex-1"><input id={`dn-${d.id}`} name="name" required defaultValue={d.name} className={inputCls} /></Field>
+                  <SubmitButton variant="dark" small>Rename</SubmitButton>
+                </ActionForm>
+                <ActionForm action={setDepartmentExternal}>
+                  <input type="hidden" name="department_id" value={d.id} />
+                  <input type="hidden" name="external" value={d.external ? '0' : '1'} />
+                  <p className="mb-1.5 text-[13px] text-ink-2">
+                    {d.external
+                      ? 'People outside the company, like agencies. They can’t mark sponsorship items sold.'
+                      : 'People in the company. Everyone here can mark sponsorship items sold.'}
+                  </p>
+                  <SubmitButton variant="secondary" small>{d.external ? 'Mark as inside the company' : 'Mark as outside the company'}</SubmitButton>
+                </ActionForm>
+              </div>
 
               <ActionForm action={setDepartmentMembers}>
                 <input type="hidden" name="department_id" value={d.id} />

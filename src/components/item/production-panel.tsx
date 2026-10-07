@@ -1,6 +1,6 @@
 import type { ItemDetail } from '@/lib/data/load';
 import type { CurrentUser } from '@/lib/auth/session';
-import { categoryInfo, PRODUCTION } from '@/lib/domain/labels';
+import { categoryInfo, productionSteps } from '@/lib/domain/labels';
 import { worksOn } from '@/lib/domain/suppliers';
 import { SupplierOptions } from '../supplier-options';
 import { canEdit } from '@/lib/domain/permissions';
@@ -28,7 +28,7 @@ export function ProductionPanel({ detail, user }: { detail: ItemDetail; user: Cu
           <Field label="Status" htmlFor="production_status">
             <select id="production_status" name="production_status" defaultValue={item.production_status ?? ''} className={inputCls}>
               <option value="">{state.fullyApproved ? 'Not started' : 'Locked until approved'}</option>
-              {PRODUCTION.map((p) => (
+              {productionSteps(item.category).map((p) => (
                 <option key={p.key} value={p.key} disabled={!state.fullyApproved && item.production_status !== p.key}>{p.label}</option>
               ))}
             </select>
@@ -41,7 +41,9 @@ export function ProductionPanel({ detail, user }: { detail: ItemDetail; user: Cu
           </Field>
           <Field label="PO number" htmlFor="p_po"><input id="p_po" name="po_number" defaultValue={item.po_number ?? ''} className={inputCls} /></Field>
           <Field label="Delivery to venue" htmlFor="p_delivery"><input id="p_delivery" type="date" name="delivery_date" defaultValue={item.delivery_date ?? ''} className={inputCls} /></Field>
-          <Field label="Install by" htmlFor="p_install"><input id="p_install" type="date" name="install_date" defaultValue={item.install_date ?? ''} className={inputCls} /></Field>
+          <Field label={item.category === 'sponsor_item' ? 'Hand-out date' : 'Install by'} htmlFor="p_install">
+            <input id="p_install" type="date" name="install_date" defaultValue={item.install_date ?? ''} className={inputCls} />
+          </Field>
           <div className="flex items-end">
             <p className="text-[14px] text-ink-2">
               Cost: <b className="text-ink">{total !== null ? money(total, 2) : 'not set'}</b>

@@ -12,6 +12,13 @@ export const isSuperAdmin = (u: Actor | null | undefined) => u?.role === 'super_
 /** Manager or Super Admin: can add, edit and delete signage and the things around it. Users are view-only. */
 export const canEdit = (u: Actor | null | undefined) => u?.role === 'super_admin' || u?.role === 'manager';
 
+/**
+ * Who can mark a sponsorship item sold and record its sale price: everyone with an account, including Users,
+ * except people in an external department (agencies, contractors). Managers and super admins always can.
+ */
+export const canSell = (u: (Actor & { is_external?: boolean }) | null | undefined) =>
+  !!u && (canEdit(u) || !u.is_external);
+
 /** Is this person the named approver for the stage (or the sponsor's account manager for sponsor stages)? */
 export function isStageApprover(u: Actor, stage: StageRow, sponsor: SponsorRow | null): boolean {
   if (stage.uses_account_manager) return !!sponsor?.account_manager_id && sponsor.account_manager_id === u.id;
@@ -32,7 +39,7 @@ export function canDecideStage(u: Actor, stage: StageRow, sponsor: SponsorRow | 
  * - later stages: none (they unlock in order)
  */
 export function allowedDecisions(state: ItemState, stageId: string): DecisionValue[] {
-  if (!state.artIn || state.group === 'cancelled') return [];
+  if (!state.artIn || state.group === 'cancelled' || state.group === 'for_sale') return [];
   const s = state.stages.find((x) => x.stage.id === stageId);
   if (!s || !s.applies) return [];
   if (s.kind === 'current' || s.kind === 'stale') return ['approved', 'changes_requested', 'rejected', 'on_hold'];

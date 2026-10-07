@@ -43,6 +43,22 @@ export async function renameDepartment(_prev: ActionResult | null, fd: FormData)
   });
 }
 
+/** People in an external department (agencies, contractors) can't mark sponsorship items sold. */
+export async function setDepartmentExternal(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const id = uuidOrNull(fd, 'department_id');
+    if (!id) throw new UserError('Missing department.');
+    const external = fd.get('external') === '1';
+    const sql = await db();
+    const [d] = await sql<{ name: string }[]>`update departments set external = ${external} where id = ${id} returning name`;
+    if (!d) throw new UserError('That department no longer exists.');
+    await log(sql, me, `Marked ${d.name} as ${external ? 'outside' : 'inside'} the company`);
+    refresh();
+    return { ok: true, message: external ? `${d.name} is outside the company.` : `${d.name} is inside the company.` };
+  });
+}
+
 export async function moveDepartment(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     await actor('manager');

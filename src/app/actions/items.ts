@@ -11,8 +11,9 @@ import { sponsorLinksEnabled } from '@/lib/settings';
 import { appOrigin } from '@/lib/url';
 import { logActivity } from '@/lib/activity';
 import { fmtDate } from '@/lib/dates';
-import { categoryInfo, decisionLabel, itemCode, productionLabel } from '@/lib/domain/labels';
-import { allowedDecisions, canDecideStage } from '@/lib/domain/permissions';
+import { categoryInfo, decisionLabel, itemCode, productionLabel, productionLabelFor } from '@/lib/domain/labels';
+import { isForSale } from '@/lib/domain/engine';
+import { allowedDecisions, canDecideStage, canSell } from '@/lib/domain/permissions';
 import type { ArtworkBy, Category, DecisionValue, ProductionStatus } from '@/lib/domain/types';
 import { ALLOWED_UPLOAD_TYPES, artworkPrefix, blobExists, deleteBlobs, MAX_DERIVED_BYTES, MAX_ORIGINAL_BYTES } from '@/lib/storage';
 
@@ -29,11 +30,12 @@ function refresh(itemId?: string) {
 /** Parses the editable fields shared by the add and edit forms. */
 async function readItemFields(fd: FormData, eventId: string, category: Category) {
   const sql = await db();
+  const sponsorship = category === 'sponsor_item';
   const sponsorId = uuidOrNull(fd, 'sponsor_id');
   if (sponsorId) {
     const s = await sql`select 1 from sponsors where id = ${sponsorId} and event_id = ${eventId}`;
     if (!s.length) throw new UserError('Pick a sponsor from this show’s list.');
-  } else if (category !== 'organiser_signage') {
+  } else if (category === 'sponsor_signage') {
     throw new UserError('Choose the sponsor for this line.');
   }
   const supplierId = uuidOrNull(fd, 'supplier_id');
@@ -47,30 +49,44 @@ async function readItemFields(fd: FormData, eventId: string, category: Category)
   if (sides && sides !== 'single' && sides !== 'double') throw new UserError('Choose single or double-sided.');
   const link = str(fd, 'artwork_link', 1000);
   if (link && !/^https?:\/\//i.test(link)) throw new UserError('The artwork link must start with https://');
-  return {
-    description: required(fd, 'description', 'Description', 200),
+  const shared = {
+    description: required(fd, 'description', sponsorship ? 'Item name' : 'Description', 200),
     sponsor_id: sponsorId,
     item_type: str(fd, 'item_type', 120),
     wording: str(fd, 'wording', 2000),
     hall: str(fd, 'hall', 60),
     zone: str(fd, 'zone', 120),
     location_detail: str(fd, 'location_detail', 300),
-    position: str(fd, 'position', 120),
-    width_mm: int(fd, 'width_mm', 'Width', { min: 0, max: 1_000_000 }),
-    height_mm: int(fd, 'height_mm', 'Height', { min: 0, max: 1_000_000 }),
-    sides: sides as 'single' | 'double' | null,
     qty: int(fd, 'qty', 'Quantity', { min: 0, max: 10_000_000 }),
     material: str(fd, 'material', 120),
     artwork_by: artworkBy,
     artwork_due: date(fd, 'artwork_due', 'Artwork due'),
     artwork_link: link,
     supplier_id: supplierId,
-    print_deadline: date(fd, 'print_deadline', 'Print / order deadline'),
+    print_deadline: date(fd, 'print_deadline', sponsorship ? 'Order deadline' : 'Print / order deadline'),
     po_number: str(fd, 'po_number', 60),
     delivery_date: date(fd, 'delivery_date', 'Delivery date'),
-    install_date: date(fd, 'install_date', 'Install date'),
-    unit_cost: num(fd, 'unit_cost', 'Unit cost'),
+    install_date: date(fd, 'install_date', sponsorship ? 'Hand-out date' : 'Install date'),
+    unit_cost: num(fd, 'unit_cost', sponsorship ? 'Cost price per unit' : 'Unit cost'),
     notes: str(fd, 'notes', 4000),
+  };
+  if (sponsorship) {
+    // Sponsorship items: no sign sizes; a rate card price, a sale price once sold, and how they reach visitors
+    const salePrice = num(fd, 'sale_price', 'Sale price');
+    if (salePrice !== null && !sponsorId) throw new UserError('Choose the sponsor it was sold to, or clear the sale price.');
+    return {
+      ...shared,
+      rate_card_price: num(fd, 'rate_card_price', 'Rate card price'),
+      sale_price: sponsorId ? salePrice : null,
+      distribution_method: str(fd, 'distribution_method', 120),
+    };
+  }
+  return {
+    ...shared,
+    position: str(fd, 'position', 120),
+    width_mm: int(fd, 'width_mm', 'Width', { min: 0, max: 1_000_000 }),
+    height_mm: int(fd, 'height_mm', 'Height', { min: 0, max: 1_000_000 }),
+    sides: sides as 'single' | 'double' | null,
   };
 }
 
@@ -84,11 +100,14 @@ export async function createItem(_prev: ActionResult | null, fd: FormData): Prom
     const ev = await sql<{ archived: boolean }[]>`select archived from events where id = ${eventId}`;
     if (!ev.length) throw new UserError('That event no longer exists.');
     const f = await readItemFields(fd, eventId, category);
+    // A sponsorship item added with its sponsor is already sold
+    const sold = category === 'sponsor_item' && f.sponsor_id ? { sold_at: new Date(), sold_by: me.id } : {};
     const [row] = await sql<{ id: string; ref_no: number }[]>`
-      insert into items ${sql({ ...f, event_id: eventId, category, created_by: me.id } as never)}
+      insert into items ${sql({ ...f, ...sold, event_id: eventId, category, created_by: me.id } as never)}
       returning id, ref_no`;
+    const forSale = category === 'sponsor_item' && !f.sponsor_id ? ' (for sale)' : '';
     await logActivity(sql, { eventId, itemId: row.id, userId: me.id, actorName: me.full_name, kind: 'created',
-      message: `Added ${itemCode(category, row.ref_no)} to ${categoryInfo(category).label.toLowerCase()}` });
+      message: `Added ${itemCode(category, row.ref_no)} to ${categoryInfo(category).label.toLowerCase()}${forSale}` });
     refresh();
     redirect(`/items/${row.id}?created=1`);
   });
@@ -100,6 +119,7 @@ const FIELD_LABELS: Record<string, string> = {
   material: 'material', artwork_by: 'artwork supplier', artwork_due: 'artwork due date', artwork_link: 'artwork link',
   supplier_id: 'supplier', print_deadline: 'print deadline', po_number: 'PO number', delivery_date: 'delivery date',
   install_date: 'install date', unit_cost: 'unit cost', notes: 'notes',
+  rate_card_price: 'rate card price', sale_price: 'sale price', distribution_method: 'distribution method',
 };
 
 export async function updateItem(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -122,7 +142,15 @@ export async function updateItem(_prev: ActionResult | null, fd: FormData): Prom
     if (sponsorChanged && me.role !== 'super_admin' && detail.decisions.length > 0) {
       throw new UserError('Sign-off has started on this line, so only a super admin can move it to another sponsor.');
     }
+    if (sponsorChanged && item.category === 'sponsor_item' && !f.sponsor_id && (detail.versions.length > 0 || detail.decisions.length > 0)) {
+      throw new UserError('Artwork or sign-off has started for this sponsor, so it can’t go back on sale. Cancel it and add a new item to sell instead.');
+    }
     await sql`update items set ${sql(f as never, ...(changed as never[]))} where id = ${itemId}`;
+    // Sponsorship items: choosing a sponsor marks it sold now; clearing it puts the item back on sale
+    if (sponsorChanged && item.category === 'sponsor_item') {
+      if (f.sponsor_id) await sql`update items set sold_at = now(), sold_by = ${me.id} where id = ${itemId}`;
+      else await sql`update items set sold_at = null, sold_by = null, sale_price = null where id = ${itemId}`;
+    }
     // Approval links belong to the old sponsor
     if (sponsorChanged) await sql`update share_links set revoked_at = now() where item_id = ${itemId} and revoked_at is null`;
     await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'updated',
@@ -158,7 +186,7 @@ export async function updateProduction(_prev: ActionResult | null, fd: FormData)
     };
     await sql`update items set ${sql(next as never)} where id = ${itemId}`;
     const msgs: string[] = [];
-    if (status !== item.production_status) msgs.push(status ? `Production status: ${productionLabel(status)}` : 'Cleared production status');
+    if (status !== item.production_status) msgs.push(status ? `Production status: ${productionLabelFor(status, item.category)}` : 'Cleared production status');
     if (next.po_number !== item.po_number && next.po_number) msgs.push(`PO ${next.po_number}`);
     if (next.delivery_date !== item.delivery_date) msgs.push(next.delivery_date ? `Delivery date ${fmtDate(next.delivery_date, 'long')}` : 'Cleared delivery date');
     if (next.install_date !== item.install_date) msgs.push(next.install_date ? `Install date ${fmtDate(next.install_date, 'long')}` : 'Cleared install date');
@@ -261,6 +289,86 @@ export async function recordDecision(_prev: ActionResult | null, fd: FormData): 
   });
 }
 
+// ---- Sponsorship sales ----------------------------------------------------------
+// Anyone with an account can record a sale, except people in an external department (see canSell).
+
+const gbp = (n: number) => '£' + n.toLocaleString('en-GB', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+
+/** Marks a sponsorship item sold, or changes the sale: who bought it (an existing or new sponsor) and the sale price. */
+export async function saveSale(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('user');
+    if (!canSell(me)) throw new UserError('People in an external department can’t mark items sold.');
+    const itemId = uuidOrNull(fd, 'item_id');
+    if (!itemId) throw new UserError('Missing item.');
+    const detail = await loadItem(itemId);
+    if (!detail) throw new UserError('That item no longer exists.');
+    const { item, code } = detail.row;
+    if (item.category !== 'sponsor_item') throw new UserError('Only sponsorship items are sold.');
+    if (item.cancelled) throw new UserError('This item is cancelled. Restore it first.');
+    const price = num(fd, 'sale_price', 'Sale price');
+    if (price === null) throw new UserError('Enter the sale price (0 if it’s part of a bigger package).');
+    const sql = await db();
+    let sponsorId = uuidOrNull(fd, 'sponsor_id');
+    const newName = str(fd, 'new_sponsor', 120);
+    if (sponsorId && newName) throw new UserError('Choose a sponsor from the list or type a new one, not both.');
+    let added = false;
+    if (newName) {
+      const [found] = await sql<{ id: string }[]>`select id from sponsors where event_id = ${item.event_id} and lower(name) = lower(${newName})`;
+      if (found) sponsorId = found.id;
+      else {
+        const [s] = await sql<{ id: string }[]>`insert into sponsors (event_id, name) values (${item.event_id}, ${newName}) returning id`;
+        sponsorId = s.id;
+        added = true;
+        await logActivity(sql, { eventId: item.event_id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'sponsor',
+          message: `Added sponsor ${newName} when selling ${code}` });
+      }
+    } else if (sponsorId) {
+      if (!(await sql`select 1 from sponsors where id = ${sponsorId} and event_id = ${item.event_id}`).length) throw new UserError('Pick a sponsor from this show’s list.');
+    } else {
+      throw new UserError('Choose who bought it, or type a new sponsor’s name.');
+    }
+    const changingSponsor = !!item.sponsor_id && item.sponsor_id !== sponsorId;
+    if (changingSponsor && (detail.versions.length > 0 || detail.decisions.length > 0) && me.role !== 'super_admin') {
+      throw new UserError('Artwork or sign-off has started for the current sponsor, so only a super admin can change who bought it.');
+    }
+    const newSale = !item.sponsor_id || changingSponsor;
+    if (!newSale && item.sale_price === price) return { ok: true, message: 'No changes.' };
+    if (newSale) await sql`update items set sponsor_id = ${sponsorId}, sale_price = ${price}, sold_at = now(), sold_by = ${me.id} where id = ${itemId}`;
+    else await sql`update items set sale_price = ${price} where id = ${itemId}`;
+    if (changingSponsor) await sql`update share_links set revoked_at = now() where item_id = ${itemId} and revoked_at is null`;
+    const [{ name }] = await sql<{ name: string }[]>`select name from sponsors where id = ${sponsorId}`;
+    await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'sale',
+      message: newSale ? `Sold to ${name} for ${gbp(price)}` : `Changed the sale price to ${gbp(price)}` });
+    refresh(itemId);
+    return { ok: true, message: newSale ? `Sold to ${name}${added ? ', who’s now on the Sponsors list' : ''}.` : 'Sale price saved.' };
+  });
+}
+
+/** Puts a sold sponsorship item back on sale, as long as no artwork or sign-off has started for the buyer. */
+export async function putBackOnSale(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('user');
+    if (!canSell(me)) throw new UserError('People in an external department can’t change sales.');
+    const itemId = uuidOrNull(fd, 'item_id');
+    if (!itemId) throw new UserError('Missing item.');
+    const detail = await loadItem(itemId);
+    if (!detail) throw new UserError('That item no longer exists.');
+    const { item, sponsor } = detail.row;
+    if (item.category !== 'sponsor_item' || !item.sponsor_id) return { ok: true };
+    if (detail.versions.length > 0 || detail.decisions.length > 0) {
+      throw new UserError('Artwork or sign-off has started for this sponsor, so it can’t go back on sale. Cancel it and add a new item to sell instead.');
+    }
+    const sql = await db();
+    await sql`update items set sponsor_id = null, sale_price = null, sold_at = null, sold_by = null where id = ${itemId}`;
+    await sql`update share_links set revoked_at = now() where item_id = ${itemId} and revoked_at is null`;
+    await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'sale',
+      message: `Put back on sale (was sold to ${sponsor?.name ?? 'a sponsor'})` });
+    refresh(itemId);
+    return { ok: true, message: 'It’s back on sale.' };
+  });
+}
+
 // ---- Artwork ------------------------------------------------------------------
 
 export interface UploadedFile { url: string; pathname: string; size: number; contentType: string }
@@ -273,10 +381,11 @@ export async function commitArtwork(input: {
     const me = await actor('manager');
     if (!isUuid(input.itemId)) throw new UserError('Missing line.');
     const sql = await db();
-    const [item] = await sql<{ id: string; event_id: string; cancelled: boolean; production_status: ProductionStatus | null }[]>`
-      select id, event_id, cancelled, production_status from items where id = ${input.itemId}`;
+    const [item] = await sql<{ id: string; event_id: string; cancelled: boolean; production_status: ProductionStatus | null; category: Category; sponsor_id: string | null }[]>`
+      select id, event_id, cancelled, production_status, category, sponsor_id from items where id = ${input.itemId}`;
     if (!item) throw new UserError('That line no longer exists.');
     if (item.cancelled) throw new UserError('This line is cancelled. Restore it before adding artwork.');
+    if (isForSale(item)) throw new UserError('This item is still for sale. Mark it sold before adding artwork.');
     const prefix = artworkPrefix(item.event_id, item.id);
     const files = [input.original, input.preview, input.thumb].filter((f): f is UploadedFile => !!f);
     for (const f of files) {

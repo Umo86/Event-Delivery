@@ -6,7 +6,7 @@ const WORKS_ON: Record<Category, 'works_on_os' | 'works_on_ss' | 'works_on_si'> 
   sponsor_item: 'works_on_si',
 };
 
-/** Whether the supplier's scope covers this list (organiser signage, sponsor signage or sponsor items). */
+/** Whether the supplier's scope covers this list (organiser signage, sponsor signage or sponsorship items). */
 export function worksOn(s: Pick<SupplierRow, 'works_on_os' | 'works_on_ss' | 'works_on_si'>, category: Category): boolean {
   return s[WORKS_ON[category]];
 }

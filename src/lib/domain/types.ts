@@ -11,7 +11,9 @@ export type Group =
   | 'on_hold'
   | 'approved'
   | ProductionStatus
-  | 'cancelled';
+  | 'cancelled'
+  /** A sponsorship item nobody has bought yet. */
+  | 'for_sale';
 export type Flag = 'not_signed_off' | 'overdue' | 'due_soon' | 'slow';
 
 export interface UserRow {
@@ -80,6 +82,8 @@ export interface DepartmentRow {
   name: string;
   position: number;
   archived: boolean;
+  /** People outside the company (agencies, contractors). They can't mark sponsorship items sold. */
+  external: boolean;
 }
 
 export interface SupplierRow {
@@ -128,6 +132,15 @@ export interface ItemRow {
   delivery_date: string | null;
   install_date: string | null;
   unit_cost: number | null;
+  /** Sponsorship items: what sales should ask for the whole package. */
+  rate_card_price: number | null;
+  /** Sponsorship items: what the sponsor paid. */
+  sale_price: number | null;
+  /** Sponsorship items: how it reaches visitors (registration desk, show bag, seat drop…). */
+  distribution_method: string | null;
+  /** Sponsorship items: when it was marked sold, and by whom. Sold means it has a sponsor. */
+  sold_at: Date | null;
+  sold_by: string | null;
   cancelled: boolean;
   notes: string | null;
   created_by: string | null;

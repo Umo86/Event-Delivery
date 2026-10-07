@@ -11,7 +11,7 @@ import { EVENT_COOKIE } from '@/lib/data/load';
 import { DEFAULT_STAGES, suggestedDeadlines } from '@/lib/data/seed';
 
 const refresh = () => revalidatePath('/', 'layout');
-const LIST_KEYS = ['sign_type', 'item_type', 'material', 'position', 'zone', 'hall_nec', 'hall_excel', 'hall_other'];
+const LIST_KEYS = ['sign_type', 'item_type', 'distribution', 'material', 'position', 'zone', 'hall_nec', 'hall_excel', 'hall_other'];
 
 async function userExists(id: string | null) {
   if (!id) return true;
@@ -38,8 +38,8 @@ export async function updateEvent(_prev: ActionResult | null, fd: FormData): Pro
       print_due_os: date(fd, 'print_due_os', 'Organiser signage print deadline'),
       art_due_ss: date(fd, 'art_due_ss', 'Sponsor signage artwork deadline'),
       print_due_ss: date(fd, 'print_due_ss', 'Sponsor signage print deadline'),
-      art_due_si: date(fd, 'art_due_si', 'Sponsor items artwork deadline'),
-      print_due_si: date(fd, 'print_due_si', 'Sponsor items order deadline'),
+      art_due_si: date(fd, 'art_due_si', 'Sponsorship items artwork deadline'),
+      print_due_si: date(fd, 'print_due_si', 'Sponsorship items order deadline'),
     };
     const venue = required(fd, 'venue', 'Venue', 80);
     const values = {

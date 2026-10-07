@@ -5,7 +5,7 @@ export const APP_NAME = 'Event Delivery';
 export const CATEGORIES: { key: Category; slug: 'os' | 'ss' | 'si'; label: string; short: string; prefix: string }[] = [
   { key: 'organiser_signage', slug: 'os', label: 'Organiser signage', short: 'Organiser', prefix: 'OS' },
   { key: 'sponsor_signage', slug: 'ss', label: 'Sponsor signage', short: 'Sponsor signage', prefix: 'SS' },
-  { key: 'sponsor_item', slug: 'si', label: 'Sponsor items', short: 'Sponsor items', prefix: 'SI' },
+  { key: 'sponsor_item', slug: 'si', label: 'Sponsorship items', short: 'Sponsorship items', prefix: 'SI' },
 ];
 
 export function categoryBySlug(slug: string) {
@@ -34,6 +34,13 @@ export const PRODUCTION: { key: ProductionStatus; label: string }[] = [
 ];
 export const productionLabel = (k: ProductionStatus) => PRODUCTION.find((p) => p.key === k)?.label ?? k;
 
+/** Production steps as worded for a list: sponsorship items are handed out rather than installed. */
+export function productionSteps(category: Category): { key: ProductionStatus; label: string }[] {
+  return category === 'sponsor_item' ? PRODUCTION.map((p) => (p.key === 'installed' ? { ...p, label: 'Handed out' } : p)) : PRODUCTION;
+}
+export const productionLabelFor = (k: ProductionStatus, category: Category) =>
+  productionSteps(category).find((p) => p.key === k)?.label ?? k;
+
 export const DECISIONS: { key: DecisionValue; label: string; verb: string }[] = [
   { key: 'approved', label: 'Approved', verb: 'Approve' },
   { key: 'changes_requested', label: 'Changes requested', verb: 'Request changes' },
@@ -54,6 +61,7 @@ export const GROUPS: { key: Group; label: string; tone: Tone }[] = [
   { key: 'delivered', label: 'Delivered to venue', tone: 'blue' },
   { key: 'installed', label: 'Installed', tone: 'green' },
   { key: 'cancelled', label: 'Cancelled', tone: 'muted' },
+  { key: 'for_sale', label: 'For sale', tone: 'yellow' },
 ];
 export const groupInfo = (k: Group) => GROUPS.find((g) => g.key === k)!;
 
@@ -120,5 +128,6 @@ export const GROUP_CHART_COLOURS: Record<Group, string> = {
   in_production: '#06b6d4',
   delivered: '#3b82f6',
   installed: '#15803d',
+  for_sale: '#eab308',
   cancelled: '#cbd5e1',
 };

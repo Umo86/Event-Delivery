@@ -15,6 +15,7 @@ import { ArtworkPanel } from '@/components/item/artwork-panel';
 import { SignoffRoute } from '@/components/item/signoff';
 import { ProductionPanel } from '@/components/item/production-panel';
 import { ActivityPanel } from '@/components/item/activity-panel';
+import { SalePanel } from '@/components/item/sale-panel';
 import { deleteItem, setCancelled } from '@/app/actions/items';
 
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -42,7 +43,29 @@ export default async function ItemPage(props: {
   const dateOr = (d: string | null, fallback: string | null) =>
     d ? fmtDate(d, 'long') : fallback ? <span className="text-muted">{fmtDate(fallback, 'long')} (show default)</span> : <span className="text-muted">Not set</span>;
 
-  const spec: [string, React.ReactNode][] = [
+  const sponsorship = item.category === 'sponsor_item';
+  const forSale = state.group === 'for_sale';
+  const where = [item.hall, item.zone, item.location_detail].filter(Boolean).join(', ');
+  // Sponsorship items: what's being sold and how it reaches visitors (the sale itself is in the Sale panel)
+  const sponsorshipSpec: [string, React.ReactNode][] = [
+    ['Type', item.item_type],
+    ['What’s included', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
+    ['Material / spec', item.material],
+    ['Quantity', item.qty?.toLocaleString('en-GB')],
+    ['Cost price per unit', item.unit_cost !== null ? money(item.unit_cost, 2) : null],
+    ['Total cost', total !== null ? money(total, 2) : null],
+    ['Rate card price', item.rate_card_price !== null ? money(item.rate_card_price, 2) : null],
+    ['Distribution', item.distribution_method],
+    ['Where', where || null],
+    ['Hand-out date', item.install_date ? fmtDate(item.install_date, 'long') : null],
+    ['Artwork from', artworkByLabel(item.artwork_by)],
+    ['Artwork due', dateOr(item.artwork_due, defArt)],
+    ['Order deadline', dateOr(item.print_deadline, defPrint)],
+    ['Supplier', supplier?.name],
+    ['Notes', item.notes ? <span className="whitespace-pre-wrap">{item.notes}</span> : null],
+  ];
+
+  const signageSpec: [string, React.ReactNode][] = [
     ['Sponsor', sponsor ? <>{sponsor.name}{sponsor.account_manager_id ? <span className="text-muted">, managed by {names.get(sponsor.account_manager_id)}</span> : null}</> : <span className="text-muted">None</span>],
     ['Type', item.item_type],
     ['Wording / content', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
@@ -62,6 +85,10 @@ export default async function ItemPage(props: {
     ['Total cost', total !== null ? money(total, 2) : null],
     ['Notes', item.notes ? <span className="whitespace-pre-wrap">{item.notes}</span> : null],
   ];
+  const spec = sponsorship ? sponsorshipSpec : signageSpec;
+  const createdNote = !sponsorship ? `Line ${row.code} added. Upload the artwork when it’s ready.`
+    : sponsor ? `Line ${row.code} added, sold to ${sponsor.name}. Upload the artwork when it’s ready.`
+      : `Line ${row.code} added. It’s for sale until someone marks it sold.`;
 
   return (
     <>
@@ -70,7 +97,7 @@ export default async function ItemPage(props: {
         <span aria-hidden> / </span>{row.code}
       </nav>
 
-      {sp.created && <div className="mb-4"><Notice tone="ok">Line {row.code} added. Upload the artwork when it’s ready.</Notice></div>}
+      {sp.created && <div className="mb-4"><Notice tone="ok">{createdNote}</Notice></div>}
       {sp.saved && <div className="mb-4"><Notice tone="ok">Changes saved.</Notice></div>}
       {item.cancelled && <div className="mb-4"><Notice tone="warn">This line is cancelled. It’s left out of every count and list.</Notice></div>}
 
@@ -83,7 +110,9 @@ export default async function ItemPage(props: {
               <FlagChip flag={state.flag} />
             </div>
             <h1 className={cx('mt-2 text-[28px] font-semibold leading-tight text-ink', item.cancelled && 'line-through')}>{item.description}</h1>
-            <p className="mt-1 text-[14px] text-muted">{cat.label}{sponsor ? ` for ${sponsor.name}` : ''}, added {fmtDateTime(item.created_at)}</p>
+            <p className="mt-1 text-[14px] text-muted">
+              {sponsorship ? `Sponsorship item, ${sponsor ? `sold to ${sponsor.name}` : 'for sale'}` : `${cat.label}${sponsor ? ` for ${sponsor.name}` : ''}`}, added {fmtDateTime(item.created_at)}
+            </p>
           </div>
           <div className="no-print flex flex-wrap gap-2">
             {canEdit(user) && <ButtonLink href={`/items/${item.id}/edit`}><PencilLine size={16} aria-hidden /> Edit</ButtonLink>}
@@ -94,12 +123,12 @@ export default async function ItemPage(props: {
           <dl className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
             <div>
               <dt className="text-[13px] text-muted">Next step</dt>
-              <dd className="font-semibold text-ink">{state.action || 'Nothing left to do'}</dd>
+              <dd className="font-semibold text-ink">{forSale ? 'Sell it to a sponsor' : state.action || 'Nothing left to do'}</dd>
             </div>
             <div>
               <dt className="text-[13px] text-muted">Waiting on</dt>
               <dd className={cx('font-semibold', state.waitingOnLabel && state.waitingOnUserIds.length === 0 ? 'text-red-700' : 'text-ink')}>
-                {state.waitingOnLabel || 'Nobody'}
+                {forSale ? 'Sales' : state.waitingOnLabel || 'Nobody'}
                 {state.daysWaiting !== null && state.waitingOnLabel && (
                   <span className="font-normal text-muted">{state.daysWaiting > 0 ? ` for ${state.daysWaiting} day${state.daysWaiting === 1 ? '' : 's'}` : ' since today'}</span>
                 )}
@@ -117,12 +146,21 @@ export default async function ItemPage(props: {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="space-y-6">
-          <ArtworkPanel detail={detail} user={user} viewVersion={sp.v ? Number(sp.v) : undefined} />
-          <Panel title="Sign-off" id="signoff">
-            <SignoffRoute detail={detail} user={user} sponsorLinks={await sponsorLinksEnabled()} />
-          </Panel>
+          {forSale ? (
+            <Panel title="Artwork and sign-off">
+              <Notice tone="info">Artwork and sign-off start once it’s sold. The sponsor’s account manager then chases the artwork.</Notice>
+            </Panel>
+          ) : (
+            <>
+              <ArtworkPanel detail={detail} user={user} viewVersion={sp.v ? Number(sp.v) : undefined} />
+              <Panel title="Sign-off" id="signoff">
+                <SignoffRoute detail={detail} user={user} sponsorLinks={await sponsorLinksEnabled()} />
+              </Panel>
+            </>
+          )}
         </div>
         <div className="space-y-6">
+          {sponsorship && <SalePanel detail={detail} user={user} />}
           <Panel title="Details" actions={canEdit(user) ? <ButtonLink href={`/items/${item.id}/edit`} small variant="ghost">Edit</ButtonLink> : undefined}>
             <dl className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-4 gap-y-2 text-[14px]">
               {spec.map(([k, v]) => (
@@ -133,7 +171,7 @@ export default async function ItemPage(props: {
               ))}
             </dl>
           </Panel>
-          <ProductionPanel detail={detail} user={user} />
+          {!forSale && <ProductionPanel detail={detail} user={user} />}
           <ActivityPanel detail={detail} />
           {canEdit(user) && (
             <Panel title="Line options">

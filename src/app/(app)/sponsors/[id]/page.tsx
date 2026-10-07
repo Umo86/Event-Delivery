@@ -35,7 +35,7 @@ export default async function SponsorPage(props: { params: Promise<{ id: string 
         actions={canEdit(user) ? (
           <>
             <ButtonLink href={`/schedule/ss/new?sponsor=${sponsor.id}`} small>Add sponsor signage</ButtonLink>
-            <ButtonLink href={`/schedule/si/new?sponsor=${sponsor.id}`} small>Add sponsor item</ButtonLink>
+            <ButtonLink href={`/schedule/si/new?sponsor=${sponsor.id}`} small>Add sponsorship item</ButtonLink>
           </>
         ) : undefined}
       />

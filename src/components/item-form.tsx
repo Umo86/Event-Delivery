@@ -13,7 +13,147 @@ function hallList(bundle: Bundle) {
   return bundle.lists[v === 'NEC Birmingham' ? 'hall_nec' : v === 'ExCeL London' ? 'hall_excel' : 'hall_other'] ?? [];
 }
 
-export function ItemForm({ bundle, category, item, cancelHref, defaultSponsorId }: {
+export function ItemForm(props: {
+  bundle: Bundle; category: Category; item?: ItemRow; cancelHref: string; defaultSponsorId?: string;
+}) {
+  return props.category === 'sponsor_item' ? <SponsorshipItemForm {...props} /> : <SignageForm {...props} />;
+}
+
+/**
+ * Sponsorship items: things the show sells to sponsors (lanyards, show bags, seat drops…). Set up with what it is,
+ * what it costs and how it reaches visitors; sold by choosing the sponsor and sale price (here, or on the item's page).
+ */
+function SponsorshipItemForm({ bundle, category, item, cancelHref, defaultSponsorId }: {
+  bundle: Bundle; category: Category; item?: ItemRow; cancelHref: string; defaultSponsorId?: string;
+}) {
+  const ev = bundle.event;
+  const v = (k: keyof ItemRow) => (item ? ((item[k] ?? '') as string | number) : '');
+  const defArt = defaultArtworkDue(ev, category);
+  const defPrint = defaultPrintDeadline(ev, category);
+  const section = 'rounded-[10px] border border-line bg-white p-4 sm:p-5';
+  const h2 = 'mb-4 text-[18px] font-semibold text-ink';
+  const grid = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4';
+  const hallsHere = hallList(bundle);
+
+  return (
+    <ActionForm action={item ? updateItem : createItem} className="space-y-5">
+      <input type="hidden" name="event_id" value={ev.id} />
+      <input type="hidden" name="category" value={category} />
+      {item && <input type="hidden" name="item_id" value={item.id} />}
+
+      <datalist id="dl-type">{(bundle.lists.item_type ?? []).map((x) => <option key={x} value={x} />)}</datalist>
+      <datalist id="dl-material">{(bundle.lists.material ?? []).map((x) => <option key={x} value={x} />)}</datalist>
+      <datalist id="dl-distribution">{(bundle.lists.distribution ?? []).map((x) => <option key={x} value={x} />)}</datalist>
+      <datalist id="dl-hall">{hallsHere.map((x) => <option key={x} value={x} />)}</datalist>
+      <datalist id="dl-zone">{(bundle.lists.zone ?? []).map((x) => <option key={x} value={x} />)}</datalist>
+
+      <section className={section}>
+        <h2 className={h2}>The item</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Field label="Item name" htmlFor="description" help="What sales and sponsors will call it, like “Visitor lanyards”.">
+            <input id="description" name="description" required maxLength={200} defaultValue={v('description')} className={inputCls} />
+          </Field>
+          <Field label="Type" htmlFor="item_type" help="Pick from the list or type your own.">
+            <input id="item_type" name="item_type" list="dl-type" defaultValue={v('item_type')} className={inputCls} />
+          </Field>
+        </div>
+        <Field label="What’s included" htmlFor="wording" className="mt-4" help="What the sponsor gets, in a line or two sales can quote.">
+          <textarea id="wording" name="wording" rows={2} defaultValue={v('wording')} className={textareaCls} />
+        </Field>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="Material / spec" htmlFor="material" help="Size, colours, print method.">
+            <input id="material" name="material" list="dl-material" defaultValue={v('material')} className={inputCls} />
+          </Field>
+          <Field label="Quantity" htmlFor="qty"><input id="qty" name="qty" type="number" min={0} inputMode="numeric" defaultValue={v('qty')} className={inputCls} /></Field>
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className={h2}>Price and cost</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Cost price per unit (£)" htmlFor="unit_cost" help="What it costs to make. Total cost = cost price × quantity.">
+            <input id="unit_cost" name="unit_cost" inputMode="decimal" defaultValue={v('unit_cost')} className={inputCls} />
+          </Field>
+          <Field label="Rate card price (£)" htmlFor="rate_card_price" help="What sales ask for the whole package.">
+            <input id="rate_card_price" name="rate_card_price" inputMode="decimal" defaultValue={v('rate_card_price')} className={inputCls} />
+          </Field>
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className={h2}>Sale</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Sold to" htmlFor="sponsor_id" help="Leave as For sale until it’s sold. Anyone except external people can also mark it sold from the item’s page.">
+            <select id="sponsor_id" name="sponsor_id" defaultValue={item ? v('sponsor_id') : defaultSponsorId ?? ''} className={inputCls}>
+              <option value="">For sale</option>
+              {bundle.sponsors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Sale price (£)" htmlFor="sale_price" help="What the sponsor paid. Only once it’s sold.">
+            <input id="sale_price" name="sale_price" inputMode="decimal" defaultValue={v('sale_price')} className={inputCls} />
+          </Field>
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className={h2}>Distribution</h2>
+        <div className={grid}>
+          <Field label="Distribution method" htmlFor="distribution_method" help="How it reaches visitors.">
+            <input id="distribution_method" name="distribution_method" list="dl-distribution" defaultValue={v('distribution_method')} className={inputCls} />
+          </Field>
+          <Field label="Hall" htmlFor="hall"><input id="hall" name="hall" list="dl-hall" defaultValue={v('hall')} className={inputCls} /></Field>
+          <Field label="Zone / area" htmlFor="zone"><input id="zone" name="zone" list="dl-zone" defaultValue={v('zone')} className={inputCls} /></Field>
+          <Field label="Exact spot" htmlFor="location_detail"><input id="location_detail" name="location_detail" defaultValue={v('location_detail')} placeholder="Desk, theatre, entrance…" className={inputCls} /></Field>
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className={h2}>Artwork</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Who supplies the artwork" htmlFor="artwork_by" help="Usually the sponsor’s logo. “Not required” starts sign-off as soon as it’s sold.">
+            <select id="artwork_by" name="artwork_by" defaultValue={v('artwork_by') || 'sponsor'} className={inputCls}>
+              {ARTWORK_BY.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Artwork due" htmlFor="artwork_due" help={defArt ? `Leave blank to use the show’s default (${fmtDate(defArt, 'long')}).` : 'Leave blank to use the show’s default.'}>
+            <input id="artwork_due" name="artwork_due" type="date" defaultValue={v('artwork_due')} className={inputCls} />
+          </Field>
+          <Field label="Link to full-size files (optional)" htmlFor="artwork_link" help="SharePoint, Dropbox or WeTransfer link to print-ready files.">
+            <input id="artwork_link" name="artwork_link" type="url" placeholder="https://" defaultValue={v('artwork_link')} className={inputCls} />
+          </Field>
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className={h2}>Ordering and delivery</h2>
+        <div className={grid}>
+          <Field label="Supplier" htmlFor="supplier_id">
+            <select id="supplier_id" name="supplier_id" defaultValue={v('supplier_id')} className={inputCls}>
+              <option value="">Not chosen</option>
+              <SupplierOptions suppliers={bundle.suppliers} category={category} />
+            </select>
+          </Field>
+          <Field label="Order deadline" htmlFor="print_deadline" help={defPrint ? `Blank uses ${fmtDate(defPrint, 'long')}.` : undefined}>
+            <input id="print_deadline" name="print_deadline" type="date" defaultValue={v('print_deadline')} className={inputCls} />
+          </Field>
+          <Field label="Delivery to venue" htmlFor="delivery_date"><input id="delivery_date" name="delivery_date" type="date" defaultValue={v('delivery_date')} className={inputCls} /></Field>
+          <Field label="Hand-out date" htmlFor="install_date" help="When it’s given out or put in place."><input id="install_date" name="install_date" type="date" defaultValue={v('install_date')} className={inputCls} /></Field>
+          <Field label="PO number" htmlFor="po_number"><input id="po_number" name="po_number" defaultValue={v('po_number')} className={inputCls} /></Field>
+        </div>
+        <Field label="Notes" htmlFor="notes" className="mt-4">
+          <textarea id="notes" name="notes" rows={3} defaultValue={v('notes')} className={textareaCls} />
+        </Field>
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <SubmitButton>{item ? 'Save changes' : 'Add item'}</SubmitButton>
+        <ButtonLink href={cancelHref} variant="ghost">Cancel</ButtonLink>
+      </div>
+    </ActionForm>
+  );
+}
+
+function SignageForm({ bundle, category, item, cancelHref, defaultSponsorId }: {
   bundle: Bundle; category: Category; item?: ItemRow; cancelHref: string; defaultSponsorId?: string;
 }) {
   const ev = bundle.event;

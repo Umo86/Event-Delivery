@@ -23,7 +23,12 @@ export default async function NewItemPage(props: { params: Promise<{ cat: string
   if (!bundle) return <NoEvent />;
   return (
     <>
-      <PageHeader title={`Add ${category.label.toLowerCase()}`} subtitle={`${event.name}. It gets the next ${category.prefix} number automatically.`} />
+      {category.key === 'sponsor_item' ? (
+        <PageHeader title="Add a sponsorship item"
+          subtitle={`${event.name}. Something the show sells to sponsors. It gets the next SI number and stays for sale until it’s sold.`} />
+      ) : (
+        <PageHeader title={`Add ${category.label.toLowerCase()}`} subtitle={`${event.name}. It gets the next ${category.prefix} number automatically.`} />
+      )}
       <ItemForm bundle={bundle} category={category.key} cancelHref={`/schedule/${category.slug}`}
         defaultSponsorId={bundle.sponsors.some((s) => s.id === sponsor) ? sponsor : undefined} />
     </>

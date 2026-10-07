@@ -114,7 +114,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
                 </tr>
               </thead>
               <tbody>
-                {([['os', 'Organiser signage'], ['ss', 'Sponsor signage'], ['si', 'Sponsor items']] as const).map(([k, label]) => (
+                {([['os', 'Organiser signage'], ['ss', 'Sponsor signage'], ['si', 'Sponsorship items']] as const).map(([k, label]) => (
                   <tr key={k}>
                     <td className="py-1.5 pr-3 font-semibold text-ink">{label}</td>
                     {/* Keyed by the saved date so "Suggest" replaces what's shown */}

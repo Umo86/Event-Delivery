@@ -29,7 +29,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ person?
       order by lower(u.full_name)`,
     sql<{ id: string; actor_name: string; message: string; created_at: Date }[]>`
       select id, actor_name, message, created_at from activity where kind = 'access' order by created_at desc limit 40`,
-    sql<DepartmentRow[]>`select id, name, position, archived from departments where not archived order by position, lower(name)`,
+    sql<DepartmentRow[]>`select id, name, position, archived, external from departments where not archived order by position, lower(name)`,
     sql<{ user_id: string; department_id: string }[]>`select user_id, department_id from user_departments`,
   ]);
   const deptIds = new Map<string, string[]>();

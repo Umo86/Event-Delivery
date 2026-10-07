@@ -59,6 +59,16 @@ export function defaultPrintDeadline(event: EventRow, category: Category): strin
   return category === 'organiser_signage' ? event.print_due_os : category === 'sponsor_signage' ? event.print_due_ss : event.print_due_si;
 }
 
+/** A sponsorship item is for sale until it's sold to a sponsor (one sponsor per item). */
+export function isForSale(item: Pick<ItemRow, 'category' | 'sponsor_id' | 'cancelled'>): boolean {
+  return item.category === 'sponsor_item' && !item.sponsor_id && !item.cancelled;
+}
+
+/** Lines in the sign-off and production workflow: not cancelled, and not a sponsorship item still for sale. */
+export function inWorkflow(group: Group): boolean {
+  return group !== 'cancelled' && group !== 'for_sale';
+}
+
 const NOT_SET = 'Account manager not set';
 const NOT_ASSIGNED = 'Not assigned';
 
@@ -71,6 +81,9 @@ export function computeItemState(
   const { event, today } = ctx;
   const ordered = [...ctx.stages].filter((s) => !s.archived).sort((a, b) => a.position - b.position);
   const sponsor = item.sponsor_id ? ctx.sponsorsById.get(item.sponsor_id) ?? null : null;
+  // A sponsorship item nobody has bought yet: no artwork, sign-off or deadlines until it's sold.
+  const forSale = isForSale(item);
+  const sponsorship = item.category === 'sponsor_item';
   const name = (id: string | null | undefined) => (id ? ctx.userNames.get(id) ?? null : null);
 
   // Current artwork version: 0 when artwork isn't required and none has been uploaded.
@@ -107,7 +120,7 @@ export function computeItemState(
     }
     applicableCount += 1;
     const d = latest.get(s.id) ?? null;
-    if (!artIn) {
+    if (!artIn || forSale) {
       stages.push({ stage: s, applies, kind: 'locked', decision: d });
       continue;
     }
@@ -124,13 +137,14 @@ export function computeItemState(
       stages.push({ stage: s, applies, kind: d && d.decision === 'approved' ? 'stale' : 'current', decision: d });
     }
   }
-  const fullyApproved = artIn && !current;
+  const fullyApproved = artIn && !current && !forSale;
   const currentDecision = current ? latest.get(current.id) ?? null : null;
   const staleApproval = !!currentDecision && currentDecision.decision === 'approved';
 
   // Group
   let group: Group;
   if (item.cancelled) group = 'cancelled';
+  else if (forSale) group = 'for_sale';
   else if (!artIn) group = 'awaiting_artwork';
   else if (!current) group = item.production_status ?? 'approved';
   else if (currentDecision?.decision === 'changes_requested') group = 'changes_requested';
@@ -140,6 +154,7 @@ export function computeItemState(
 
   const phase =
     group === 'cancelled' ? 9
+      : group === 'for_sale' ? 0
       : group === 'awaiting_artwork' ? 1
         : group === 'in_signoff' ? 2
           : group === 'changes_requested' || group === 'rejected' || group === 'on_hold' ? 3
@@ -193,7 +208,7 @@ export function computeItemState(
 
   // Flag (most serious wins)
   let flag: Flag | null = null;
-  if (!item.cancelled) {
+  if (!item.cancelled && !forSale) {
     if (item.production_status && !fullyApproved) flag = 'not_signed_off';
     else if (group !== 'installed') {
       if (due && due < today) flag = 'overdue';
@@ -219,7 +234,8 @@ export function computeItemState(
     case 'sent_to_supplier': statusLabel = 'Sent to supplier'; break;
     case 'in_production': statusLabel = 'In production'; break;
     case 'delivered': statusLabel = 'Delivered to venue'; break;
-    case 'installed': statusLabel = 'Installed'; break;
+    case 'installed': statusLabel = sponsorship ? 'Handed out' : 'Installed'; break;
+    case 'for_sale': statusLabel = 'For sale'; break;
     default: statusLabel = 'Cancelled';
   }
 
@@ -236,7 +252,7 @@ export function computeItemState(
     case 'approved': action = 'Send to supplier / place order'; break;
     case 'sent_to_supplier':
     case 'in_production': action = 'Chase delivery'; break;
-    case 'delivered': action = 'Install / put in place'; break;
+    case 'delivered': action = sponsorship ? 'Hand out / put in place' : 'Install / put in place'; break;
   }
 
   return {

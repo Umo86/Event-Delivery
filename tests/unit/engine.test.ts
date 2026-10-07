@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeItemState, type EngineContext } from '@/lib/domain/engine';
-import { allowedDecisions, canDecideStage } from '@/lib/domain/permissions';
+import { computeItemState, inWorkflow, isForSale, type EngineContext } from '@/lib/domain/engine';
+import { allowedDecisions, canDecideStage, canSell } from '@/lib/domain/permissions';
 import type { DecisionRow, EventRow, ItemRow, SponsorRow, StageRow, VersionRow } from '@/lib/domain/types';
 import { addDays } from '@/lib/dates';
 
@@ -56,6 +56,7 @@ function item(over: Partial<ItemRow> = {}): ItemRow {
     item_type: null, wording: null, hall: null, zone: null, location_detail: null, position: null, width_mm: null, height_mm: null,
     sides: null, qty: null, material: null, artwork_by: 'in_house', artwork_due: null, artwork_link: null, supplier_id: null,
     print_deadline: null, production_status: null, po_number: null, delivery_date: null, install_date: null, unit_cost: null,
+    rate_card_price: null, sale_price: null, distribution_method: null, sold_at: null, sold_by: null,
     cancelled: false, notes: null, created_by: null, created_at: at(-30), updated_at: at(-30), ...over,
   };
 }
@@ -295,6 +296,48 @@ describe('production and other states', () => {
       dec(it1, 's1', 1, 'approved', at(-5)), dec(it1, 's2', 1, 'approved', at(-4)),
     ], ctx({ stages }));
     expect(s.group).toBe('approved');
+  });
+});
+
+describe('sponsorship items', () => {
+  it('are for sale until sold: nobody is waiting, nothing is due and nothing flags', () => {
+    const it1 = item({ category: 'sponsor_item', artwork_by: 'sponsor', artwork_due: addDays(TODAY, -3) });
+    const s = computeItemState(it1, null, [], ctx());
+    expect(s.group).toBe('for_sale');
+    expect(s.phase).toBe(0);
+    expect(s.statusLabel).toBe('For sale');
+    expect(s.waitingOnLabel).toBe('');
+    expect(s.waitingOnUserIds).toEqual([]);
+    expect(s.due).toBeNull();
+    expect(s.flag).toBeNull();
+    expect(s.action).toBe('');
+    expect(s.stages.filter((x) => x.applies).every((x) => x.kind === 'locked')).toBe(true);
+    expect(allowedDecisions(s, 's1')).toEqual([]);
+    expect(inWorkflow(s.group)).toBe(false);
+  });
+  it('once sold, the sponsor’s artwork is chased through their account manager', () => {
+    const s = computeItemState(item({ category: 'sponsor_item', artwork_by: 'sponsor', sponsor_id: sponsorA.id }), null, [], ctx());
+    expect(s.group).toBe('awaiting_artwork');
+    expect(s.waitingOnUserIds).toEqual([USERS.am1]);
+    expect(s.due).toBe(event.art_due_si);
+    expect(inWorkflow(s.group)).toBe(true);
+  });
+  it('are handed out rather than installed', () => {
+    const base = { category: 'sponsor_item' as const, sponsor_id: sponsorA.id, artwork_by: 'not_required' as const };
+    expect(computeItemState(item({ ...base, production_status: 'installed' }), null, [], ctx({ stages: [] })).statusLabel).toBe('Handed out');
+    expect(computeItemState(item({ ...base, production_status: 'delivered' }), null, [], ctx({ stages: [] })).action).toBe('Hand out / put in place');
+  });
+  it('cancelled unsold items are cancelled, not for sale', () => {
+    const s = computeItemState(item({ category: 'sponsor_item', cancelled: true }), null, [], ctx());
+    expect(s.group).toBe('cancelled');
+    expect(isForSale({ category: 'sponsor_item', sponsor_id: null, cancelled: true })).toBe(false);
+    expect(isForSale({ category: 'sponsor_signage', sponsor_id: null, cancelled: false })).toBe(false);
+  });
+  it('everyone except external people can mark them sold', () => {
+    expect(canSell({ id: 'u', role: 'user', full_name: 'Sales person', is_external: false })).toBe(true);
+    expect(canSell({ id: 'x', role: 'user', full_name: 'Agency', is_external: true })).toBe(false);
+    expect(canSell({ id: 'm', role: 'manager', full_name: 'Manager in External', is_external: true })).toBe(true);
+    expect(canSell(null)).toBe(false);
   });
 });
 

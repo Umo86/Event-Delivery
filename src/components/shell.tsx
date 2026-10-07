@@ -39,7 +39,7 @@ function navFor(role: string): { group: string; items: NavItem[] }[] {
     { group: 'Signage', items: [
       { href: '/schedule/os', label: 'Organiser signage', icon: Signpost, key: 'os' },
       { href: '/schedule/ss', label: 'Sponsor signage', icon: Flag, key: 'ss' },
-      { href: '/schedule/si', label: 'Sponsor items', icon: Package, key: 'si' },
+      { href: '/schedule/si', label: 'Sponsorship items', icon: Package, key: 'si' },
     ] },
     { group: 'Show', items: [
       { href: '/sponsors', label: 'Sponsors', icon: Handshake, key: 'sponsors' },
