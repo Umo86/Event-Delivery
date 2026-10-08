@@ -1,13 +1,12 @@
-import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { fmtDateTime } from '@/lib/dates';
-import { ACCESS_LEVELS, accessLevel, canCancelInvite, personStatus, ROLE_TONE, STATUS_INFO } from '@/lib/domain/access';
+import { ACCESS_LEVELS, accessLevel, personStatus, ROLE_TONE, STATUS_INFO } from '@/lib/domain/access';
 import type { DepartmentRow, Role, SponsorRow, StageRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { Chip, Field, inputCls } from '@/components/ui';
-import { DetailsForm } from './details-form';
+import { Chip, inputCls } from '@/components/ui';
+import { DetailsSection, SignInSection } from '@/components/people/account-sections';
 import {
-  cancelInvite, changeAccess, saveSignoffDuties, sendNewPassword, setPersonActive, updatePersonDetails,
+  changeAccess, saveSignoffDuties,
 } from '@/app/actions/admin';
 import { setPersonDepartments } from '@/app/actions/departments';
 
@@ -48,12 +47,12 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
   open?: boolean;
 }) {
   const isMe = u.id === me;
+  const viewer = { id: me, superAdmin: meSuper, demo: meDemo };
   // Super admins can only be changed by other super admins, and never by the demo login
   const protectedSuper = u.is_super_admin && !isMe && (!meSuper || meDemo);
   const status = personStatus(u);
   const info = STATUS_INFO[status];
   const locked = !!u.locked_until && new Date(u.locked_until) > new Date();
-  const neverSignedIn = !u.last_login_at;
   const myStages = stages.filter((s) => s.approver_ids.includes(u.id));
   const mySponsors = sponsors.filter((s) => s.account_manager_id === u.id);
   const duties = [...myStages.map((s) => s.name), ...mySponsors.map((s) => s.name)];
@@ -78,75 +77,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
         </summary>
 
         <div className="grid gap-x-8 gap-y-6 border-t border-line bg-paper/50 px-4 py-4 lg:grid-cols-2">
-          {/* Sign-in */}
-          <section aria-label={`Sign-in for ${u.full_name}`} className="min-w-0">
-            <h3 className={h3}>Sign-in</h3>
-            <div className="space-y-1 text-[14px] text-ink-2">
-              {u.is_demo && (
-                <p className="font-semibold text-ink">
-                  {u.active
-                    ? 'The shared demo login. Its email and password are shown on the sign-in page, so anyone with the link can sign in with it. Deactivate it to take it off.'
-                    : 'The shared demo login. It’s deactivated, so it isn’t on the sign-in page and doesn’t work.'}
-                </p>
-              )}
-              {u.invited_at && !u.is_demo && (
-                <p>Invited by {u.invited_by_name ?? 'an admin'} on {fmtDateTime(u.invited_at)}.</p>
-              )}
-              {u.must_change_password && u.temp_password_expires_at && (
-                new Date(u.temp_password_expires_at) < new Date()
-                  ? <p className="font-semibold text-red-700">Their temporary password expired on {fmtDateTime(u.temp_password_expires_at)}. Make a new one below.</p>
-                  : <p>Their temporary password works until {fmtDateTime(u.temp_password_expires_at)}. They choose their own when they sign in.</p>
-              )}
-              {locked && <p className="font-semibold text-red-700">Locked out after too many wrong passwords. A new password unlocks the account.</p>}
-              {!u.active && <p>Deactivated: {first} can’t sign in.</p>}
-              {isMe && <p>This is you. Change your own password on <Link href="/account" className="font-semibold text-ink underline">Your account</Link>.</p>}
-              {protectedSuper && <p>{first} is a super admin, so only another super admin can change their sign-in, access or details.</p>}
-            </div>
-
-            {!isMe && !protectedSuper && (
-              <div className="mt-3 space-y-3">
-                {u.active && !u.is_demo && (
-                  <DetailsForm action={sendNewPassword}
-                    confirm={neverSignedIn ? undefined : `Reset ${u.full_name}’s password? They’ll be signed out, and you’ll get a temporary password to send them.`}>
-                    <input type="hidden" name="user_id" value={u.id} />
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <SubmitButton variant="secondary" small pendingText="Working…">{neverSignedIn ? 'New invite' : 'Reset password'}</SubmitButton>
-                      <span className={help}>{neverSignedIn
-                        ? 'Gives you a new invite email with a new temporary password. The old one stops working.'
-                        : 'Signs them out and gives you an email with a temporary password to send them.'}</span>
-                    </div>
-                  </DetailsForm>
-                )}
-                {/* One form for both directions, so its message stays on screen when the button flips */}
-                {(u.is_demo || !neverSignedIn || !u.active) && (
-                  <ActionForm action={setPersonActive}
-                    confirm={u.active
-                      ? u.is_demo
-                        ? 'Deactivate the demo login? It comes off the sign-in page and anyone using it is signed out.'
-                        : `Deactivate ${u.full_name}? They’ll be signed out straight away and can’t sign back in.`
-                      : undefined}>
-                    <input type="hidden" name="user_id" value={u.id} />
-                    <input type="hidden" name="active" value={u.active ? '0' : '1'} />
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <SubmitButton variant={u.active ? 'danger' : 'secondary'} small pendingText="Saving…">{u.active ? 'Deactivate' : 'Reactivate'}</SubmitButton>
-                      <span className={help}>{u.is_demo
-                        ? (u.active ? 'Takes the demo login off the sign-in page.' : 'Puts the demo login back on the sign-in page.')
-                        : (u.active ? 'Their name stays on everything they did.' : 'Lets them sign in again with their current password.')}</span>
-                    </div>
-                  </ActionForm>
-                )}
-                {canCancelInvite(u) && !u.is_demo && (
-                  <ActionForm action={cancelInvite} confirm={`Cancel the invite for ${u.full_name}? Their account will be removed.`}>
-                    <input type="hidden" name="user_id" value={u.id} />
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <SubmitButton variant="danger" small pendingText="Cancelling…">Cancel invite</SubmitButton>
-                      <span className={help}>Removes the account. You can invite them again later.</span>
-                    </div>
-                  </ActionForm>
-                )}
-              </div>
-            )}
-          </section>
+          <SignInSection u={u} viewer={viewer} />
 
           {/* Access level */}
           <section aria-label={`Access level for ${u.full_name}`} className="min-w-0">
@@ -243,22 +174,7 @@ export function PersonRow({ u, me, meSuper, meDemo, event, stages, sponsors, nam
             </section>
           )}
 
-          {/* Details */}
-          <section aria-label={`Details for ${u.full_name}`} className="min-w-0">
-            <h3 className={h3}>Details</h3>
-            {protectedSuper ? <p className={help}>Only another super admin can change these.</p> : (
-            <ActionForm action={updatePersonDetails} className="grid items-end gap-3 sm:grid-cols-2">
-              <input type="hidden" name="user_id" value={u.id} />
-              <Field label="Name" htmlFor={`pn-${u.id}`}><input id={`pn-${u.id}`} name="full_name" required defaultValue={u.full_name} className={inputCls} /></Field>
-              <Field label="Job title" htmlFor={`pt-${u.id}`}><input id={`pt-${u.id}`} name="job_title" defaultValue={u.job_title ?? ''} className={inputCls} /></Field>
-              <Field label="Email (used to sign in)" htmlFor={`pe-${u.id}`} className="sm:col-span-2"
-                help={u.is_demo ? 'Set in the deployment settings.' : undefined}>
-                <input id={`pe-${u.id}`} name="email" type="email" required defaultValue={u.email} readOnly={u.is_demo} className={inputCls} />
-              </Field>
-              <div><SubmitButton variant="secondary" small>Save details</SubmitButton></div>
-            </ActionForm>
-            )}
-          </section>
+          <DetailsSection u={u} viewer={viewer} />
         </div>
       </details>
     </li>

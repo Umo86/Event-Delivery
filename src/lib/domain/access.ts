@@ -14,8 +14,8 @@ export const ACCESS_LEVELS: { key: Role; label: string; summary: string; email: 
   {
     key: 'manager',
     label: 'Manager',
-    summary: 'Adds, edits and deletes signage, changes status, creates shows, adds people to the team, manages sponsors, suppliers and sign-off setup, and signs off their stages.',
-    email: 'You can add, edit and remove signage, change status, create shows, add people to the team and sign off the stages you look after',
+    summary: 'Adds, edits and deletes signage, changes status, creates shows, manages the team (except super admins), sponsors, suppliers and sign-off setup, and signs off their stages.',
+    email: 'You can add, edit and remove signage, change status, create shows, manage the team and sign off the stages you look after',
   },
   {
     key: 'user',
@@ -46,8 +46,8 @@ export const ABILITIES: { label: string; super_admin: string; manager: string; u
   { label: 'Mark sponsorship items sold', super_admin: 'Yes', manager: 'Yes', user: 'Yes, unless external' },
   { label: 'Create and manage shows', super_admin: 'Yes', manager: 'Yes', user: 'No' },
   { label: 'Sponsors, suppliers, sign-off setup, dropdown lists', super_admin: 'Yes', manager: 'Yes', user: 'No' },
-  { label: 'Add people, choose their departments and what they approve', super_admin: 'Yes', manager: 'As Managers or Users', user: 'No' },
-  { label: 'Super Admins, password resets, deactivating people, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },
+  { label: 'Add people, change their details, passwords, departments and approvals, deactivate them', super_admin: 'Everyone', manager: 'Managers and Users', user: 'No' },
+  { label: 'Super Admins, sponsors’ account managers, platform settings', super_admin: 'Yes', manager: 'No', user: 'No' },
 ];
 
 export type PersonStatus = 'active' | 'invited' | 'invite_expired' | 'temp_password' | 'temp_expired' | 'deactivated';

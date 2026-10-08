@@ -5,7 +5,7 @@ import type postgres from 'postgres';
 import { db, type Sql } from '@/lib/db';
 import { bool, isUuid, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor, type CurrentUser } from '@/lib/auth/session';
-import { hashPassword, tempPassword } from '@/lib/auth/password';
+import { hashPassword, PASSWORD_MIN, tempPassword } from '@/lib/auth/password';
 import { logActivity } from '@/lib/activity';
 import { getAppName } from '@/lib/data/load';
 import { ACCESS_LEVELS, accessLevel, personStatus, TEMP_PASSWORD_DAYS } from '@/lib/domain/access';
@@ -15,9 +15,10 @@ import { SETTING, writeSetting } from '@/lib/settings';
 import { listText } from '@/lib/text';
 import { appOrigin } from '@/lib/url';
 
-// People: invitations, access levels and sign-off responsibilities (Admin › People and Show › Team), plus the
-// sponsor links switch on Admin › Platform. Managers can add people as Managers or Users, handle invites nobody
-// has used yet, and choose departments and approvers; everything else here is for super admins.
+// People: invitations, sign-in, details, access levels and sign-off responsibilities (Admin › People and Show › Team),
+// plus the sponsor links switch on Admin › Platform. Managers can do all of it for Managers and Users: add them,
+// change their details and passwords, deactivate them, and choose their departments and what they approve.
+// Super admins, the demo login and sponsors' account managers are left to super admins.
 // Every change is written to the access log. The platform doesn't send email: an invite or reset gives the admin
 // a ready-made message with the temporary password to send from their own mailbox.
 
@@ -241,7 +242,7 @@ export async function invitePerson(_prev: ActionResult | null, fd: FormData): Pr
 
 /**
  * A new invite for someone who hasn't signed in yet, or a password reset for someone who has.
- * Managers can only make new invites (for Managers and Users); resets are for super admins.
+ * Managers can do this for Managers and Users; only super admins can for a super admin.
  */
 export async function sendNewPassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
@@ -251,7 +252,6 @@ export async function sendNewPassword(_prev: ActionResult | null, fd: FormData):
     if (p.id === me.id) throw new UserError('Change your own password on the Your account page.');
     if (p.is_demo) throw new UserError('The demo login’s password comes from the deployment settings and is shown on the sign-in page.');
     guardSuperAdmin(me, p);
-    if (p.last_login_at && !me.is_super_admin) throw new UserError(`${p.full_name} has already signed in, so only a super admin can reset their password.`);
     if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
     const kind: InviteKind = p.last_login_at ? 'reset' : 'invite';
     const { password, hash, expiresAt } = await newTempPassword();
@@ -293,6 +293,39 @@ export async function cancelInvite(_prev: ActionResult | null, fd: FormData): Pr
   });
 }
 
+/**
+ * A password typed by a manager or super admin, instead of a generated one. By default the person still chooses
+ * their own when they next sign in (and the password stops working after the usual temporary-password time).
+ */
+export async function setPersonPassword(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await teamActor();
+    const sql = await db();
+    const p = await findPerson(sql, fd);
+    if (p.id === me.id) throw new UserError('Change your own password on the Your account page.');
+    if (p.is_demo) throw new UserError('The demo login’s password comes from the deployment settings and is shown on the sign-in page.');
+    guardSuperAdmin(me, p);
+    if (!p.active) throw new UserError(`Reactivate ${p.full_name} first.`);
+    const password = String(fd.get('password') ?? '');
+    if (password.length < PASSWORD_MIN) throw new UserError(`Choose a password of at least ${PASSWORD_MIN} characters.`);
+    if (password.length > 200) throw new UserError('That password is too long.');
+    const mustChange = bool(fd, 'must_change');
+    const expiresAt = mustChange ? new Date(Date.now() + TEMP_PASSWORD_DAYS * 86400000) : null;
+    await sql`update users set password_hash = ${await hashPassword(password)}, must_change_password = ${mustChange},
+                temp_password_expires_at = ${expiresAt}, failed_logins = 0, locked_until = null where id = ${p.id}`;
+    await sql`delete from sessions where user_id = ${p.id}`;
+    await audit(sql, me, `Set a new password for ${p.full_name}${mustChange ? '' : ' that they can keep'}`);
+    refresh();
+    const first = firstName(p.full_name);
+    return {
+      ok: true,
+      message: mustChange
+        ? `${first}’s password is set and they’ve been signed out. Tell them the new password: it works for ${TEMP_PASSWORD_DAYS} days, and they choose their own when they sign in.`
+        : `${first}’s password is set and they’ve been signed out. Tell them the new password: they can keep using it.`,
+    };
+  });
+}
+
 // ---- People -----------------------------------------------------------------------------
 
 /** Super admins can give any access level. Managers can switch other people between Manager and User. */
@@ -323,14 +356,16 @@ export async function changeAccess(_prev: ActionResult | null, fd: FormData): Pr
   });
 }
 
+/** Name, job title and sign-in email. Managers can change anyone's except a super admin's and the demo login's. */
 export async function updatePersonDetails(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('super_admin');
+    const me = await teamActor();
     const sql = await db();
     const p = await findPerson(sql, fd);
     const name = required(fd, 'full_name', 'Name', 120);
     const email = readEmail(fd);
     const title = str(fd, 'job_title', 120);
+    if (p.is_demo && !me.is_super_admin) throw new UserError('Only a super admin can change the demo login.');
     if (p.is_demo && email !== p.email.toLowerCase()) throw new UserError('The demo login’s email comes from the deployment settings.');
     guardSuperAdmin(me, p);
     if ((await sql`select 1 from users where lower(email) = ${email} and id <> ${p.id}`).length) {
@@ -345,16 +380,18 @@ export async function updatePersonDetails(_prev: ActionResult | null, fd: FormDa
   });
 }
 
+/** Deactivating signs someone out and stops them signing in; reactivating lets them back in. Managers can for Managers and Users. */
 export async function setPersonActive(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
   return run(async () => {
-    const me = await actor('super_admin');
+    const me = await teamActor();
     const sql = await db();
     const p = await findPerson(sql, fd);
     const active = bool(fd, 'active');
     if (p.active === active) return { ok: true };
+    if (p.is_demo && !me.is_super_admin) throw new UserError('Only a super admin can switch the demo login on or off.');
     guardSuperAdmin(me, p);
     if (!active) {
-      if (p.id === me.id) throw new UserError('You can’t deactivate your own account. Ask another super admin.');
+      if (p.id === me.id) throw new UserError(`You can’t deactivate your own account. Ask ${me.is_super_admin ? 'another' : 'a'} super admin.`);
       if (p.role === 'super_admin' && (await otherActiveSuperAdmins(sql, p.id)) === 0) throw new UserError('There must always be at least one active Super Admin.');
     }
     await sql`update users set active = ${active} where id = ${p.id}`;

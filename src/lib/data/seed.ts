@@ -1,6 +1,8 @@
 import 'server-only';
 import type { Sql } from '@/lib/db';
-import { addDays } from '@/lib/dates';
+import { suggestedDeadlines } from '@/lib/domain/deadlines';
+
+export { suggestedDeadlines };
 
 export const DEFAULT_STAGES = [
   { name: 'Operations', department: 'Operations', uses_account_manager: false, applies_os: true, applies_ss: true, applies_si: true },
@@ -8,19 +10,6 @@ export const DEFAULT_STAGES = [
   { name: 'Sponsor', department: null, uses_account_manager: true, applies_os: false, applies_ss: true, applies_si: true },
   { name: 'Final sign-off', department: 'Operations', uses_account_manager: false, applies_os: true, applies_ss: true, applies_si: true },
 ];
-
-/** Suggested default deadlines, counted back from the opening day. */
-export function suggestedDeadlines(showOpen: string | null) {
-  if (!showOpen) return { art_due_os: null, print_due_os: null, art_due_ss: null, print_due_ss: null, art_due_si: null, print_due_si: null };
-  return {
-    art_due_os: addDays(showOpen, -42),
-    print_due_os: addDays(showOpen, -21),
-    art_due_ss: addDays(showOpen, -56),
-    print_due_ss: addDays(showOpen, -21),
-    art_due_si: addDays(showOpen, -70),
-    print_due_si: addDays(showOpen, -56),
-  };
-}
 
 export async function createDefaultEvent(sql: Sql, _adminId: string): Promise<string> {
   const showOpen = '2027-05-11';

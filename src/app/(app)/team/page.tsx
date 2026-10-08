@@ -23,22 +23,26 @@ export default async function TeamPage(props: { searchParams: Promise<{ person?:
   const sp = await props.searchParams;
   const sql = await db();
   const event = await getCurrentEvent();
-  const [bundle, team, departments, memberships, [{ off }]] = await Promise.all([
+  const [bundle, everybody, departments, memberships] = await Promise.all([
     event ? loadBundle(event.id) : Promise.resolve(null),
+    // Deactivated people come last, so they can be reactivated from the same list
     sql<TeamPerson[]>`
-      select id, email, full_name, job_title, role, active, must_change_password, last_login_at, temp_password_expires_at, is_demo
-      from users where active order by lower(full_name)`,
+      select u.id, u.email, u.full_name, u.job_title, u.role, u.active, u.must_change_password, u.last_login_at, u.temp_password_expires_at,
+             u.locked_until, u.invited_at, inv.full_name as invited_by_name, u.is_demo
+      from users u left join users inv on inv.id = u.invited_by
+      order by u.active desc, lower(u.full_name)`,
     sql<DepartmentRow[]>`select id, name, position, archived, external from departments where not archived order by position, lower(name)`,
     sql<{ user_id: string; department_id: string }[]>`select user_id, department_id from user_departments`,
-    sql<{ off: number }[]>`select count(*)::int as off from users where not active`,
   ]);
+  const team = everybody.filter((u) => u.active);
+  const off = everybody.length - team.length;
 
   const deptIds = new Map<string, string[]>();
   for (const m of memberships) (deptIds.get(m.user_id) ?? deptIds.set(m.user_id, []).get(m.user_id)!).push(m.department_id);
   // Everyone ever invited, so approvers who've since been deactivated still show by name
   const everyone = new Map((bundle?.users ?? []).map((u) => [u.id, u]));
   const names = new Map([...everyone].map(([id, u]) => [id, u.full_name]));
-  for (const u of team) names.set(u.id, u.full_name);
+  for (const u of everybody) names.set(u.id, u.full_name);
   const byName = (a: string, b: string) => (names.get(a) ?? '').localeCompare(names.get(b) ?? '');
   const stages = (bundle?.stages ?? []).filter((s) => !s.uses_account_manager)
     .map((s) => ({ ...s, approver_ids: [...s.approver_ids].sort(byName) }));
@@ -56,6 +60,7 @@ export default async function TeamPage(props: { searchParams: Promise<{ person?:
     `${counts.manager} manager${counts.manager === 1 ? '' : 's'}`,
     counts.user ? `${counts.user} user${counts.user === 1 ? '' : 's'}` : null,
     counts.waiting ? `${counts.waiting} waiting to sign in` : null,
+    off ? `${off} deactivated` : null,
   ].filter(Boolean).join(', ');
   const noDept = team.filter((u) => !(deptIds.get(u.id) ?? []).some((id) => departments.some((d) => d.id === id)));
 
@@ -87,19 +92,14 @@ export default async function TeamPage(props: { searchParams: Promise<{ person?:
               <span>Departments</span>
               {show && <span>Approver in {show.name}</span>}
             </div>
+            {/* One list, so a row keeps its message when someone is deactivated and moves to the end */}
             <ul>
-              {team.map((u) => (
+              {everybody.map((u, i) => (
                 <TeamRow key={u.id} u={u} me={{ id: me.id, superAdmin: me.is_super_admin, demo: me.is_demo }} event={show}
                   stages={stages} sponsors={sponsors} departments={departments} deptIds={deptIds.get(u.id) ?? []} names={names}
-                  open={sp.person === u.id} />
+                  open={sp.person === u.id} firstDeactivated={!u.active && (i === 0 || everybody[i - 1].active)} />
               ))}
             </ul>
-            {off > 0 && (
-              <p className="border-t border-line px-4 py-2.5 text-[13.5px] text-muted">
-                {peopleCount(off)} with a deactivated account {off === 1 ? 'isn’t' : 'aren’t'} listed.{' '}
-                {me.is_super_admin ? <Link href="/admin" className={sideLink}>See them in Admin › People</Link> : 'A super admin can reactivate them.'}
-              </p>
-            )}
           </Panel>
         </div>
 
@@ -120,7 +120,7 @@ export default async function TeamPage(props: { searchParams: Promise<{ person?:
                           return (
                             <span key={id}>
                               {i > 0 && ', '}
-                              {u?.active ? <Link href={memberHref(id)} className="text-ink underline-offset-2 hover:underline">{names.get(id)}</Link> : names.get(id) ?? 'someone'}
+                              {u ? <Link href={memberHref(id)} className="text-ink underline-offset-2 hover:underline">{names.get(id)}</Link> : 'someone'}
                               {problem && <span className="font-semibold text-red-700"> ({problem})</span>}
                             </span>
                           );

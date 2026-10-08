@@ -55,19 +55,68 @@ test('a new show copies stages and sponsors, and people can switch between shows
   await expect(page).toHaveURL(/\/shows$/);
   await page.getByRole('link', { name: 'New show' }).click();
   await expect(page).toHaveURL(/\/shows\/new$/);
+  const step = (title: string) => page.locator('li').filter({ has: page.getByRole('heading', { name: title, level: 2 }) });
+  const progress = (text: string) => expect(page.getByText(text, { exact: true })).toBeVisible();
+
+  // One step at a time, each saying what to do
+  await progress('Step 1 of 7: Name and venue');
+  await page.getByRole('button', { name: 'Next: build-up' }).click();
+  await expect(page.getByText('Give the show a name to carry on.')).toBeVisible();
   await page.fill('#ne-name', 'UKCW Birmingham 2027');
   await page.selectOption('#ne-venue', 'NEC Birmingham');
-  await page.fill('#ne-build', '2027-09-25');
-  await page.fill('#ne-open', '2027-09-28');
-  await page.fill('#ne-close', '2027-09-30');
-  await page.fill('#ne-breakdown', '2027-10-01');
+  await page.getByRole('button', { name: 'Next: build-up' }).click();
+
+  // Picking a day moves straight on, and each calendar starts from the date before it
+  await progress('Step 2 of 7: Build-up starts');
+  await expect(page.getByText('Pick the first day contractors are on site.')).toBeVisible();
+  await page.getByLabel('Month', { exact: true }).selectOption('9');
+  await page.getByLabel('Year', { exact: true }).selectOption('2027');
+  await page.getByRole('button', { name: 'Saturday 25 September 2027' }).click();
+  await progress('Step 3 of 7: Opening day');
+  await expect(step('Build-up starts')).toContainText('Sat 25 Sep 2027');
+  await expect(page.getByText('The calendar starts from the build-up date, Sat 25 Sep 2027. Days before it are greyed out.')).toBeVisible();
+  await expect(page.getByLabel('Month', { exact: true })).toHaveValue('9');
+  await expect(page.getByRole('button', { name: 'Friday 24 September 2027' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Tuesday 28 September 2027' }).click();
+  await progress('Step 4 of 7: Closing day');
+  await expect(page.getByRole('button', { name: 'Monday 27 September 2027' })).toBeDisabled();
+  await page.screenshot({ path: test.info().outputPath('new-show-calendar.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Thursday 30 September 2027' }).click();
+  await progress('Step 5 of 7: Breakdown ends');
+  await expect(step('Closing day')).toContainText('Thu 30 Sep 2027 (3 show days)');
+  // Breakdown can't be before the closing day, whether it's picked or typed
+  await expect(page.getByRole('button', { name: 'Wednesday 29 September 2027' })).toBeDisabled();
+  await page.fill('#ne-breakdown', '2027-09-29');
+  await page.getByRole('button', { name: 'Next: copy from a past show' }).click();
+  await expect(page.getByText('Pick Thu 30 Sep 2027 or later: that’s the closing day.')).toBeVisible();
+  await page.getByRole('button', { name: 'Friday 1 October 2027' }).click();
+
+  await progress('Step 6 of 7: Copy from a past show');
   await expect(page.locator('#ne-copy option:checked')).toHaveText('UKCW London 2027');
   await page.getByLabel('Also copy the sponsor list').check();
-  // Breakdown can't be before the closing day
-  await page.fill('#ne-breakdown', '2027-09-29');
-  await page.getByRole('button', { name: 'Create show' }).click();
-  await expect(errorMessage(page, 'Breakdown must end on or after the closing day.')).toBeVisible();
-  await page.fill('#ne-breakdown', '2027-10-01');
+  await page.getByRole('button', { name: 'Next: check and create' }).click();
+
+  // Everything on one page before it's created, with the deadlines worked out
+  await progress('Step 7 of 7: Check and create');
+  const review = step('Check and create');
+  await expect(review).toContainText('UKCW Birmingham 2027, NEC Birmingham');
+  await expect(review).toContainText('UKCW London 2027, with its sponsor list');
+  await expect(review).toContainText('Sat 25 Sep 2027 to Mon 27 Sep 2027 (3 days)');
+  await expect(review).toContainText('Tue 28 Sep 2027 to Thu 30 Sep 2027 (3 days)');
+  await expect(review).toContainText('Fri 1 Oct 2027 (1 day)');
+  await expect(review.locator('tr', { hasText: 'Organiser signage artwork due' })).toContainText('Tue 17 Aug 2027');
+
+  // Moving the opening day past the closing day clears the closing day, which then asks again
+  await page.getByRole('button', { name: 'Change opening day' }).click();
+  await page.getByRole('button', { name: 'Friday 1 October 2027' }).click();
+  await progress('Step 4 of 7: Closing day');
+  await expect(page.getByText('Pick the closing day again: the one you had was before the new opening day.')).toBeVisible();
+  await page.getByRole('button', { name: 'Change opening day' }).click();
+  await page.getByRole('button', { name: 'Tuesday 28 September 2027' }).click();
+  await progress('Step 4 of 7: Closing day');
+  await page.getByRole('button', { name: 'Thursday 30 September 2027' }).click();
+  await progress('Step 7 of 7: Check and create'); // everything else was already done
+  await page.screenshot({ path: test.info().outputPath('new-show-review.png'), fullPage: true });
   await page.getByRole('button', { name: 'Create show' }).click();
   await expect(page).toHaveURL(/\/settings\?created=1/);
   await expect(page.getByText('Show created. Check its dates and deadlines below.')).toBeVisible();

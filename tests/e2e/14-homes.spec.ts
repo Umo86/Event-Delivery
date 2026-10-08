@@ -56,8 +56,19 @@ test('a manager can set up a new show and manage it from All shows', async ({ pa
   await panel(page, 'Your shows').getByRole('link', { name: 'New show' }).click();
   await expect(page).toHaveURL(/\/shows\/new$/);
   await page.fill('#ne-name', 'UKCW Manchester 2028');
-  await page.fill('#ne-open', '2028-03-14');
-  await page.fill('#ne-close', '2028-03-16');
+  await page.keyboard.press('Enter'); // Enter moves on too
+  // Typing a date works as well as the calendar
+  await page.fill('#ne-build', '2028-03-11');
+  await page.getByRole('button', { name: 'Next: opening day' }).click();
+  // A past show's timings can be reused in one go
+  const current = page.locator('li[aria-current="step"]');
+  await expect(current).toContainText('Same timings as UKCW Birmingham 2027?');
+  await expect(current).toContainText('Opens Tue 14 Mar 2028, closes Thu 16 Mar 2028, breakdown ends Fri 17 Mar 2028.');
+  await current.getByRole('button', { name: 'Use these dates' }).click();
+  await expect(page.getByText('Step 6 of 7: Copy from a past show', { exact: true })).toBeVisible();
+  await expect(page.locator('#ne-copy option:checked')).toHaveText('UKCW London 2027');
+  await page.getByRole('button', { name: 'Next: check and create' }).click();
+  await expect(page.locator('li[aria-current="step"]')).toContainText('Tue 14 Mar 2028 to Thu 16 Mar 2028 (3 days)');
   await page.getByRole('button', { name: 'Create show' }).click();
   await expect(page).toHaveURL(/\/settings\?created=1/);
   await expect(page.getByText('Show created. Check its dates and deadlines below.')).toBeVisible();
