@@ -118,8 +118,13 @@ test('a new show copies stages and sponsors, and people can switch between shows
   await progress('Step 7 of 7: Check and create'); // everything else was already done
   await page.screenshot({ path: test.info().outputPath('new-show-review.png'), fullPage: true });
   await page.getByRole('button', { name: 'Create show' }).click();
-  await expect(page).toHaveURL(/\/settings\?created=1/);
-  await expect(page.getByText('Show created. Check its dates and deadlines below.')).toBeVisible();
+  // Straight on to setting it up; everything came across from London, so it's ready to go
+  await expect(page).toHaveURL(/\/shows\/setup\?created=1&copied=1/);
+  await expect(page.getByRole('heading', { name: 'Set up UKCW Birmingham 2027', level: 1 })).toBeVisible();
+  await expect(page.getByText('UKCW Birmingham 2027 is created. Everything came across from the show you started from')).toBeVisible();
+  await expect(page.locator('li[aria-current="step"]')).toContainText('UKCW Birmingham 2027 is ready for signage.');
+  await expect(page.getByText('5 of 5 done.', { exact: false })).toBeVisible();
+  await page.goto('/settings');
   await expect(page.locator('#name')).toHaveValue('UKCW Birmingham 2027');
   await expect(page.locator('#build_start')).toHaveValue('2027-09-25');
   await expect(page.locator('#breakdown_end')).toHaveValue('2027-10-01');
@@ -204,7 +209,7 @@ test.describe('on a phone', () => {
     await loginAs(page, 'admin');
     const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/schedule/ss/new', '/sponsors',
       `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/admin',
-      '/suppliers', '/settings/lists', '/shows', '/shows/new', '/admin/platform', '/admin/activity', '/account', '/gs'];
+      '/suppliers', '/settings/lists', '/shows', '/shows/new', '/shows/setup', '/team', '/admin/platform', '/admin/activity', '/account', '/gs'];
     const wide: string[] = [];
     for (const p of pages) {
       await page.goto(p);

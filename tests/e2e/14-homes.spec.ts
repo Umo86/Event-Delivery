@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { acceptNextDialog, loginAs, panel } from './helpers';
+import { acceptNextDialog, loginAs, okMessage, panel } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -70,9 +70,17 @@ test('a manager can set up a new show and manage it from All shows', async ({ pa
   await page.getByRole('button', { name: 'Next: check and create' }).click();
   await expect(page.locator('li[aria-current="step"]')).toContainText('Tue 14 Mar 2028 to Thu 16 Mar 2028 (3 days)');
   await page.getByRole('button', { name: 'Create show' }).click();
-  await expect(page).toHaveURL(/\/settings\?created=1/);
-  await expect(page.getByText('Show created. Check its dates and deadlines below.')).toBeVisible();
-  await expect(page.locator('#name')).toHaveValue('UKCW Manchester 2028');
+  // The guide picks up what wasn't copied: the sponsors
+  await expect(page).toHaveURL(/\/shows\/setup\?created=1&copied=1/);
+  await expect(page.getByText('UKCW Manchester 2028 is created. One thing is left to set up.')).toBeVisible();
+  const open = page.locator('li[aria-current="step"]');
+  await expect(open.getByRole('heading', { name: 'Sponsors', level: 2 })).toBeVisible();
+  await page.fill('#gs-sponsor', 'Northern Build Ltd');
+  await open.getByRole('button', { name: 'Add sponsor' }).click();
+  await expect(okMessage(open, 'Northern Build Ltd added.')).toBeVisible();
+  await expect(open.getByRole('list', { name: 'Sponsors so far' })).toContainText('Northern Build Ltd');
+  await open.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.locator('li[aria-current="step"]')).toContainText('UKCW Manchester 2028 is ready for signage.');
 
   // All shows summarises it alongside the others, and it can be archived from there
   await menu(page).getByRole('link', { name: 'All shows', exact: true }).click();

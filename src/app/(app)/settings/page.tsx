@@ -5,7 +5,7 @@ import { requireManager } from '@/lib/auth/session';
 import { getCurrentEvent, loadBundle } from '@/lib/data/load';
 import { VENUES } from '@/lib/domain/labels';
 import { ActionForm, SubmitButton } from '@/components/forms';
-import { Field, Intro, inputCls, Notice, Panel, cx } from '@/components/ui';
+import { ButtonLink, Field, Intro, inputCls, Notice, Panel, cx } from '@/components/ui';
 import { NoEvent } from '@/components/no-event';
 import { updateEvent } from '@/app/actions/settings';
 import { setEventDepartments } from '@/app/actions/departments';
@@ -25,7 +25,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
 
   // Steps a manager can't do themselves say who does them instead of linking to a page they can't open.
   const steps: { done: boolean; text: string; href: string | null }[] = [
-    { done: bundle.users.length > 1, text: isSuper ? 'Invite your team' : 'Invite your team (a super admin does this)', href: isSuper ? '/admin' : null },
+    { done: bundle.users.length > 1, text: 'Add your team', href: '/team' },
     { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_ids.length > 0), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
     { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles in-house artwork and production (below)', href: '#owners' },
     { done: bundle.sponsors.length > 0, text: isSuper ? 'Add sponsors and their account managers' : 'Add sponsors', href: '/sponsors' },
@@ -44,7 +44,8 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
       <Intro>Name, venue, dates and deadlines for {e.name}. To set up a different show, switch to it from the menu.</Intro>
       {sp.created && <Notice tone="ok">Show created. Check its dates and deadlines below.</Notice>}
       {showSteps && (
-        <Panel title={sp.welcome ? 'Welcome. Here’s how to get set up' : 'Still to set up'}>
+        <Panel title={sp.welcome ? 'Welcome. Here’s how to get set up' : 'Still to set up'}
+          actions={<ButtonLink href="/shows/setup" variant="dark" small>Set it up step by step</ButtonLink>}>
           <ol className="space-y-2">
             {steps.map((s, i) => (
               <li key={s.text} className="flex items-center gap-3 text-[15px]">

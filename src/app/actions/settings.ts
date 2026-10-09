@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { db } from '@/lib/db';
+import { db, type Sql } from '@/lib/db';
 import { bool, date, int, isUuid, num, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor } from '@/lib/auth/session';
 import { logActivity } from '@/lib/activity';
@@ -122,7 +122,77 @@ export async function createEvent(_prev: ActionResult | null, fd: FormData): Pro
     const jar = await cookies();
     jar.set(EVENT_COOKIE, newId, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
     refresh();
-    redirect('/settings?created=1');
+    // Straight on to the guided setup for the new show
+    redirect(copyFrom ? '/shows/setup?created=1&copied=1' : '/shows/setup?created=1');
+  });
+}
+
+// ---- Guided setup (Show › Set up) -------------------------------------------------
+
+/** People who can sign off and own work: active, and not Users. */
+async function teamCanSignOff(sql: Sql): Promise<Map<string, string>> {
+  const rows = await sql<{ id: string; full_name: string }[]>`select id, full_name from users where active and role <> 'user'`;
+  return new Map(rows.map((r) => [r.id, r.full_name]));
+}
+
+/** Every named-approver stage of a show at once: each stage's approvers are exactly the ones ticked. */
+export async function saveShowApprovers(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const eventId = uuidOrNull(fd, 'event_id');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
+    const sql = await db();
+    const eligible = await teamCanSignOff(sql);
+    const stages = await sql<{ id: string; name: string }[]>`
+      select id, name from stages where event_id = ${eventId} and not archived and not uses_account_manager order by position`;
+    if (!stages.length) throw new UserError('This show has no stages with named approvers. Add them in Show setup › Sign-off stages.');
+    const changed: string[] = [];
+    await sql.begin(async (tx) => {
+      for (const st of stages) {
+        const want = [...new Set(fd.getAll(`approvers_${st.id}`).filter(isUuid))];
+        if (want.some((id) => !eligible.has(id))) throw new UserError('Choose approvers from the team. Users and deactivated people can’t sign off.');
+        const have = new Set((await tx<{ user_id: string }[]>`select user_id from stage_approvers where stage_id = ${st.id}`).map((r) => r.user_id));
+        if (want.length === have.size && want.every((id) => have.has(id))) continue;
+        await tx`delete from stage_approvers where stage_id = ${st.id}`;
+        for (const uid of want) await tx`insert into stage_approvers (stage_id, user_id) values (${st.id}, ${uid}) on conflict do nothing`;
+        // Keep the legacy single column pointing at an approver so older reads still see one.
+        await tx`update stages set approver_id = ${want[0] ?? null} where id = ${st.id}`;
+        changed.push(st.name);
+      }
+    });
+    const [{ gaps }] = await sql<{ gaps: string[] }[]>`
+      select coalesce(array_agg(s.name order by s.position), '{}') as gaps from stages s
+      where s.event_id = ${eventId} and not s.archived and not s.uses_account_manager
+        and not exists (select 1 from stage_approvers sa join users u on u.id = sa.user_id
+                        where sa.stage_id = s.id and u.active and u.role <> 'user')`;
+    if (changed.length) {
+      await logActivity(sql, { eventId, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings',
+        message: `Changed who approves ${changed.join(', ')}` });
+    }
+    refresh();
+    const gapText = gaps.length ? ` ${gaps.join(', ')} still ${gaps.length === 1 ? 'has' : 'have'} no approver.` : '';
+    return { ok: true, message: `${changed.length ? 'Saved.' : 'No changes to save.'}${gapText}` };
+  });
+}
+
+/** Who looks after in-house artwork and who handles print and production for a show. */
+export async function saveShowOwners(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const eventId = uuidOrNull(fd, 'event_id');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
+    const studio = uuidOrNull(fd, 'studio_owner_id');
+    const prod = uuidOrNull(fd, 'production_owner_id');
+    const sql = await db();
+    const eligible = await teamCanSignOff(sql);
+    if ((studio && !eligible.has(studio)) || (prod && !eligible.has(prod))) throw new UserError('Choose people from the team. Users can’t own work.');
+    const [e] = await sql<{ name: string }[]>`
+      update events set studio_owner_id = ${studio}, production_owner_id = ${prod} where id = ${eventId} returning name`;
+    if (!e) throw new UserError('That show no longer exists. Reload the page.');
+    await logActivity(sql, { eventId, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings',
+      message: `Set who handles artwork (${studio ? eligible.get(studio) : 'nobody'}) and production (${prod ? eligible.get(prod) : 'nobody'})` });
+    refresh();
+    return { ok: true, message: 'Saved.' };
   });
 }
 
