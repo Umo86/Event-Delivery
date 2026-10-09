@@ -81,7 +81,7 @@ function Row({ s, here, canArchive }: { s: ShowSummary; here: boolean; canArchiv
             </span>
             <span className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[13.5px]">
               <Stat label="Lines" value={s.total} />
-              <Stat label="In sign-off" value={s.signoff} />
+              <Stat label="Artworked" value={s.signoff} />
               <Stat label="Attention" value={s.attention} danger={s.attention > 0} />
               <Stat label="Overdue" value={s.overdue} danger={s.overdue > 0} />
               <Stat label="Approved" value={s.total ? `${Math.round((s.approved / s.total) * 100)}%` : '–'} />

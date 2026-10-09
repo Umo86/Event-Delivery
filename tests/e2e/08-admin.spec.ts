@@ -136,9 +136,9 @@ test('sponsor approval links can be switched off and back on', async ({ browser,
   const id = idFromUrl(page);
   await uploadArtwork(page, { name: 'aisle.png', mimeType: 'image/png', buffer: makePng(400, 200) });
   await decide(page, 'Operations', 'Approve');
-  await expectStatus(page, 'With Marketing');
+  await expectStatus(page, 'Artworked · with Marketing');
   await decide(page, 'Marketing', 'Approve');
-  await expectStatus(page, 'With Sponsor');
+  await expectStatus(page, 'Artworked · with Sponsor');
   await signoffStage(page, 'Sponsor').getByRole('button', { name: 'Create approval link' }).click();
   const link = await page.getByTestId('share-url').inputValue();
 

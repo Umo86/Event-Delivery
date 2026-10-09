@@ -2,6 +2,7 @@ import type { Bundle } from '@/lib/data/load';
 import { ARTWORK_BY } from '@/lib/domain/labels';
 import { defaultArtworkDue, defaultPrintDeadline } from '@/lib/domain/engine';
 import { fmtDate } from '@/lib/dates';
+import { SectionPicker } from './section-picker';
 import type { Category, ItemRow } from '@/lib/domain/types';
 import { ActionForm, SubmitButton } from './forms';
 import { ButtonLink, Field, inputCls, textareaCls } from './ui';
@@ -60,6 +61,14 @@ function SponsorshipItemForm({ bundle, category, item, cancelHref, defaultSponso
         <Field label="What’s included" htmlFor="wording" className="mt-4" help="What the sponsor gets, in a line or two sales can quote.">
           <textarea id="wording" name="wording" rows={2} defaultValue={v('wording')} className={textareaCls} />
         </Field>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="Section on the sheet" htmlFor="section_id" help="Groups it with other lines in the same area.">
+            <SectionPicker sections={bundle.sections} value={item?.section_id ?? null} />
+          </Field>
+          <Field label="Plan code (optional)" htmlFor="plan_code" help="Your own code from the old sheet, like FS01.">
+            <input id="plan_code" name="plan_code" maxLength={40} defaultValue={v('plan_code')} className={inputCls} />
+          </Field>
+        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Material / spec" htmlFor="material" help="Size, colours, print method.">
             <input id="material" name="material" list="dl-material" defaultValue={v('material')} className={inputCls} />
@@ -191,6 +200,12 @@ function SignageForm({ bundle, category, item, cancelHref, defaultSponsorId }: {
               {bundle.sponsors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </Field>
+          <Field label="Section on the sheet" htmlFor="section_id" help="Groups it with the other lines in the same area, like F1 UKCW Main Stage.">
+            <SectionPicker sections={bundle.sections} value={item?.section_id ?? null} />
+          </Field>
+          <Field label="Plan code (optional)" htmlFor="plan_code" help="Your own code from the floor plan or the old sheet, like F1.1 or MBar2.">
+            <input id="plan_code" name="plan_code" maxLength={40} defaultValue={v('plan_code')} className={inputCls} />
+          </Field>
           <Field label="Type" htmlFor="item_type" help="Pick from the list or type your own.">
             <input id="item_type" name="item_type" list="dl-type" defaultValue={v('item_type')} className={inputCls} />
           </Field>
@@ -198,9 +213,14 @@ function SignageForm({ bundle, category, item, cancelHref, defaultSponsorId }: {
             <input id="material" name="material" list="dl-material" defaultValue={v('material')} className={inputCls} />
           </Field>
         </div>
-        <Field label="Wording / content" htmlFor="wording" className="mt-4">
-          <textarea id="wording" name="wording" rows={2} defaultValue={v('wording')} className={textareaCls} />
-        </Field>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <Field label="Side 1 wording / content" htmlFor="wording">
+            <textarea id="wording" name="wording" rows={2} defaultValue={v('wording')} className={textareaCls} />
+          </Field>
+          <Field label="Side 2 wording (double-sided only)" htmlFor="wording_side2" help="Kept only when Sides is double-sided.">
+            <textarea id="wording_side2" name="wording_side2" rows={2} defaultValue={v('wording_side2')} className={textareaCls} />
+          </Field>
+        </div>
         <div className={`${grid} mt-4`}>
           <Field label="Hall" htmlFor="hall"><input id="hall" name="hall" list="dl-hall" defaultValue={v('hall')} className={inputCls} /></Field>
           <Field label="Zone / area" htmlFor="zone"><input id="zone" name="zone" list="dl-zone" defaultValue={v('zone')} className={inputCls} /></Field>
@@ -216,6 +236,7 @@ function SignageForm({ bundle, category, item, cancelHref, defaultSponsorId }: {
             </select>
           </Field>
           <Field label="Quantity" htmlFor="qty"><input id="qty" name="qty" type="number" min={0} inputMode="numeric" defaultValue={v('qty')} className={inputCls} /></Field>
+          <Field label="Bleed (mm)" htmlFor="bleed_mm" help="Extra print beyond the finished size."><input id="bleed_mm" name="bleed_mm" type="number" min={0} inputMode="numeric" defaultValue={v('bleed_mm')} className={inputCls} /></Field>
         </div>
       </section>
 

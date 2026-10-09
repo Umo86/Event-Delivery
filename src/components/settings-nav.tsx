@@ -3,6 +3,7 @@ import { TabNav } from './tab-nav';
 const ITEMS = [
   { href: '/settings', label: 'Details and dates' },
   { href: '/settings/stages', label: 'Sign-off stages' },
+  { href: '/settings/sections', label: 'Sections' },
   { href: '/settings/departments', label: 'Departments' },
   { href: '/settings/lists', label: 'Dropdown lists' },
 ];

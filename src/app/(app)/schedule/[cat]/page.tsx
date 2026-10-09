@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus, Rows3, Table2 } from 'lucide-react';
 import { requireUser } from '@/lib/auth/session';
 import { getCurrentEvent, loadSchedule } from '@/lib/data/load';
 import { applyFilters, filterQuery, readFilters } from '@/lib/data/filter';
-import { CATEGORIES, categoryBySlug, GROUPS } from '@/lib/domain/labels';
+import { CATEGORIES, categoryBySlug, GROUPS, SHEET_STATUSES } from '@/lib/domain/labels';
 import { canEdit } from '@/lib/domain/permissions';
 import { FilterBar } from '@/components/filter-bar';
 import { ItemTable } from '@/components/item-table';
+import { SheetTable } from '@/components/sheet/sheet-table';
 import { ButtonLink, cx, Empty, money, PageHeader } from '@/components/ui';
 import { inWorkflow } from '@/lib/domain/engine';
 import { NoEvent } from '@/components/no-event';
@@ -70,6 +71,12 @@ export default async function SchedulePage(props: {
   };
   const base = `/schedule/${category?.slug ?? 'all'}`;
   const title = category?.label ?? 'All lines';
+  // The sheet (spec, cost, supplier, status, like the team's spreadsheet) is the default for organiser and sponsor
+  // signage; sponsorship items open on their sales view, and All lines is a working list across the show.
+  const view: 'sheet' | 'workflow' = filters.view === 'sheet' || filters.view === 'workflow' ? filters.view
+    : category && !sponsorship ? 'sheet' : 'workflow';
+  const viewHref = (v: 'sheet' | 'workflow') => `${base}${filterQuery({ ...filters, view: v })}`;
+  const sections = sched.bundle.sections.map((x) => ({ value: x.id, label: x.name }));
 
   return (
     <>
@@ -112,47 +119,68 @@ export default async function SchedulePage(props: {
       )}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {stat(sponsorship ? 'Items' : 'Lines', counts.total, base)}
-        {stat('Awaiting artwork', counts.awaiting, `${base}?status=awaiting_artwork`)}
-        {stat('In sign-off', counts.signoff, `${base}?status=in_signoff`)}
+        {stat('Ready to artwork', counts.awaiting, `${base}?status=awaiting_artwork`)}
+        {stat('Artworked', counts.signoff, `${base}?status=in_signoff`)}
         {stat('Needs attention', counts.attention, `${base}?status=attention`)}
         {stat('Approved or later', counts.approved, `${base}?status=approved_plus`)}
         {stat('Overdue', counts.overdue, `${base}?flag=urgent`, true)}
       </div>
 
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="View" className="inline-flex rounded-md border border-line-strong bg-white p-0.5">
+          {([['sheet', 'Sheet', Table2], ['workflow', 'Workflow', Rows3]] as const).map(([v, label, Icon]) => (
+            <Link key={v} href={viewHref(v)} aria-current={view === v ? 'page' : undefined}
+              className={cx('inline-flex h-8 items-center gap-1.5 rounded px-3 text-[13.5px] font-semibold',
+                view === v ? 'bg-ink text-white' : 'text-ink-2 hover:bg-paper hover:text-ink')}>
+              <Icon size={15} aria-hidden /> {label}
+            </Link>
+          ))}
+        </div>
+        <p className="text-[13px] text-muted">
+          {view === 'sheet'
+            ? 'Spec, cost, supplier and status for every line, grouped by section. Suppliers and production status save as you change them.'
+            : 'What each line is waiting on, with deadlines and flags.'}
+        </p>
+      </div>
+
       <FilterBar
-        key={cat}
+        key={`${cat}-${view}`}
+        sheet={view === 'sheet'}
         statuses={[
           ...(sponsorship || !category ? [{ value: 'for_sale', label: 'For sale' }, { value: 'sold', label: 'Sold' }] : []),
-          { value: 'attention', label: 'Needs attention' },
+          ...SHEET_STATUSES.map((x) => ({ value: `sheet:${x.key}`, label: x.label })),
+          { value: 'attention', label: 'Needs attention (changes requested, rejected, on hold)' },
           { value: 'slow', label: `Slow sign-off (over ${event.turnaround_days} days)` },
-          { value: 'production', label: 'Approved or in production' },
           { value: 'approved_plus', label: 'Approved or later' },
-          ...GROUPS.filter((g) => g.key !== 'for_sale').map((g) => ({ value: g.key, label: g.label })),
+          // Finer states the sheet's words don't single out
+          ...GROUPS.filter((g) => !['for_sale', 'awaiting_artwork', 'approved', 'sent_to_supplier', 'in_production', 'installed', 'cancelled'].includes(g.key))
+            .map((g) => ({ value: g.key, label: g.label })),
+          { value: 'cancelled', label: 'Cancelled' },
         ]}
         people={people}
         sponsors={sched.bundle.sponsors.map((s) => ({ value: s.id, label: s.name }))}
         halls={halls}
         suppliers={sched.bundle.suppliers.map((s) => ({ value: s.id, label: s.name }))}
+        sections={sections}
         showSponsor={category?.key !== 'organiser_signage' || all.some((r) => r.item.sponsor_id)}
       />
 
-      <ItemTable
-        rows={rows}
-        today={sched.bundle.ctx.today}
-        showCategory={!category}
-        empty={
-          all.length === 0 ? (
-            <Empty title={`No ${title.toLowerCase()} yet`}
-              action={canEdit(user) && category ? <ButtonLink href={`${base}/new`} variant="primary"><Plus size={16} /> {sponsorship ? 'Add the first item' : 'Add the first line'}</ButtonLink> : undefined}>
-              {sponsorship
-                ? <>Add each thing the show sells to sponsors, like lanyards, show bags or seat drops. Each one gets an ID like SI-001 and stays for sale until someone marks it sold.</>
-                : <>Add a line for each sign or item. Each one gets an ID like {category?.prefix ?? 'OS'}-001.</>}
-            </Empty>
-          ) : (
-            <Empty title="No lines match these filters">Clear the filters to see everything.</Empty>
-          )
-        }
-      />
+      {(() => {
+        const empty = all.length === 0 ? (
+          <Empty title={`No ${title.toLowerCase()} yet`}
+            action={canEdit(user) && category ? <ButtonLink href={`${base}/new`} variant="primary"><Plus size={16} /> {sponsorship ? 'Add the first item' : 'Add the first line'}</ButtonLink> : undefined}>
+            {sponsorship
+              ? <>Add each thing the show sells to sponsors, like lanyards, show bags or seat drops. Each one gets an ID like SI-001 and stays for sale until someone marks it sold.</>
+              : <>Add a line for each sign or item. Each one gets an ID like {category?.prefix ?? 'OS'}-001.</>}
+          </Empty>
+        ) : (
+          <Empty title="No lines match these filters">Clear the filters to see everything.</Empty>
+        );
+        return view === 'sheet'
+          ? <SheetTable rows={rows} bundle={sched.bundle} canEdit={canEdit(user)} showCategory={!category}
+              showSponsor={category?.key !== 'organiser_signage' || all.some((r) => r.item.sponsor_id)} empty={empty} />
+          : <ItemTable rows={rows} today={sched.bundle.ctx.today} showCategory={!category} empty={empty} />;
+      })()}
       {rows.length > 0 && rows.length !== all.length && (
         <p className="mt-3 text-[13.5px] text-muted">Showing {rows.length} of {all.length}.</p>
       )}

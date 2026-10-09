@@ -302,6 +302,84 @@ export async function removeStage(_prev: ActionResult | null, fd: FormData): Pro
   });
 }
 
+// ---- Sections (the groups on the signage sheet) ---------------------------------------
+async function sectionOf(sql: Sql, fd: FormData) {
+  const id = uuidOrNull(fd, 'section_id');
+  if (!id) throw new UserError('Missing section.');
+  const [sec] = await sql<{ id: string; event_id: string; name: string }[]>`select id, event_id, name from sections where id = ${id}`;
+  if (!sec) throw new UserError('That section no longer exists. Reload the page.');
+  return sec;
+}
+
+export async function addSection(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const eventId = uuidOrNull(fd, 'event_id');
+    if (!eventId) throw new UserError('Missing show. Reload the page.');
+    const name = required(fd, 'name', 'Section name', 80);
+    const sql = await db();
+    if ((await sql`select 1 from sections where event_id = ${eventId} and lower(name) = lower(${name})`).length) throw new UserError(`${name} is already a section.`);
+    const [{ p }] = await sql<{ p: number }[]>`select coalesce(max(position), 0)::int + 1 as p from sections where event_id = ${eventId}`;
+    await sql`insert into sections (event_id, name, position) values (${eventId}, ${name}, ${p})`;
+    await logActivity(sql, { eventId, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Added the section ${name}` });
+    refresh();
+    return { ok: true, message: `${name} added.` };
+  });
+}
+
+export async function renameSection(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const sql = await db();
+    const sec = await sectionOf(sql, fd);
+    const name = required(fd, 'name', 'Section name', 80);
+    if ((await sql`select 1 from sections where event_id = ${sec.event_id} and lower(name) = lower(${name}) and id <> ${sec.id}`).length) {
+      throw new UserError(`${name} is already a section.`);
+    }
+    await sql`update sections set name = ${name} where id = ${sec.id}`;
+    if (sec.name !== name) {
+      await logActivity(sql, { eventId: sec.event_id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings', message: `Renamed the section ${sec.name} to ${name}` });
+    }
+    refresh();
+    return { ok: true, message: 'Saved.' };
+  });
+}
+
+export async function moveSection(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    await actor('manager');
+    const dir = fd.get('dir');
+    if (dir !== 'up' && dir !== 'down') throw new UserError('Missing direction.');
+    const sql = await db();
+    const sec = await sectionOf(sql, fd);
+    await sql.begin(async (tx) => {
+      const list = await tx<{ id: string }[]>`select id from sections where event_id = ${sec.event_id} order by position, lower(name) for update`;
+      const i = list.findIndex((x) => x.id === sec.id);
+      const j = dir === 'up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= list.length) return;
+      [list[i], list[j]] = [list[j], list[i]];
+      for (let k = 0; k < list.length; k++) await tx`update sections set position = ${k + 1} where id = ${list[k].id}`;
+    });
+    refresh();
+    return { ok: true };
+  });
+}
+
+/** Removes a section; its lines stay, under "No section". */
+export async function removeSection(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const sql = await db();
+    const sec = await sectionOf(sql, fd);
+    const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from items where section_id = ${sec.id}`;
+    await sql`delete from sections where id = ${sec.id}`;
+    await logActivity(sql, { eventId: sec.event_id, itemId: null, userId: me.id, actorName: me.full_name, kind: 'settings',
+      message: `Removed the section ${sec.name}${n ? ` (${n} line${n === 1 ? '' : 's'} left without a section)` : ''}` });
+    refresh();
+    return { ok: true, message: n ? `${sec.name} removed. Its ${n} line${n === 1 ? ' is' : 's are'} now under “No section”.` : `${sec.name} removed.` };
+  });
+}
+
 // ---- Suppliers ----------------------------------------------------------------
 async function readSupplier(fd: FormData) {
   const email = str(fd, 'email', 200);

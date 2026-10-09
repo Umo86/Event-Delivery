@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeItemState, inWorkflow, isForSale, type EngineContext } from '@/lib/domain/engine';
 import { allowedDecisions, canDecideStage, canSell } from '@/lib/domain/permissions';
+import { PRODUCTION, SHEET_STATUSES, sheetStatus } from '@/lib/domain/labels';
 import type { DecisionRow, EventRow, ItemRow, SponsorRow, StageRow, VersionRow } from '@/lib/domain/types';
 import { addDays } from '@/lib/dates';
 
@@ -53,7 +54,7 @@ function item(over: Partial<ItemRow> = {}): ItemRow {
   seq += 1;
   return {
     id: `i${seq}`, event_id: 'ev', category: 'organiser_signage', ref_no: seq, description: 'Test line', sponsor_id: null,
-    item_type: null, wording: null, hall: null, zone: null, location_detail: null, position: null, width_mm: null, height_mm: null,
+    section_id: null, plan_code: null, item_type: null, wording: null, wording_side2: null, bleed_mm: null, hall: null, zone: null, location_detail: null, position: null, width_mm: null, height_mm: null,
     sides: null, qty: null, material: null, artwork_by: 'in_house', artwork_due: null, artwork_link: null, supplier_id: null,
     print_deadline: null, production_status: null, po_number: null, delivery_date: null, install_date: null, unit_cost: null,
     rate_card_price: null, sale_price: null, distribution_method: null, sold_at: null, sold_by: null,
@@ -75,7 +76,7 @@ describe('awaiting artwork', () => {
   it('routes to the in-house designer with the default artwork deadline', () => {
     const s = computeItemState(item(), null, [], ctx());
     expect(s.group).toBe('awaiting_artwork');
-    expect(s.statusLabel).toBe('Awaiting artwork');
+    expect(s.statusLabel).toBe('Ready to artwork');
     expect(s.waitingOnLabel).toBe('Designer');
     expect(s.due).toBe('2026-11-01');
     expect(s.flag).toBeNull();
@@ -115,7 +116,7 @@ describe('sign-off chain', () => {
     const it1 = item();
     const s = computeItemState(it1, ver(it1, 1, at(-2)), [], ctx());
     expect(s.group).toBe('in_signoff');
-    expect(s.statusLabel).toBe('With Operations');
+    expect(s.statusLabel).toBe('Artworked · with Operations');
     expect(s.waitingOnLabel).toBe('Ops Manager');
     expect(s.currentStageNumber).toBe(1);
     expect(s.daysWaiting).toBe(2);
@@ -131,7 +132,7 @@ describe('sign-off chain', () => {
   it('moves to the next stage after approval and measures time from that approval', () => {
     const it1 = item();
     const s = computeItemState(it1, ver(it1, 1, at(-6)), [dec(it1, 's1', 1, 'approved', at(-1))], ctx());
-    expect(s.statusLabel).toBe('With Marketing');
+    expect(s.statusLabel).toBe('Artworked · with Marketing');
     expect(s.waitingOnLabel).toBe('Marketing Manager');
     expect(s.daysWaiting).toBe(1);
     expect(s.stages.map((x) => x.kind)).toEqual(['approved', 'current', 'na', 'locked']);
@@ -141,7 +142,7 @@ describe('sign-off chain', () => {
     const s = computeItemState(it1, ver(it1, 1, at(-6)), [
       dec(it1, 's1', 1, 'approved', at(-5)), dec(it1, 's2', 1, 'approved', at(-4)),
     ], ctx());
-    expect(s.statusLabel).toBe('With Final sign-off');
+    expect(s.statusLabel).toBe('Artworked · with Final sign-off');
     expect(s.currentStageNumber).toBe(3);
   });
   it('sends the sponsor stage to the account manager', () => {
@@ -149,7 +150,7 @@ describe('sign-off chain', () => {
     const s = computeItemState(it1, ver(it1, 1, at(-6)), [
       dec(it1, 's1', 1, 'approved', at(-5)), dec(it1, 's2', 1, 'approved', at(-4)),
     ], ctx());
-    expect(s.statusLabel).toBe('With Sponsor');
+    expect(s.statusLabel).toBe('Artworked · with Sponsor');
     expect(s.waitingOnUserId).toBe(USERS.am1);
   });
   it('is approved and ready to order when every stage has approved', () => {
@@ -159,10 +160,10 @@ describe('sign-off chain', () => {
     ], ctx());
     expect(s.group).toBe('approved');
     expect(s.fullyApproved).toBe(true);
-    expect(s.statusLabel).toBe('Approved – ready to order');
+    expect(s.statusLabel).toBe('Approved – ready to send');
     expect(s.waitingOnLabel).toBe('Production Lead');
     expect(s.daysWaiting).toBe(6);
-    expect(s.action).toBe('Send to supplier / place order');
+    expect(s.action).toBe('Send to the supplier');
     expect(s.phase).toBe(4);
   });
 });
@@ -185,7 +186,7 @@ describe('changes, rejections, holds and new versions', () => {
       dec(it1, 's1', 1, 'approved', at(-5)), dec(it1, 's2', 1, 'changes_requested', at(-2)),
     ], ctx());
     expect(s.group).toBe('in_signoff');
-    expect(s.statusLabel).toBe('With Operations · v2');
+    expect(s.statusLabel).toBe('Artworked · with Operations · v2');
     expect(s.version).toBe(2);
     expect(s.stages.find((x) => x.stage.id === 's2')!.decision).toBeNull();
   });
@@ -207,7 +208,7 @@ describe('changes, rejections, holds and new versions', () => {
     const s = computeItemState(it1, ver(it1, 1, at(-6)), [
       dec(it1, 's1', 1, 'on_hold', at(-5)), dec(it1, 's1', 1, 'approved', at(-4)),
     ], ctx());
-    expect(s.statusLabel).toBe('With Marketing');
+    expect(s.statusLabel).toBe('Artworked · with Marketing');
   });
   it('reopening an earlier stage makes later approvals stale', () => {
     const it1 = item();
@@ -217,14 +218,14 @@ describe('changes, rejections, holds and new versions', () => {
     ], ctx());
     expect(s.currentStage?.id).toBe('s2');
     expect(s.staleApproval).toBe(true);
-    expect(s.statusLabel).toBe('With Marketing · re-approve');
+    expect(s.statusLabel).toBe('Artworked · with Marketing · re-approve');
     expect(s.action).toBe('Re-approve (Marketing)');
     expect(s.daysWaiting).toBe(3);
   });
   it('an approval given before the artwork arrived does not count', () => {
     const it1 = item();
     const s = computeItemState(it1, ver(it1, 1, at(-1)), [dec(it1, 's1', 1, 'approved', at(-3))], ctx());
-    expect(s.statusLabel).toBe('With Operations · re-approve');
+    expect(s.statusLabel).toBe('Artworked · with Operations · re-approve');
   });
   it('an out-of-order approval does not skip a stage', () => {
     const it1 = item();
@@ -253,7 +254,7 @@ describe('production and other states', () => {
     expect(computeItemState(c.it1, c.v, c.d, ctx({}, { build_start: null })).due).toBe('2027-05-11');
     const dlv = approvedItem({ production_status: 'delivered', install_date: addDays(TODAY, -1) });
     const s = computeItemState(dlv.it1, dlv.v, dlv.d, ctx());
-    expect(s.statusLabel).toBe('Delivered to venue');
+    expect(s.statusLabel).toBe('Delivered');
     expect(s.flag).toBe('overdue');
     expect(s.action).toBe('Install / put in place');
   });
@@ -284,10 +285,10 @@ describe('production and other states', () => {
     const it1 = item({ artwork_by: 'not_required', created_at: at(-2) });
     const s = computeItemState(it1, null, [], ctx());
     expect(s.version).toBe(0);
-    expect(s.statusLabel).toBe('With Operations');
+    expect(s.statusLabel).toBe('Artworked · with Operations');
     expect(s.daysWaiting).toBe(2);
     const s2 = computeItemState(it1, null, [dec(it1, 's1', 0, 'approved', at(-1))], ctx());
-    expect(s2.statusLabel).toBe('With Marketing');
+    expect(s2.statusLabel).toBe('Artworked · with Marketing');
   });
   it('ignores archived stages and respects applicability', () => {
     const stages = [...STAGES.slice(0, 3), { ...STAGES[3], archived: true }];
@@ -363,5 +364,26 @@ describe('permissions', () => {
     expect(allowedDecisions(s, 's3')).toEqual([]);
     const awaiting = computeItemState(item(), null, [], ctx());
     expect(allowedDecisions(awaiting, 's1')).toEqual([]);
+  });
+});
+
+describe('the sheet’s six words', () => {
+  it('cover every state a line can be in, in the team’s words', () => {
+    expect(sheetStatus('awaiting_artwork')).toBe('ready');
+    for (const g of ['in_signoff', 'changes_requested', 'rejected', 'on_hold'] as const) expect(sheetStatus(g)).toBe('artworked');
+    expect(sheetStatus('approved')).toBe('approved');
+    expect(sheetStatus('sent_to_supplier')).toBe('sent');
+    expect(sheetStatus('in_production')).toBe('printed');
+    expect(sheetStatus('delivered')).toBe('printed');
+    expect(sheetStatus('installed')).toBe('installed');
+    expect(sheetStatus('cancelled')).toBeNull();
+    expect(sheetStatus('for_sale')).toBeNull();
+    expect(SHEET_STATUSES.map((s) => s.label)).toEqual(['Ready to artwork', 'Artworked', 'Approved', 'Sent', 'Printed', 'Installed']);
+    // Red stays for problems: no sheet status is red
+    expect(SHEET_STATUSES.some((s) => s.tone === 'red' || s.tone === 'darkred')).toBe(false);
+  });
+
+  it('production steps read Sent, Printed, Delivered, Installed', () => {
+    expect(PRODUCTION.map((p) => p.label)).toEqual(['Sent', 'Printed', 'Delivered', 'Installed']);
   });
 });

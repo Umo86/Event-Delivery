@@ -14,7 +14,7 @@ test('my actions is a board of lines waiting on you plus personal tasks', async 
   await expect(todo).toContainText('Upload new artwork (rejected by Marketing)');
   await expect(todo).toContainText('Create the artwork');
   await expect(todo).toContainText('Acme Steel feature area banner');
-  await expect(todo).toContainText('Send to supplier / place order');
+  await expect(todo).toContainText('Send to the supplier');
   // The three kanban columns are present
   await expect(page.getByRole('region', { name: 'In process' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Complete' })).toBeVisible();
@@ -37,7 +37,7 @@ test('the dashboard summarises progress, workload, cost and sponsors', async ({ 
   await expect(page.getByRole('link', { name: /Approved or later/ })).toContainText('2 of 5 lines');
 
   const where = panel(page, 'Where everything is');
-  await expect(where.getByRole('img').first()).toHaveAttribute('aria-label', 'Awaiting artwork 1, In sign-off 0, Needs attention 1, Approved or in production 0, Installed 1');
+  await expect(where.getByRole('img').first()).toHaveAttribute('aria-label', 'Ready to artwork 1, Artworked 0, Needs attention 1, Approved, sent or printed 0, Installed 1');
   await expect(where.getByRole('list', { name: 'Legend' })).toContainText('Installed 1');
 
   const stages = panel(page, 'Sign-off by stage');

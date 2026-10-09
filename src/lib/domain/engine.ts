@@ -223,17 +223,17 @@ export function computeItemState(
   const vTag = version && version > 1 ? ` · v${version}` : '';
   let statusLabel: string;
   switch (group) {
-    case 'awaiting_artwork': statusLabel = 'Awaiting artwork'; break;
+    case 'awaiting_artwork': statusLabel = 'Ready to artwork'; break;
     case 'in_signoff':
-      statusLabel = `With ${stageName}${vTag}${staleApproval ? ' · re-approve' : ''}`;
+      statusLabel = `Artworked · with ${stageName}${vTag}${staleApproval ? ' · re-approve' : ''}`;
       break;
     case 'changes_requested': statusLabel = `Changes requested · ${stageName}`; break;
     case 'rejected': statusLabel = `Rejected · ${stageName}`; break;
     case 'on_hold': statusLabel = `On hold · ${stageName}`; break;
-    case 'approved': statusLabel = 'Approved – ready to order'; break;
-    case 'sent_to_supplier': statusLabel = 'Sent to supplier'; break;
-    case 'in_production': statusLabel = 'In production'; break;
-    case 'delivered': statusLabel = 'Delivered to venue'; break;
+    case 'approved': statusLabel = 'Approved – ready to send'; break;
+    case 'sent_to_supplier': statusLabel = 'Sent'; break;
+    case 'in_production': statusLabel = 'Printed'; break;
+    case 'delivered': statusLabel = 'Delivered'; break;
     case 'installed': statusLabel = sponsorship ? 'Handed out' : 'Installed'; break;
     case 'for_sale': statusLabel = 'For sale'; break;
     default: statusLabel = 'Cancelled';
@@ -249,7 +249,7 @@ export function computeItemState(
     case 'changes_requested': action = `Upload revised artwork (changes requested by ${stageName})`; break;
     case 'rejected': action = `Upload new artwork (rejected by ${stageName})`; break;
     case 'on_hold': action = `Resolve the hold (${stageName})`; break;
-    case 'approved': action = 'Send to supplier / place order'; break;
+    case 'approved': action = 'Send to the supplier'; break;
     case 'sent_to_supplier':
     case 'in_production': action = 'Chase delivery'; break;
     case 'delivered': action = sponsorship ? 'Hand out / put in place' : 'Install / put in place'; break;

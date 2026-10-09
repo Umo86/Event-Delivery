@@ -31,7 +31,7 @@ test('uploading artwork starts sign-off, with a preview and thumbnail', async ({
   await expect(page.getByText('Upload a PDF, PNG, JPG, WebP or GIF file.')).toBeVisible();
 
   await uploadArtwork(page, { name: 'OS-001 banner v1.png', mimeType: 'image/png', buffer: makePng(1200, 400) });
-  await expectStatus(page, 'With Operations');
+  await expectStatus(page, 'Artworked · with Operations');
   await expect(waitingOn(page)).toContainText('Olivia Ops');
   await expectImagesLoaded(page, 'img[alt="Artwork v1 for OS-001"]');
   await expect(signoffStage(page, 'Operations')).toContainText('Only Olivia Ops or a super admin can record this stage.');
@@ -50,7 +50,7 @@ test('each approver signs off in turn and can ask for changes', async ({ browser
   await expect(olivia.page).toHaveURL(new RegExp(`/items/${itemId('os1')}`));
   await decide(olivia.page, 'Operations', 'Approve');
   await expect(signoffStage(olivia.page, 'Operations')).toContainText('Approved by Olivia Ops');
-  await expectStatus(olivia.page, 'With Marketing');
+  await expectStatus(olivia.page, 'Artworked · with Marketing');
   // Olivia can reopen her own stage, but not decide Marketing
   await expect(signoffStage(olivia.page, 'Operations').getByRole('button', { name: 'Change this decision' })).toBeVisible();
   await expect(signoffStage(olivia.page, 'Marketing')).toContainText('Only Mark Marketing or a super admin can record this stage.');
@@ -76,7 +76,7 @@ test('a new version (PDF) restarts sign-off and keeps older versions', async ({ 
   await page.goto(`/items/${itemId('os1')}`);
   await expect(page.getByText('Upload a revised version')).toBeVisible();
   await uploadArtwork(page, { name: 'OS-001 banner v2.pdf', mimeType: 'application/pdf', buffer: makePdf('UKCW S1') }, 'Logo enlarged');
-  await expectStatus(page, 'With Operations · v2');
+  await expectStatus(page, 'Artworked · with Operations · v2');
   // The PDF is turned into a preview image in the browser
   await expectImagesLoaded(page, 'img[alt="Artwork v2 for OS-001"]');
   await expect(page.getByText('“Logo enlarged”')).toBeVisible();
@@ -102,7 +102,7 @@ test('every stage approves, then production moves the line on', async ({ browser
   await expect(fiona.page.getByRole('region', { name: 'To do' })).toContainText('Hall S1 entrance banner');
   await fiona.page.goto(`/items/${itemId('os1')}`);
   await decide(fiona.page, 'Final sign-off', 'Approve');
-  await expectStatus(fiona.page, 'Approved – ready to order');
+  await expectStatus(fiona.page, 'Approved – ready to send');
   await fiona.page.goto('/inbox');
   await expect(fiona.page.getByText('You’re all caught up')).toBeVisible();
   await fiona.ctx.close();
@@ -111,11 +111,11 @@ test('every stage approves, then production moves the line on', async ({ browser
   await page.goto(`/items/${itemId('os1')}`);
   await expect(waitingOn(page)).toContainText('Pete Production');
   const prod = panel(page, /^Production$/);
-  await prod.getByLabel('Status').selectOption({ label: 'Sent to supplier' });
+  await prod.getByLabel('Status').selectOption({ label: 'Sent' });
   await prod.getByLabel('PO number').fill('PO-1001');
   await prod.getByLabel('Delivery to venue').fill('2027-05-06');
   await prod.getByRole('button', { name: 'Save production' }).click();
-  await expectStatus(page, 'Sent to supplier');
+  await expectStatus(page, 'Sent');
   await expect(prod.getByLabel('PO number')).toHaveValue('PO-1001');
   await prod.getByLabel('Status').selectOption({ label: 'Installed' });
   await prod.getByRole('button', { name: 'Save production' }).click();
@@ -198,9 +198,9 @@ test('comments, cancelling and restoring a line', async ({ browser, page }) => {
   await expectStatus(page, 'Cancelled');
 
   await page.goto('/schedule/os');
-  await expect(page.locator('table tbody tr')).toHaveCount(1);
+  await expect(page.locator('table tbody tr[data-line]')).toHaveCount(1);
   await page.getByLabel('Show cancelled').check();
-  await expect(page.locator('table tbody tr')).toHaveCount(2);
+  await expect(page.locator('table tbody tr[data-line]')).toHaveCount(2);
 
   await page.goto(`/items/${itemId('os2')}`);
   await page.getByRole('button', { name: 'Restore line' }).click();
@@ -212,7 +212,7 @@ test('a sponsor approves through a private link', async ({ browser, page }) => {
   const a = amy.page;
   await a.goto(`/items/${itemId('ss1')}`);
   await uploadArtwork(a, { name: 'Acme banner.png', mimeType: 'image/png', buffer: makePng(900, 300, [0, 102, 204]) });
-  await expectStatus(a, 'With Operations');
+  await expectStatus(a, 'Artworked · with Operations');
 
   await decideAs(browser, 'olivia', 'ss1', 'Operations', 'Approve');
   await decideAs(browser, 'mark', 'ss1', 'Marketing', 'Approve');
@@ -225,7 +225,7 @@ test('a sponsor approves through a private link', async ({ browser, page }) => {
   await pete.ctx.close();
 
   await a.reload();
-  await expectStatus(a, 'With Sponsor');
+  await expectStatus(a, 'Artworked · with Sponsor');
   await expect(waitingOn(a)).toContainText('Amy Account');
   const sponsorStage = signoffStage(a, 'Sponsor');
   await expect(sponsorStage).toContainText('Amy Account (sponsor’s account manager)');
@@ -287,13 +287,13 @@ test('a sponsor approves through a private link', async ({ browser, page }) => {
   await a.reload();
   await expect(signoffStage(a, 'Sponsor')).toContainText('Approved by Jo Bloggs (sponsor)');
   await expect(signoffStage(a, 'Sponsor')).toContainText('Recorded by the sponsor through their approval link.');
-  await expectStatus(a, 'With Final sign-off');
+  await expectStatus(a, 'Artworked · with Final sign-off');
   await expect(waitingOn(a)).toContainText('Fiona Final');
   await amy.ctx.close();
 
   await decideAs(browser, 'fiona', 'ss1', 'Final sign-off', 'Approve');
   await page.goto(`/items/${itemId('ss1')}`);
-  await expectStatus(page, 'Approved – ready to order');
+  await expectStatus(page, 'Approved – ready to send');
 });
 
 test('an admin can delete a line, its artwork files and keep the number retired', async ({ page }) => {
@@ -309,13 +309,13 @@ test('an admin can delete a line, its artwork files and keep the number retired'
 
   // Removing a version never frees its number, so old decisions can't attach to new artwork
   await uploadArtwork(page, { name: 'temp-2.png', mimeType: 'image/png', buffer: makePng(220, 200) });
-  await expectStatus(page, 'With Operations · v2');
+  await expectStatus(page, 'Artworked · with Operations · v2');
   acceptNextDialog(page);
   await page.getByRole('button', { name: 'Remove this version' }).click();
   await expectStatus(page, 'Rejected · Operations'); // back to v1 and its decision
   const v = await uploadArtwork(page, { name: 'temp-3.png', mimeType: 'image/png', buffer: makePng(240, 200) });
   expect(v).toBe('v3');
-  await expectStatus(page, 'With Operations · v3');
+  await expectStatus(page, 'Artworked · with Operations · v3');
   await expect(signoffStage(page, 'Operations')).toContainText('Waiting for a decision');
 
   const versionHref = (await page.getByRole('link', { name: 'Open', exact: true }).getAttribute('href'))!;
@@ -326,7 +326,7 @@ test('an admin can delete a line, its artwork files and keep the number retired'
   acceptNextDialog(page);
   await page.getByRole('button', { name: 'Delete permanently' }).click();
   await expect(page).toHaveURL(/\/schedule\/os\?deleted=1/);
-  await expect(page.locator('table tbody tr')).toHaveCount(2);
+  await expect(page.locator('table tbody tr[data-line]')).toHaveCount(2);
   expect((await page.request.get(versionHref)).status()).toBe(404);
   await expect.poll(filesFor).toHaveLength(0);
 

@@ -49,7 +49,7 @@ test('a member adds an organiser sign with full details', async ({ page }) => {
   saveItem('os1', idFromUrl(page));
   await expect(page.getByText('Line OS-001 added.')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hall S1 entrance banner');
-  await expectStatus(page, 'Awaiting artwork');
+  await expectStatus(page, 'Ready to artwork');
   await expect(waitingOn(page)).toContainText('Pete Production');
   await expect(page.getByText('Create the artwork', { exact: true })).toBeVisible();
 
@@ -91,7 +91,7 @@ test('a line with no artwork needed goes straight to sign-off', async ({ page })
   await page.getByRole('button', { name: 'Add line' }).click();
   await expect(page.getByText('Line OS-002 added.')).toBeVisible();
   saveItem('os2', idFromUrl(page));
-  await expectStatus(page, 'With Operations');
+  await expectStatus(page, 'Artworked · with Operations');
   await expect(waitingOn(page)).toContainText('Olivia Ops');
   await expect(page.getByText('Artwork isn’t needed for this line, so sign-off has started.')).toBeVisible();
 });
@@ -109,7 +109,7 @@ test('sponsor lines are linked to the sponsor and their account manager', async 
   await page.getByRole('button', { name: 'Add line' }).click();
   await expect(page.getByText('Line SS-001 added.')).toBeVisible();
   saveItem('ss1', idFromUrl(page));
-  await expectStatus(page, 'Awaiting artwork');
+  await expectStatus(page, 'Ready to artwork');
   await expect(waitingOn(page)).toContainText('Amy Account');
   await expect(page.getByText('Chase artwork from Acme Steel', { exact: true })).toBeVisible();
 
@@ -126,9 +126,9 @@ test('sponsor lines are linked to the sponsor and their account manager', async 
 
 test('the schedule lists, filters, searches and exports lines', async ({ page }) => {
   await loginAs(page, 'pete');
-  await page.goto('/schedule/os');
+  await page.goto('/schedule/os?view=workflow'); // the workflow view: waiting on, deadlines and flags
   await expect(page.getByRole('heading', { name: 'Organiser signage' })).toBeVisible();
-  const rows = page.locator('table tbody tr');
+  const rows = page.locator('table tbody tr[data-line]');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toContainText('OS-001');
   await expect(rows.nth(1)).toContainText('OS-002');
@@ -142,17 +142,18 @@ test('the schedule lists, filters, searches and exports lines', async ({ page })
   // Export uses the same filters
   const csv = parseCsv(await (await page.request.get('/api/export/os?q=totem')).text());
   expect(csv).toHaveLength(2);
-  expect(csv[0].slice(0, 5)).toEqual(['ID', 'List', 'Description', 'Status', 'Waiting on']);
+  expect(csv[0].slice(0, 7)).toEqual(['ID', 'Plan code', 'Section', 'List', 'Description', 'Status', 'Sheet status']);
   expect(csv[0]).toContain('Operations sign-off');
   const rec = Object.fromEntries(csv[0].map((h, i) => [h, csv[1][i]]));
   expect(rec.ID).toBe('OS-002');
-  expect(rec.Status).toBe('With Operations');
+  expect(rec.Status).toBe('Artworked · with Operations');
+  expect(rec['Sheet status']).toBe('Artworked');
   expect(rec['Waiting on']).toBe('Olivia Ops');
-  expect(rec.Wording).toBe("'=1+2 (arrows to registration)"); // spreadsheet formulas are neutralised
+  expect(rec['Side 1']).toBe("'=1+2 (arrows to registration)"); // spreadsheet formulas are neutralised
 
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(rows).toHaveCount(2);
-  await page.getByLabel('Status').selectOption({ label: 'In sign-off' });
+  await page.getByLabel('Status').selectOption({ label: 'Artworked – in sign-off' });
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('OS-002');
   await page.getByLabel('Status').selectOption({ label: 'All statuses' });
@@ -171,7 +172,7 @@ test('the schedule lists, filters, searches and exports lines', async ({ page })
   const all = parseCsv(await full.text());
   expect(all.map((r) => r[0])).toEqual(['ID', 'OS-001', 'OS-002', 'SS-001', 'SI-001']);
   const os1 = Object.fromEntries(all[0].map((h, i) => [h, all[1][i]]));
-  expect(os1.Wording).toBe('Welcome to UK Construction Week\r\nHall S1'); // line breaks survive inside quotes
+  expect(os1['Side 1']).toBe('Welcome to UK Construction Week\r\nHall S1'); // line breaks survive inside quotes
   expect(os1['Total cost']).toBe('1350');
   expect(os1.Supplier).toBe('Signs Express');
 

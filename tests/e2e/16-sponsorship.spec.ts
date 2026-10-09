@@ -95,7 +95,7 @@ test('a User from the sales team marks it sold to a new sponsor at a price', asy
   await expect(sale).toContainText('£3,100.00');
   await expect(sale).toContainText('by Vic Viewer');
   // Now the normal route starts: the new sponsor has no account manager yet
-  await expectStatus(page, 'Awaiting artwork');
+  await expectStatus(page, 'Ready to artwork');
   await expect(waitingOn(page)).toContainText('Account manager not set');
   await expect(panel(page, 'Comments and history')).toContainText('Sold to Hydro Ltd for £5,500');
   await page.screenshot({ path: test.info().outputPath('sold-item.png'), fullPage: true });

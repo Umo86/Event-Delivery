@@ -36,17 +36,17 @@ export function ItemTable({ rows, today, showCategory = false, showAction = fals
         <table className="w-full border-collapse text-left text-[14px]">
           <thead>
             <tr className="border-b border-line bg-paper/70 text-[13px] text-ink-2">
-              <th className="w-[60px] px-3 py-2.5 font-semibold"><span className="sr-only">Artwork</span></th>
-              <th className="px-3 py-2.5 font-semibold">Line</th>
-              <th className="px-3 py-2.5 font-semibold">Status</th>
-              <th className="px-3 py-2.5 font-semibold">{showAction ? 'Next step' : 'Waiting on'}</th>
-              <th className="px-3 py-2.5 font-semibold">Next deadline</th>
-              <th className="px-3 py-2.5 font-semibold"><span className="sr-only">Flag</span></th>
+              <th scope="col" className="w-[60px] px-3 py-2.5 font-semibold"><span className="sr-only">Artwork</span></th>
+              <th scope="col" className="px-3 py-2.5 font-semibold">Line</th>
+              <th scope="col" className="px-3 py-2.5 font-semibold">Status</th>
+              <th scope="col" className="px-3 py-2.5 font-semibold">{showAction ? 'Next step' : 'Waiting on'}</th>
+              <th scope="col" className="px-3 py-2.5 font-semibold">Next deadline</th>
+              <th scope="col" className="px-3 py-2.5 font-semibold"><span className="sr-only">Flag</span></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.item.id} className={cx('group border-b border-line last:border-0 hover:bg-signal-soft/40', r.state.group === 'cancelled' && 'opacity-60')}>
+              <tr key={r.item.id} data-line={r.code} className={cx('group border-b border-line last:border-0 hover:bg-signal-soft/40', r.state.group === 'cancelled' && 'opacity-60')}>
                 <td className="px-3 py-2 align-middle">
                   <Link href={`/items/${r.item.id}`} tabIndex={-1} aria-hidden>
                     <Thumb src={thumbUrl(r)} alt="" size={44} />

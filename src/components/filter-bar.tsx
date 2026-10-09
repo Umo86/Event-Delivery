@@ -7,8 +7,10 @@ import { cx } from './ui';
 
 type Opt = { value: string; label: string };
 
-export function FilterBar({ statuses, people, sponsors, halls, suppliers = [], showSponsor = true }: {
-  statuses: Opt[]; people: Opt[]; sponsors: Opt[]; halls: string[]; suppliers?: Opt[]; showSponsor?: boolean;
+export function FilterBar({ statuses, people, sponsors, halls, suppliers = [], sections = [], showSponsor = true, sheet = false }: {
+  statuses: Opt[]; people: Opt[]; sponsors: Opt[]; halls: string[]; suppliers?: Opt[]; sections?: Opt[]; showSponsor?: boolean;
+  /** The sheet view: no waiting-on, flag or sort controls, which belong to the workflow view. */
+  sheet?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -41,7 +43,7 @@ export function FilterBar({ statuses, people, sponsors, halls, suppliers = [], s
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const sel = 'h-9 rounded-md border border-line-strong bg-white px-2.5 text-[14px] text-ink focus:border-ink focus:outline-none';
-  const active = ['status', 'waiting', 'sponsor', 'supplier', 'flag', 'hall', 'q', 'cancelled', 'sort'].some((k) => current.get(k));
+  const active = ['status', 'waiting', 'sponsor', 'supplier', 'flag', 'hall', 'section', 'q', 'cancelled', 'sort'].some((k) => current.get(k));
 
   return (
     <div className={cx('mb-4 flex flex-wrap items-center gap-2', pending && 'opacity-70')} role="search">
@@ -64,12 +66,21 @@ export function FilterBar({ statuses, people, sponsors, halls, suppliers = [], s
         <option value="">All statuses</option>
         {statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
       </select>
-      <select aria-label="Waiting on" className={sel} value={current.get('waiting') ?? ''} onChange={(e) => set('waiting', e.target.value)}>
-        <option value="">Waiting on anyone</option>
-        <option value="me">Waiting on me</option>
-        <option value="unassigned">Waiting on nobody assigned</option>
-        {people.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-      </select>
+      {sections.length > 0 && (
+        <select aria-label="Section" className={sel} value={current.get('section') ?? ''} onChange={(e) => set('section', e.target.value)}>
+          <option value="">All sections</option>
+          {sections.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="none">No section</option>
+        </select>
+      )}
+      {!sheet && (
+        <select aria-label="Waiting on" className={sel} value={current.get('waiting') ?? ''} onChange={(e) => set('waiting', e.target.value)}>
+          <option value="">Waiting on anyone</option>
+          <option value="me">Waiting on me</option>
+          <option value="unassigned">Waiting on nobody assigned</option>
+          {people.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+      )}
       {showSponsor && sponsors.length > 0 && (
         <select aria-label="Sponsor" className={sel} value={current.get('sponsor') ?? ''} onChange={(e) => set('sponsor', e.target.value)}>
           <option value="">All sponsors</option>
@@ -83,34 +94,44 @@ export function FilterBar({ statuses, people, sponsors, halls, suppliers = [], s
           {suppliers.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       )}
-      <select aria-label="Flag" className={sel} value={current.get('flag') ?? ''} onChange={(e) => set('flag', e.target.value)}>
-        <option value="">Any flag</option>
-        <option value="any">Flagged only</option>
-        <option value="urgent">Overdue or not signed off</option>
-        <option value="overdue">Overdue</option>
-        <option value="not_signed_off">Not signed off</option>
-        <option value="due_soon">Due soon</option>
-        <option value="slow">Slow sign-off</option>
-      </select>
+      {!sheet && (
+        <select aria-label="Flag" className={sel} value={current.get('flag') ?? ''} onChange={(e) => set('flag', e.target.value)}>
+          <option value="">Any flag</option>
+          <option value="any">Flagged only</option>
+          <option value="urgent">Overdue or not signed off</option>
+          <option value="overdue">Overdue</option>
+          <option value="not_signed_off">Not signed off</option>
+          <option value="due_soon">Due soon</option>
+          <option value="slow">Slow sign-off</option>
+        </select>
+      )}
       {halls.length > 0 && (
         <select aria-label="Hall" className={sel} value={current.get('hall') ?? ''} onChange={(e) => set('hall', e.target.value)}>
           <option value="">All halls</option>
           {halls.map((h) => <option key={h} value={h}>{h}</option>)}
         </select>
       )}
-      <select aria-label="Sort" className={sel} value={current.get('sort') ?? ''} onChange={(e) => set('sort', e.target.value)}>
-        <option value="">Sort by ID</option>
-        <option value="urgency">Most urgent first</option>
-        <option value="due">Next deadline</option>
-        <option value="waiting">Waiting on</option>
-      </select>
+      {!sheet && (
+        <select aria-label="Sort" className={sel} value={current.get('sort') ?? ''} onChange={(e) => set('sort', e.target.value)}>
+          <option value="">Sort by ID</option>
+          <option value="urgency">Most urgent first</option>
+          <option value="due">Next deadline</option>
+          <option value="waiting">Waiting on</option>
+        </select>
+      )}
       <label className="flex items-center gap-1.5 text-[14px] text-ink-2">
         <input type="checkbox" checked={current.get('cancelled') === '1'} onChange={(e) => set('cancelled', e.target.checked ? '1' : '')} className="h-4 w-4 accent-[#13233b]" />
         Show cancelled
       </label>
       {active && (
         <button type="button" className="text-[14px] font-semibold text-ink underline underline-offset-2"
-          onClick={() => { setQ(''); if (timer.current) clearTimeout(timer.current); go(''); }}>
+          onClick={() => {
+            setQ('');
+            if (timer.current) clearTimeout(timer.current);
+            // Keep the view; clear everything else
+            const view = current.get('view');
+            go(view ? `view=${view}` : '');
+          }}>
           Clear filters
         </button>
       )}

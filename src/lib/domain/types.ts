@@ -51,6 +51,13 @@ export interface EventRow {
   created_at: Date;
 }
 
+export interface SectionRow {
+  id: string;
+  event_id: string;
+  name: string;
+  position: number;
+}
+
 export interface StageRow {
   id: string;
   event_id: string;
@@ -111,8 +118,16 @@ export interface ItemRow {
   last_version?: number;
   description: string;
   sponsor_id: string | null;
+  /** The section of the show it belongs to on the sheet (F1 UKCW Main Stage…). */
+  section_id: string | null;
+  /** The team's own code from plans and the old sheet (F1.1, MBar2). */
+  plan_code: string | null;
   item_type: string | null;
+  /** Wording for side 1 (or the only side). */
   wording: string | null;
+  /** Wording for side 2 of a double-sided graphic. */
+  wording_side2: string | null;
+  bleed_mm: number | null;
   hall: string | null;
   zone: string | null;
   location_detail: string | null;

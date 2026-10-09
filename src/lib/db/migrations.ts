@@ -470,6 +470,29 @@ insert into list_options (list_key, value, sort) values
 on conflict do nothing;
 `,
   },
+  {
+    version: 11,
+    name: 'sheet view: sections, plan codes, bleed and side 2 wording',
+    sql: /* sql */ `
+-- The signage sheet groups graphics under sections (F1 UKCW Main Stage, Hall 4 - Main Bar Branding…), each with
+-- a position so the sheet reads in show order. Sections belong to a show.
+create table sections (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  name text not null,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create unique index sections_event_name_idx on sections (event_id, lower(name));
+alter table items add column section_id uuid references sections(id) on delete set null;
+create index items_section_idx on items (section_id);
+-- The code the team uses on plans and in the old sheet (F1.1, MBar2), kept alongside the platform's OS-001.
+alter table items add column plan_code text;
+-- Bleed in mm, and the wording for the second side of a double-sided graphic (side 1 is the existing wording).
+alter table items add column bleed_mm int check (bleed_mm is null or bleed_mm >= 0);
+alter table items add column wording_side2 text;
+`,
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -6,7 +6,7 @@ import { londonDate } from '@/lib/dates';
 import { computeItemState, type EngineContext, type ItemState } from '@/lib/domain/engine';
 import { itemCode } from '@/lib/domain/labels';
 import type {
-  DecisionRow, DepartmentRow, EventRow, ItemRow, SponsorRow, StageRow, SupplierRow, UserRow, VersionRow,
+  DecisionRow, DepartmentRow, EventRow, ItemRow, SectionRow, SponsorRow, StageRow, SupplierRow, UserRow, VersionRow,
 } from '@/lib/domain/types';
 
 export const EVENT_COOKIE = 'ed_event';
@@ -37,6 +37,8 @@ export interface Bundle {
   event: EventRow;
   stages: StageRow[];
   sponsors: SponsorRow[];
+  /** The show's sheet sections, in order. */
+  sections: SectionRow[];
   suppliers: SupplierRow[];
   users: UserRow[];
   departments: DepartmentRow[];
@@ -48,12 +50,13 @@ export interface Bundle {
 
 export const loadBundle = cache(async (eventId: string): Promise<Bundle | null> => {
   const sql = await db();
-  const [events, stageRows, approvers, sponsors, suppliers, users, departments, eventDepts, opts] = await Promise.all([
+  const [events, stageRows, approvers, sponsors, sections, suppliers, users, departments, eventDepts, opts] = await Promise.all([
     sql<EventRow[]>`select * from events where id = ${eventId}`,
     sql<StageRow[]>`select * from stages where event_id = ${eventId} and not archived order by position, created_at`,
     sql<{ stage_id: string; user_id: string }[]>`select sa.stage_id, sa.user_id from stage_approvers sa
       join stages s on s.id = sa.stage_id where s.event_id = ${eventId}`,
     sql<SponsorRow[]>`select * from sponsors where event_id = ${eventId} order by lower(name)`,
+    sql<SectionRow[]>`select id, event_id, name, position from sections where event_id = ${eventId} order by position, lower(name)`,
     sql<SupplierRow[]>`select * from suppliers order by lower(name)`,
     sql<UserRow[]>`select id, email, full_name, job_title, role, active, must_change_password, last_login_at, created_at from users order by lower(full_name)`,
     sql<DepartmentRow[]>`select id, name, position, archived, external from departments where not archived order by position, lower(name)`,
@@ -75,7 +78,7 @@ export const loadBundle = cache(async (eventId: string): Promise<Bundle | null> 
     departmentsById: new Map(departments.map((d) => [d.id, d])),
     today: londonDate(),
   };
-  return { event, stages, sponsors, suppliers, users, departments, eventDepartmentIds: eventDepts.map((e) => e.department_id), lists, ctx };
+  return { event, stages, sponsors, sections, suppliers, users, departments, eventDepartmentIds: eventDepts.map((e) => e.department_id), lists, ctx };
 });
 
 export interface ScheduleRow {

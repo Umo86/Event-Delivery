@@ -87,7 +87,7 @@ test('managers can run signage, settings and the team, but not the admin pages',
   await page.goto('/shows/new');
   await expect(page.getByRole('heading', { name: 'New show', level: 1 })).toBeVisible();
   await page.goto('/settings');
-  expect(await settingsTabs(page)).toEqual(['Details and dates', 'Sign-off stages', 'Departments', 'Dropdown lists']);
+  expect(await settingsTabs(page)).toEqual(['Details and dates', 'Sign-off stages', 'Sections', 'Departments', 'Dropdown lists']);
 
   await page.goto('/suppliers'); // managers can add, edit and remove suppliers
   await expect(page.getByRole('button', { name: 'Add supplier' })).toBeVisible();

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { db, type Sql } from '@/lib/db';
 import { bool, date, int, isUuid, num, required, run, str, UserError, uuidOrNull, type ActionResult } from '@/lib/action';
 import { actor } from '@/lib/auth/session';
 import { randomToken, sha256 } from '@/lib/auth/password';
@@ -52,6 +52,8 @@ async function readItemFields(fd: FormData, eventId: string, category: Category)
   const shared = {
     description: required(fd, 'description', sponsorship ? 'Item name' : 'Description', 200),
     sponsor_id: sponsorId,
+    section_id: await readSection(sql, fd, eventId),
+    plan_code: str(fd, 'plan_code', 40),
     item_type: str(fd, 'item_type', 120),
     wording: str(fd, 'wording', 2000),
     hall: str(fd, 'hall', 60),
@@ -86,8 +88,83 @@ async function readItemFields(fd: FormData, eventId: string, category: Category)
     position: str(fd, 'position', 120),
     width_mm: int(fd, 'width_mm', 'Width', { min: 0, max: 1_000_000 }),
     height_mm: int(fd, 'height_mm', 'Height', { min: 0, max: 1_000_000 }),
+    bleed_mm: int(fd, 'bleed_mm', 'Bleed', { min: 0, max: 10_000 }),
     sides: sides as 'single' | 'double' | null,
+    wording_side2: sides === 'double' ? str(fd, 'wording_side2', 2000) : null,
   };
+}
+
+/**
+ * The section a line sits under on the sheet: an existing one by id, or a new one typed in (`section_new`),
+ * which is created at the end of the show's list. Blank means no section.
+ */
+async function readSection(sql: Sql, fd: FormData, eventId: string): Promise<string | null> {
+  const typed = str(fd, 'section_new', 80);
+  if (typed) {
+    const [existing] = await sql<{ id: string }[]>`select id from sections where event_id = ${eventId} and lower(name) = lower(${typed})`;
+    if (existing) return existing.id;
+    const [{ p }] = await sql<{ p: number }[]>`select coalesce(max(position), 0)::int + 1 as p from sections where event_id = ${eventId}`;
+    const [created] = await sql<{ id: string }[]>`insert into sections (event_id, name, position) values (${eventId}, ${typed}, ${p}) returning id`;
+    return created.id;
+  }
+  const raw = str(fd, 'section_id', 40);
+  if (!raw || raw === '__new__') return null; // "New section…" chosen but nothing typed: no section
+  const id = uuidOrNull(fd, 'section_id');
+  if (!id) return null;
+  const [ok] = await sql`select 1 from sections where id = ${id} and event_id = ${eventId}`;
+  if (!ok) throw new UserError('Pick a section from this show’s list, or type a new one.');
+  return id;
+}
+
+// ---- Sheet view: one cell at a time ----------------------------------------------------
+
+/** The Supplier cell on the sheet: saves as soon as it's picked. */
+export async function setItemSupplier(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const itemId = uuidOrNull(fd, 'item_id');
+    if (!itemId) throw new UserError('Missing line.');
+    const supplierId = uuidOrNull(fd, 'supplier_id');
+    const sql = await db();
+    const [item] = await sql<{ event_id: string; supplier_id: string | null; cancelled: boolean }[]>`select event_id, supplier_id, cancelled from items where id = ${itemId}`;
+    if (!item) throw new UserError('That line no longer exists.');
+    if (item.cancelled) throw new UserError('This line is cancelled. Restore it first.');
+    if (item.supplier_id === supplierId) return { ok: true };
+    let name: string | null = null;
+    if (supplierId) {
+      const [s] = await sql<{ name: string }[]>`select name from suppliers where id = ${supplierId}`;
+      if (!s) throw new UserError('Pick a supplier from the list.');
+      name = s.name;
+    }
+    await sql`update items set supplier_id = ${supplierId} where id = ${itemId}`;
+    await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'production',
+      message: name ? `Supplier: ${name}` : 'Cleared the supplier' });
+    refresh(itemId);
+    return { ok: true, message: name ? `Supplier: ${name}.` : 'Supplier cleared.' };
+  });
+}
+
+/** The Status cell on the sheet: moves an approved line along Sent → Printed → Delivered → Installed. */
+export async function setProductionStep(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await actor('manager');
+    const itemId = uuidOrNull(fd, 'item_id');
+    if (!itemId) throw new UserError('Missing line.');
+    const detail = await loadItem(itemId);
+    if (!detail) throw new UserError('That line no longer exists.');
+    const { item, state } = detail.row;
+    if (item.cancelled) throw new UserError('This line is cancelled. Restore it first.');
+    const status = (str(fd, 'production_status', 30) as ProductionStatus | null) ?? null;
+    if (status && !PROD.includes(status)) throw new UserError('Choose a status.');
+    if (status === item.production_status) return { ok: true };
+    if (status && !state.fullyApproved) throw new UserError('It can only move on once every sign-off stage has approved the artwork.');
+    const sql = await db();
+    await sql`update items set production_status = ${status} where id = ${itemId}`;
+    await logActivity(sql, { eventId: item.event_id, itemId, userId: me.id, actorName: me.full_name, kind: 'production',
+      message: status ? `Production status: ${productionLabelFor(status, item.category)}` : 'Cleared production status' });
+    refresh(itemId);
+    return { ok: true, message: status ? `${productionLabelFor(status, item.category)}.` : 'Back to approved.' };
+  });
 }
 
 export async function createItem(_prev: ActionResult | null, fd: FormData): Promise<ActionResult> {
@@ -114,7 +191,8 @@ export async function createItem(_prev: ActionResult | null, fd: FormData): Prom
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  description: 'description', sponsor_id: 'sponsor', item_type: 'type', wording: 'wording', hall: 'hall', zone: 'zone',
+  description: 'description', sponsor_id: 'sponsor', section_id: 'section', plan_code: 'plan code', item_type: 'type', wording: 'side 1 wording',
+  wording_side2: 'side 2 wording', bleed_mm: 'bleed', hall: 'hall', zone: 'zone',
   location_detail: 'location', position: 'position', width_mm: 'width', height_mm: 'height', sides: 'sides', qty: 'quantity',
   material: 'material', artwork_by: 'artwork supplier', artwork_due: 'artwork due date', artwork_link: 'artwork link',
   supplier_id: 'supplier', print_deadline: 'print deadline', po_number: 'PO number', delivery_date: 'delivery date',

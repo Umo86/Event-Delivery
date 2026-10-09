@@ -43,8 +43,8 @@ export default async function SponsorsPage() {
                 <th className="px-4 py-2.5 font-semibold">Sponsor</th>
                 <th className="px-3 py-2.5 font-semibold">Account manager</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Lines</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Awaiting artwork</th>
-                <th className="px-3 py-2.5 text-right font-semibold">In sign-off</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Ready to artwork</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Artworked</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Needs attention</th>
                 <th className="px-3 py-2.5 font-semibold">Approved</th>
                 <th className="px-4 py-2.5 text-right font-semibold"><span className="sr-only">Overdue</span></th>

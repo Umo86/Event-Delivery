@@ -1,7 +1,7 @@
 import { getCurrentUser } from '@/lib/auth/session';
 import { getCurrentEvent, loadSchedule } from '@/lib/data/load';
 import { applyFilters, readFilters } from '@/lib/data/filter';
-import { artworkByLabel, categoryBySlug, categoryInfo, decisionLabel, productionLabelFor } from '@/lib/domain/labels';
+import { artworkByLabel, categoryBySlug, categoryInfo, decisionLabel, productionLabelFor, sheetStatus, sheetStatusInfo } from '@/lib/domain/labels';
 
 function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
@@ -29,8 +29,9 @@ export async function GET(request: Request, ctx: { params: Promise<{ cat: string
   const suppliers = new Map(sched.bundle.suppliers.map((s) => [s.id, s.name]));
   const stages = sched.bundle.stages;
 
-  const header = ['ID', 'List', 'Description', 'Status', 'Waiting on', 'Next deadline', 'Flag', 'Days waiting', 'Sponsor', 'Account manager',
-    'Type', 'Wording', 'Hall', 'Zone', 'Location', 'Position', 'Width mm', 'Height mm', 'Sides', 'Qty', 'Material', 'Artwork by',
+  const sections = new Map(sched.bundle.sections.map((s) => [s.id, s.name]));
+  const header = ['ID', 'Plan code', 'Section', 'List', 'Description', 'Status', 'Sheet status', 'Waiting on', 'Next deadline', 'Flag', 'Days waiting', 'Sponsor', 'Account manager',
+    'Type', 'Side 1', 'Side 2', 'Hall', 'Zone', 'Location', 'Position', 'Width mm', 'Height mm', 'Sides', 'Bleed mm', 'Qty', 'Material', 'Artwork by',
     'Artwork due', 'Artwork version', 'Artwork link', ...stages.map((s) => `${s.name} sign-off`), 'Supplier', 'Print/order deadline',
     'Production status', 'PO number', 'Delivery date', 'Install date', 'Unit cost', 'Total cost',
     // Sponsorship items
@@ -49,11 +50,13 @@ export async function GET(request: Request, ctx: { params: Promise<{ cat: string
       if (st.decision && (st.kind === 'current' || st.kind === 'stale')) return `${decisionLabel(st.decision.decision)} by ${st.decision.decided_by_name}`;
       return st.kind === 'current' ? 'Waiting' : 'Pending';
     });
+    const sheet = sheetStatus(r.state.group);
     lines.push([
-      r.code, categoryInfo(it.category).label, it.description, r.state.statusLabel, r.state.waitingOnLabel, r.state.due,
+      r.code, it.plan_code, it.section_id ? sections.get(it.section_id) : '', categoryInfo(it.category).label, it.description, r.state.statusLabel,
+      sheet ? sheetStatusInfo(sheet).label : '', r.state.waitingOnLabel, r.state.due,
       r.state.flag ? r.state.flag.replace(/_/g, ' ') : '', r.state.daysWaiting, r.sponsor?.name,
-      r.sponsor?.account_manager_id ? names.get(r.sponsor.account_manager_id) : '', it.item_type, it.wording, it.hall, it.zone,
-      it.location_detail, it.position, it.width_mm, it.height_mm, it.sides, it.qty, it.material, artworkByLabel(it.artwork_by),
+      r.sponsor?.account_manager_id ? names.get(r.sponsor.account_manager_id) : '', it.item_type, it.wording, it.sides === 'double' ? it.wording_side2 : '', it.hall, it.zone,
+      it.location_detail, it.position, it.width_mm, it.height_mm, it.sides, it.bleed_mm, it.qty, it.material, artworkByLabel(it.artwork_by),
       it.artwork_due, r.version?.version ?? '', it.artwork_link, ...so, it.supplier_id ? suppliers.get(it.supplier_id) : '',
       it.print_deadline, it.production_status ? productionLabelFor(it.production_status, it.category) : '', it.po_number, it.delivery_date,
       it.install_date, it.unit_cost, total,

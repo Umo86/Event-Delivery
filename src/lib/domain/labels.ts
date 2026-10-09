@@ -26,11 +26,12 @@ export const ARTWORK_BY: { key: ArtworkBy; label: string }[] = [
 ];
 export const artworkByLabel = (k: ArtworkBy) => ARTWORK_BY.find((a) => a.key === k)?.label ?? k;
 
-export const PRODUCTION: { key: ProductionStatus; label: string }[] = [
-  { key: 'sent_to_supplier', label: 'Sent to supplier' },
-  { key: 'in_production', label: 'In production' },
-  { key: 'delivered', label: 'Delivered to venue' },
-  { key: 'installed', label: 'Installed' },
+// Production steps, in the words the team uses on the signage sheet: Sent → Printed → Delivered → Installed.
+export const PRODUCTION: { key: ProductionStatus; label: string; help: string }[] = [
+  { key: 'sent_to_supplier', label: 'Sent', help: 'Sent to the supplier to print or make' },
+  { key: 'in_production', label: 'Printed', help: 'Printed or made, not yet at the venue' },
+  { key: 'delivered', label: 'Delivered', help: 'At the venue' },
+  { key: 'installed', label: 'Installed', help: 'In place' },
 ];
 export const productionLabel = (k: ProductionStatus) => PRODUCTION.find((p) => p.key === k)?.label ?? k;
 
@@ -50,20 +51,59 @@ export const DECISIONS: { key: DecisionValue; label: string; verb: string }[] = 
 export const decisionLabel = (k: DecisionValue) => DECISIONS.find((d) => d.key === k)?.label ?? k;
 
 export const GROUPS: { key: Group; label: string; tone: Tone }[] = [
-  { key: 'awaiting_artwork', label: 'Awaiting artwork', tone: 'grey' },
-  { key: 'in_signoff', label: 'In sign-off', tone: 'amber' },
+  { key: 'awaiting_artwork', label: 'Ready to artwork', tone: 'grey' },
+  { key: 'in_signoff', label: 'Artworked – in sign-off', tone: 'yellow' },
   { key: 'changes_requested', label: 'Changes requested', tone: 'orange' },
   { key: 'rejected', label: 'Rejected', tone: 'red' },
   { key: 'on_hold', label: 'On hold', tone: 'violet' },
-  { key: 'approved', label: 'Approved – ready to order', tone: 'lime' },
-  { key: 'sent_to_supplier', label: 'Sent to supplier', tone: 'teal' },
-  { key: 'in_production', label: 'In production', tone: 'cyan' },
-  { key: 'delivered', label: 'Delivered to venue', tone: 'blue' },
-  { key: 'installed', label: 'Installed', tone: 'green' },
+  { key: 'approved', label: 'Approved – ready to send', tone: 'orange' },
+  { key: 'sent_to_supplier', label: 'Sent', tone: 'teal' },
+  { key: 'in_production', label: 'Printed', tone: 'green' },
+  { key: 'delivered', label: 'Delivered', tone: 'green' },
+  { key: 'installed', label: 'Installed', tone: 'blue' },
   { key: 'cancelled', label: 'Cancelled', tone: 'muted' },
   { key: 'for_sale', label: 'For sale', tone: 'yellow' },
 ];
 export const groupInfo = (k: Group) => GROUPS.find((g) => g.key === k)!;
+
+/**
+ * The six words on the signage sheet, with its colours. Every line is one of these, worked out from what has
+ * happened to it (artwork uploaded, stages signed off, production updated). Held-up lines (changes requested,
+ * rejected, on hold) count as Artworked, with the hold-up shown alongside.
+ */
+export type SheetStatus = 'ready' | 'artworked' | 'approved' | 'sent' | 'printed' | 'installed';
+
+export const SHEET_STATUSES: { key: SheetStatus; label: string; tone: Tone; swatch: string }[] = [
+  { key: 'ready', label: 'Ready to artwork', tone: 'grey', swatch: '#f1f5f9' },
+  { key: 'artworked', label: 'Artworked', tone: 'yellow', swatch: '#fef08a' },
+  { key: 'approved', label: 'Approved', tone: 'orange', swatch: '#fdba74' },
+  { key: 'sent', label: 'Sent', tone: 'teal', swatch: '#99f6e4' },
+  { key: 'printed', label: 'Printed', tone: 'green', swatch: '#86efac' },
+  { key: 'installed', label: 'Installed', tone: 'blue', swatch: '#bfdbfe' },
+];
+
+export function sheetStatus(group: Group): SheetStatus | null {
+  switch (group) {
+    case 'awaiting_artwork': return 'ready';
+    case 'in_signoff': case 'changes_requested': case 'rejected': case 'on_hold': return 'artworked';
+    case 'approved': return 'approved';
+    case 'sent_to_supplier': return 'sent';
+    case 'in_production': case 'delivered': return 'printed';
+    case 'installed': return 'installed';
+    default: return null; // cancelled, for sale
+  }
+}
+export const sheetStatusInfo = (k: SheetStatus) => SHEET_STATUSES.find((s) => s.key === k)!;
+
+/** Row background for the sheet view, pale so the text stays readable. */
+export const SHEET_ROW_CLASSES: Record<SheetStatus, string> = {
+  ready: 'bg-white',
+  artworked: 'bg-yellow-50',
+  approved: 'bg-orange-50',
+  sent: 'bg-teal-50',
+  printed: 'bg-green-50',
+  installed: 'bg-blue-50',
+};
 
 /** What kind of job a line is waiting on: new artwork, a sign-off decision, or ordering and delivery. */
 export type ActionKind = 'artwork' | 'signoff' | 'production';
@@ -111,7 +151,7 @@ export const TONE_CLASSES: Record<Tone, string> = {
   teal: 'bg-teal-50 text-teal-800 ring-teal-200',
   cyan: 'bg-cyan-50 text-cyan-800 ring-cyan-200',
   blue: 'bg-blue-50 text-blue-800 ring-blue-200',
-  green: 'bg-green-600 text-white ring-green-700',
+  green: 'bg-green-100 text-green-900 ring-green-300',
   muted: 'bg-slate-50 text-slate-400 ring-slate-200 line-through',
   yellow: 'bg-yellow-100 text-yellow-900 ring-yellow-300',
 };
@@ -119,15 +159,15 @@ export const TONE_CLASSES: Record<Tone, string> = {
 /** Solid colours for charts (kept in step with the tones above). */
 export const GROUP_CHART_COLOURS: Record<Group, string> = {
   awaiting_artwork: '#94a3b8',
-  in_signoff: '#f59e0b',
+  in_signoff: '#eab308',
   changes_requested: '#f97316',
   rejected: '#dc2626',
   on_hold: '#8b5cf6',
-  approved: '#84cc16',
+  approved: '#fb923c',
   sent_to_supplier: '#14b8a6',
-  in_production: '#06b6d4',
-  delivered: '#3b82f6',
-  installed: '#15803d',
-  for_sale: '#eab308',
+  in_production: '#22c55e',
+  delivered: '#16a34a',
+  installed: '#3b82f6',
+  for_sale: '#facc15',
   cancelled: '#cbd5e1',
 };

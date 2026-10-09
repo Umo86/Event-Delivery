@@ -26,10 +26,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Five phases, validated for colour-blind separation; always shown with labels and counts.
 const PHASES = [
-  { key: 1, label: 'Awaiting artwork', color: '#7c6fd6', status: 'awaiting_artwork' },
-  { key: 2, label: 'In sign-off', color: '#e3a008', status: 'in_signoff' },
+  { key: 1, label: 'Ready to artwork', color: '#7c6fd6', status: 'awaiting_artwork' },
+  { key: 2, label: 'Artworked', color: '#e3a008', status: 'in_signoff' },
   { key: 3, label: 'Needs attention', color: '#dc2626', status: 'attention' },
-  { key: 4, label: 'Approved or in production', color: '#0284c7', status: 'production' },
+  { key: 4, label: 'Approved, sent or printed', color: '#0284c7', status: 'production' },
   { key: 5, label: 'Installed', color: '#15803d', status: 'installed' },
 ] as const;
 // Sponsorship items nobody has bought yet: shown on their own bar only, in a neutral grey (they aren't late or stuck).

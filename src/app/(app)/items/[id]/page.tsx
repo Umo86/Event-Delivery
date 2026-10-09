@@ -47,7 +47,10 @@ export default async function ItemPage(props: {
   const forSale = state.group === 'for_sale';
   const where = [item.hall, item.zone, item.location_detail].filter(Boolean).join(', ');
   // Sponsorship items: what's being sold and how it reaches visitors (the sale itself is in the Sale panel)
+  const sectionName = item.section_id ? bundle.sections.find((x) => x.id === item.section_id)?.name ?? null : null;
   const sponsorshipSpec: [string, React.ReactNode][] = [
+    ['Section', sectionName],
+    ['Plan code', item.plan_code],
     ['Type', item.item_type],
     ['What’s included', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
     ['Material / spec', item.material],
@@ -67,14 +70,18 @@ export default async function ItemPage(props: {
 
   const signageSpec: [string, React.ReactNode][] = [
     ['Sponsor', sponsor ? <>{sponsor.name}{sponsor.account_manager_id ? <span className="text-muted">, managed by {names.get(sponsor.account_manager_id)}</span> : null}</> : <span className="text-muted">None</span>],
+    ['Section', sectionName],
+    ['Plan code', item.plan_code],
     ['Type', item.item_type],
-    ['Wording / content', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
+    [item.sides === 'double' ? 'Side 1 wording' : 'Wording / content', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
+    ...(item.sides === 'double' ? [['Side 2 wording', item.wording_side2 ? <span className="whitespace-pre-wrap">{item.wording_side2}</span> : null] as [string, React.ReactNode]] : []),
     ['Hall', item.hall ? <Plate tone="light">{item.hall}</Plate> : null],
     ['Zone / area', item.zone],
     ['Exact location', item.location_detail],
     ['Position', item.position],
     ['Size', item.width_mm || item.height_mm ? `${(item.width_mm ?? 0).toLocaleString('en-GB')} × ${(item.height_mm ?? 0).toLocaleString('en-GB')} mm` : null],
     ['Sides', item.sides === 'double' ? 'Double-sided' : item.sides === 'single' ? 'Single-sided' : null],
+    ['Bleed', item.bleed_mm !== null && item.bleed_mm !== undefined ? `${item.bleed_mm} mm` : null],
     ['Quantity', item.qty?.toLocaleString('en-GB')],
     ['Material / spec', item.material],
     ['Artwork from', artworkByLabel(item.artwork_by)],
