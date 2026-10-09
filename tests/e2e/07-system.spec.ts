@@ -149,7 +149,7 @@ test('a new show copies stages and sponsors, and people can switch between shows
   await expect(page.getByRole('link', { name: 'BuildCo' })).toBeVisible();
   await page.goto('/schedule/os');
   await expect(page.getByText('No organiser signage yet')).toBeVisible();
-  await page.goto('/schedule/os/new');
+  await page.goto('/signage/new?type=os');
   await expect(page.locator('#dl-hall option').first()).toHaveAttribute('value', 'Hall 1');
 
   // Switch back to London from the menu
@@ -207,7 +207,7 @@ test.describe('on a phone', () => {
 
   test('no page scrolls sideways on a phone', async ({ page }) => {
     await loginAs(page, 'admin');
-    const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/schedule/ss/new', '/sponsors',
+    const pages = ['/inbox', '/inbox?view=team', '/dashboard', '/schedule/os', '/schedule/all', '/signage/new', '/sponsors',
       `/items/${itemId('os1')}`, `/items/${itemId('ss1')}`, `/proof/${itemId('os1')}`, '/settings', '/settings/stages', '/admin',
       '/suppliers', '/settings/lists', '/shows', '/shows/new', '/shows/setup', '/team', '/admin/platform', '/admin/activity', '/account', '/gs'];
     const wide: string[] = [];

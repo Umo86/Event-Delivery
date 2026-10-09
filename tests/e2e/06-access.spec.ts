@@ -30,7 +30,7 @@ test('signed-out visitors are sent to sign in, then back to the page they wanted
 test('users can look but not change anything', async ({ page }) => {
   await loginAs(page, 'vic');
   await page.goto('/schedule/os');
-  await expect(page.getByRole('link', { name: 'Add line' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Add signage' })).toHaveCount(0);
   await page.goto('/schedule/os/new');
   await expect(page).toHaveURL(/\/schedule\/os$/);
 

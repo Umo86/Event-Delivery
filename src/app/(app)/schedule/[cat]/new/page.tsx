@@ -17,6 +17,8 @@ export default async function NewItemPage(props: { params: Promise<{ cat: string
   const category = categoryBySlug(cat);
   if (!category) notFound();
   if (!canEdit(user)) redirect(`/schedule/${cat}`);
+  // Signage is added from the one step-by-step form
+  if (category.key !== 'sponsor_item') redirect(`/signage/new?type=${category.slug}${sponsor ? `&sponsor=${sponsor}` : ''}`);
   const event = await getCurrentEvent();
   if (!event) return <NoEvent />;
   const bundle = await loadBundle(event.id);

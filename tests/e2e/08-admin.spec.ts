@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
-  acceptNextDialog, asUser, decide, emailToSend, errorMessage, expectStatus, idFromUrl, login, loginAs, makePng, okMessage,
-  openPerson, panel, signoffStage, uploadArtwork, withDb,
+  acceptNextDialog, addSignage, asUser, decide, emailToSend, errorMessage, expectStatus, idFromUrl, login, loginAs, makePng, okMessage, openPerson, panel, signoffStage, uploadArtwork, withDb,
 } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -30,13 +29,13 @@ test('changing someone’s access level takes effect straight away', async ({ br
 
   const vic = await asUser(browser, 'vic');
   await vic.page.goto('/schedule/os');
-  await expect(vic.page.getByRole('link', { name: 'Add line' })).toBeVisible();
+  await expect(vic.page.getByRole('link', { name: 'Add signage' })).toBeVisible();
 
   await row.getByLabel('Access level', { exact: true }).selectOption('user');
   await row.getByRole('button', { name: 'Save access' }).click();
   await expect(okMessage(row, 'Vic Viewer is now a User.')).toBeVisible();
   await vic.page.reload();
-  await expect(vic.page.getByRole('link', { name: 'Add line' })).toHaveCount(0);
+  await expect(vic.page.getByRole('link', { name: 'Add signage' })).toHaveCount(0);
   await vic.ctx.close();
   await expect(panel(page, 'Access log')).toContainText('Changed Vic Viewer from Manager to User');
 });
@@ -128,10 +127,7 @@ test('an expired invite is refused at sign-in and can be sent again', async ({ b
 
 test('sponsor approval links can be switched off and back on', async ({ browser, page }) => {
   await loginAs(page, 'admin');
-  await page.goto('/schedule/ss/new');
-  await page.fill('#description', 'Acme Steel aisle sign');
-  await page.locator('#sponsor_id').selectOption({ label: 'Acme Steel' });
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await addSignage(page, 'ss', { sponsor_id: 'Acme Steel', description: 'Acme Steel aisle sign' });
   await expect(page.getByText(/^Line SS-\d{3} added\./)).toBeVisible();
   const id = idFromUrl(page);
   await uploadArtwork(page, { name: 'aisle.png', mimeType: 'image/png', buffer: makePng(400, 200) });

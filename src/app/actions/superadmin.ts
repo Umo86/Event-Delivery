@@ -8,6 +8,8 @@ import { sha256 } from '@/lib/auth/password';
 import { SESSION_COOKIE, superActor, type CurrentUser } from '@/lib/auth/session';
 import { logActivity } from '@/lib/activity';
 import { SETTING, writeSetting } from '@/lib/settings';
+import { EVENT_COOKIE } from '@/lib/data/load';
+import { addSampleData, removeSampleData, SAMPLE_SHOW } from '@/lib/data/sample';
 
 // Platform-wide controls on Admin › Platform that only super admins have. Every change goes in the access log.
 
@@ -81,5 +83,43 @@ export async function setDemoLogin(_prev: ActionResult | null, fd: FormData): Pr
     await audit(sql, me, `${on ? 'Reactivated' : 'Deactivated'} the demo login (${demo.full_name})`);
     refresh();
     return { ok: true, message: on ? 'The demo login is back on the sign-in page.' : 'The demo login is off the sign-in page and no longer works.' };
+  });
+}
+
+// ---- Sample data -------------------------------------------------------------------------
+
+/** Adds the sample show, team, sponsors, suppliers and signage. The sample people's passwords are shown once, here. */
+export async function addSample(_prev: ActionResult | null, _fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await superActor();
+    if (me.is_demo) throw new UserError('The demo login can’t add sample data.');
+    const sql = await db();
+    let result: Awaited<ReturnType<typeof addSampleData>>;
+    try {
+      result = await addSampleData(sql, me);
+    } catch (e) {
+      throw new UserError(e instanceof Error ? e.message : 'The sample data couldn’t be added.');
+    }
+    const jar = await cookies();
+    jar.set(EVENT_COOKIE, result.eventId, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+    refresh();
+    return {
+      ok: true,
+      message: `${SAMPLE_SHOW} is ready with ${result.lines} lines. You’re now working in it. The sample team can sign in with these temporary passwords (shown only now; make a new invite from Team if you lose one).`,
+      data: { people: result.people },
+    };
+  });
+}
+
+export async function removeSample(_prev: ActionResult | null, _fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const me = await superActor();
+    const sql = await db();
+    const { removed } = await removeSampleData(sql, me);
+    if (!removed) throw new UserError('There’s no sample data to remove.');
+    const jar = await cookies();
+    jar.delete(EVENT_COOKIE);
+    refresh();
+    return { ok: true, message: 'Sample data removed: the sample show and its lines, the sample people and the sample suppliers.' };
   });
 }

@@ -4,7 +4,7 @@ export const APP_NAME = 'Event Delivery';
 
 export const CATEGORIES: { key: Category; slug: 'os' | 'ss' | 'si'; label: string; short: string; prefix: string }[] = [
   { key: 'organiser_signage', slug: 'os', label: 'Organiser signage', short: 'Organiser', prefix: 'OS' },
-  { key: 'sponsor_signage', slug: 'ss', label: 'Sponsor signage', short: 'Sponsor signage', prefix: 'SS' },
+  { key: 'sponsor_signage', slug: 'ss', label: 'Sponsor signage', short: 'Sponsor', prefix: 'SS' },
   { key: 'sponsor_item', slug: 'si', label: 'Sponsorship items', short: 'Sponsorship items', prefix: 'SI' },
 ];
 
@@ -18,12 +18,15 @@ export function itemCode(category: Category, refNo: number): string {
   return `${categoryInfo(category).prefix}-${String(refNo).padStart(3, '0')}`;
 }
 
-export const ARTWORK_BY: { key: ArtworkBy; label: string }[] = [
-  { key: 'in_house', label: 'In-house design' },
-  { key: 'sponsor', label: 'Sponsor' },
-  { key: 'supplier', label: 'Supplier' },
-  { key: 'not_required', label: 'Not required' },
+// Who supplies the artwork. The form offers Media10 Studio or the sponsor; the other two are kept for older lines
+// and for sample data (no artwork step: sign-off starts straight away).
+export const ARTWORK_BY: { key: ArtworkBy; label: string; offered: boolean }[] = [
+  { key: 'in_house', label: 'Media10 Studio', offered: true },
+  { key: 'sponsor', label: 'Sponsor', offered: true },
+  { key: 'supplier', label: 'Supplier', offered: false },
+  { key: 'not_required', label: 'Not required', offered: false },
 ];
+export const ARTWORK_BY_OFFERED = ARTWORK_BY.filter((a) => a.offered);
 export const artworkByLabel = (k: ArtworkBy) => ARTWORK_BY.find((a) => a.key === k)?.label ?? k;
 
 // Production steps, in the words the team uses on the signage sheet: Sent → Printed → Delivered → Installed.

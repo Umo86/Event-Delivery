@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { errorMessage, expectStatus, idFromUrl, itemId, loginAs, okMessage, parseCsv, saveItem, waitingOn } from './helpers';
+import {
+  errorMessage, expectStatus, fillSignage, idFromUrl, itemId, loginAs, makePng, okMessage, parseCsv, saveItem, uploadArtwork, waitingOn,
+} from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -12,19 +14,22 @@ async function fillLine(page: Page, f: Record<string, string>) {
   }
 }
 
-test('a member adds an organiser sign with full details', async ({ page }) => {
+test('a member adds an organiser sign with full details, one step at a time', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto('/schedule/os');
   await expect(page.getByText('No organiser signage yet')).toBeVisible();
-  await page.getByRole('link', { name: 'Add the first line' }).click();
-  await expect(page.getByRole('heading', { name: 'Add organiser signage' })).toBeVisible();
-  await expect(page.locator('#artwork_by')).toHaveValue('in_house');
+  await page.getByRole('link', { name: 'Add the first signage' }).click();
+  await expect(page).toHaveURL(/\/signage\/new\?type=os$/);
+  await expect(page.getByRole('heading', { name: 'Add signage', level: 1 })).toBeVisible();
+  // It asks which list first, with organiser signage already chosen from the tab we came from
+  await expect(page.getByText('Step 1 of 7: Which list')).toBeVisible();
+  await expect(page.locator('input[name=category][value=organiser_signage]')).toBeChecked();
+  await page.screenshot({ path: test.info().outputPath('add-signage-step1.png'), fullPage: true });
 
-  await fillLine(page, {
+  await fillSignage(page, 'os', {
     description: 'Hall S1 entrance banner',
     item_type: 'Hall entrance banner',
-    material: 'PVC banner',
-    wording: 'Welcome to UK Construction Week\nHall S1',
+    qty: '2',
     hall: 'S1',
     zone: 'Hall entrance',
     location_detail: 'Rigging point R12',
@@ -32,19 +37,32 @@ test('a member adds an organiser sign with full details', async ({ page }) => {
     width_mm: '6000',
     height_mm: '2000',
     sides: 'Double-sided',
-    qty: '2',
+    wording: 'Welcome to UK Construction Week\nHall S1',
+    wording_side2: 'See you next year',
+    material: 'PVC banner',
     artwork_link: 'https://example.sharepoint.com/ukcw/os-001',
     supplier_id: 'Signs Express',
     unit_cost: 'four hundred',
+  }, async (title) => {
+    if (title === 'Size and print') await page.screenshot({ path: test.info().outputPath('add-signage-print.png'), fullPage: true });
   });
-  await page.getByRole('button', { name: 'Add line' }).click();
+  // The last step sums it up before anything is saved
+  const check = page.locator('li[aria-current="step"]');
+  await expect(check).toContainText('Hall S1 entrance banner · Hall entrance banner · ×2');
+  await expect(check).toContainText('6,000 × 2,000 mm, double-sided, PVC banner');
+  await expect(check).toContainText('Media10 Studio, due 30 Mar 2027 (show default)');
+  await expect(check).toContainText('Side A: Welcome to UK Construction Week');
+  await expect(check).toContainText('Side B: See you next year');
+  await page.screenshot({ path: test.info().outputPath('add-signage-check.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Add signage' }).click();
   await expect(errorMessage(page, 'Unit cost must be a positive number.')).toBeVisible();
-  // Nothing typed is lost after a mistake
-  await expect(page.locator('#description')).toHaveValue('Hall S1 entrance banner');
-  await expect(page.locator('#wording')).toHaveValue('Welcome to UK Construction Week\nHall S1');
-
+  // Nothing typed is lost after a mistake: go back to that step and fix it
+  await page.getByRole('button', { name: 'Change production and cost' }).click();
+  await expect(page.locator('#unit_cost')).toHaveValue('four hundred');
   await page.fill('#unit_cost', '450');
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Next: check and add' }).click();
+  await expect(page.locator('li[aria-current="step"]')).toContainText('£450.00 each');
+  await page.getByRole('button', { name: 'Add signage' }).click();
   await expect(page).toHaveURL(/\/items\/[0-9a-f-]{36}\?created=1/);
   saveItem('os1', idFromUrl(page));
   await expect(page.getByText('Line OS-001 added.')).toBeVisible();
@@ -56,6 +74,7 @@ test('a member adds an organiser sign with full details', async ({ page }) => {
   const details = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Details' }) });
   await expect(details).toContainText('6,000 × 2,000 mm');
   await expect(details).toContainText('Double-sided');
+  await expect(details).toContainText('See you next year');
   await expect(details).toContainText('Signs Express');
   await expect(details).toContainText('£900.00'); // 2 × £450
   await expect(details).toContainText('30 Mar 2027 (show default)');
@@ -77,23 +96,24 @@ test('editing a line records what changed', async ({ page }) => {
     .toContainText('Edited quantity, notes');
 });
 
-test('a line with no artwork needed goes straight to sign-off', async ({ page }) => {
+test('the old add-line address goes to the one form, and artwork starts sign-off', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto('/schedule/os/new');
-  await fillLine(page, {
+  await expect(page).toHaveURL(/\/signage\/new\?type=os$/);
+  await fillSignage(page, 'os', {
     description: 'Registration directional totem',
     item_type: 'Freestanding totem',
     wording: '=1+2 (arrows to registration)',
     hall: 'Boulevard',
-    artwork_by: 'Not required',
     unit_cost: '120',
   });
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await page.getByRole('button', { name: 'Add signage' }).click();
   await expect(page.getByText('Line OS-002 added.')).toBeVisible();
   saveItem('os2', idFromUrl(page));
+  await expectStatus(page, 'Ready to artwork');
+  await uploadArtwork(page, { name: 'totem.png', mimeType: 'image/png', buffer: makePng(300, 900) });
   await expectStatus(page, 'Artworked · with Operations');
   await expect(waitingOn(page)).toContainText('Olivia Ops');
-  await expect(page.getByText('Artwork isn’t needed for this line, so sign-off has started.')).toBeVisible();
 });
 
 test('sponsor lines are linked to the sponsor and their account manager', async ({ page }) => {
@@ -103,10 +123,13 @@ test('sponsor lines are linked to the sponsor and their account manager', async 
   await expect(page.getByRole('heading', { name: 'Acme Steel' })).toBeVisible();
   await expect(page.getByText('Account manager: Amy Account.')).toBeVisible();
   await page.getByRole('link', { name: 'Add sponsor signage' }).click();
+  // From a sponsor's page, sponsor signage for that sponsor is already chosen
+  await expect(page.locator('input[name=category][value=sponsor_signage]')).toBeChecked();
   await expect(page.locator('#sponsor_id option:checked')).toHaveText('Acme Steel');
-  await expect(page.locator('#artwork_by')).toHaveValue('sponsor');
-  await fillLine(page, { description: 'Acme Steel feature area banner', hall: 'S3', zone: 'Feature area', width_mm: '3000', height_mm: '1000', qty: '1', unit_cost: '300' });
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await fillSignage(page, 'ss', { description: 'Acme Steel feature area banner', hall: 'S3', zone: 'Feature area', width_mm: '3000', height_mm: '1000', qty: '1', unit_cost: '300' });
+  // Sponsor signage defaults to the sponsor supplying the artwork
+  await expect(page.locator('li[aria-current="step"]')).toContainText('Sponsor, due');
+  await page.getByRole('button', { name: 'Add signage' }).click();
   await expect(page.getByText('Line SS-001 added.')).toBeVisible();
   saveItem('ss1', idFromUrl(page));
   await expectStatus(page, 'Ready to artwork');
@@ -142,14 +165,14 @@ test('the schedule lists, filters, searches and exports lines', async ({ page })
   // Export uses the same filters
   const csv = parseCsv(await (await page.request.get('/api/export/os?q=totem')).text());
   expect(csv).toHaveLength(2);
-  expect(csv[0].slice(0, 7)).toEqual(['ID', 'Plan code', 'Section', 'List', 'Description', 'Status', 'Sheet status']);
+  expect(csv[0].slice(0, 7)).toEqual(['ID', 'Signage ID', 'Section', 'List', 'Description', 'Status', 'Sheet status']);
   expect(csv[0]).toContain('Operations sign-off');
   const rec = Object.fromEntries(csv[0].map((h, i) => [h, csv[1][i]]));
   expect(rec.ID).toBe('OS-002');
   expect(rec.Status).toBe('Artworked · with Operations');
   expect(rec['Sheet status']).toBe('Artworked');
   expect(rec['Waiting on']).toBe('Olivia Ops');
-  expect(rec['Side 1']).toBe("'=1+2 (arrows to registration)"); // spreadsheet formulas are neutralised
+  expect(rec['Side A']).toBe("'=1+2 (arrows to registration)"); // spreadsheet formulas are neutralised
 
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(rows).toHaveCount(2);
@@ -172,25 +195,37 @@ test('the schedule lists, filters, searches and exports lines', async ({ page })
   const all = parseCsv(await full.text());
   expect(all.map((r) => r[0])).toEqual(['ID', 'OS-001', 'OS-002', 'SS-001', 'SI-001']);
   const os1 = Object.fromEntries(all[0].map((h, i) => [h, all[1][i]]));
-  expect(os1['Side 1']).toBe('Welcome to UK Construction Week\r\nHall S1'); // line breaks survive inside quotes
+  expect(os1['Side A']).toBe('Welcome to UK Construction Week\r\nHall S1'); // line breaks survive inside quotes
   expect(os1['Total cost']).toBe('1350');
   expect(os1.Supplier).toBe('Signs Express');
 
-  await page.getByRole('link', { name: 'All lines', exact: true }).click();
+  await page.getByRole('link', { name: 'All signage', exact: true }).click();
   await expect(rows).toHaveCount(4);
+  // Flags belong to the workflow view
+  await expect(page.getByLabel('Flag')).toHaveCount(0);
+  await page.getByRole('group', { name: 'View' }).getByRole('link', { name: 'Workflow' }).click();
   await page.getByLabel('Flag').selectOption({ label: 'Overdue or not signed off' });
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('SI-001');
+  // Back on the sheet, the flag filter is dropped, since the sheet has no control for it
+  await page.getByRole('group', { name: 'View' }).getByRole('link', { name: 'Sheet' }).click();
+  await expect(page).toHaveURL(/view=sheet/);
+  await expect(page).not.toHaveURL(/flag=/);
+  await expect(rows).toHaveCount(4);
 });
 
-test('the line form checks sponsor lines have a sponsor', async ({ page }) => {
+test('the form checks sponsor signage has a sponsor', async ({ page }) => {
   await loginAs(page, 'amy');
-  await page.goto('/schedule/ss/new');
-  await page.fill('#description', 'Banner with no sponsor');
-  // Bypass the browser's own check to make sure the server refuses it too
+  await page.goto('/signage/new?type=ss');
+  // The browser won't move on without a sponsor
+  await page.getByRole('button', { name: 'Next: what it is' }).click();
+  await expect(page.getByText('Step 1 of 7: Which list')).toBeVisible();
+  expect(await page.locator('#sponsor_id').evaluate((e) => (e as HTMLSelectElement).validity.valueMissing)).toBe(true);
+  // Bypass that check to make sure the server refuses it too
   await page.locator('#sponsor_id').evaluate((e) => e.removeAttribute('required'));
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await fillSignage(page, 'ss', { description: 'Banner with no sponsor' });
+  await page.getByRole('button', { name: 'Add signage' }).click();
   await expect(errorMessage(page, 'Choose the sponsor for this line.')).toBeVisible();
-  await expect(page).toHaveURL(/\/schedule\/ss\/new/);
+  await expect(page).toHaveURL(/\/signage\/new/);
   await expect(okMessage(page, /./)).toHaveCount(0);
 });

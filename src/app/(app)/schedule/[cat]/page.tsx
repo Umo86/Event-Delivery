@@ -16,7 +16,7 @@ import { NoEvent } from '@/components/no-event';
 
 export async function generateMetadata(props: { params: Promise<{ cat: string }> }): Promise<Metadata> {
   const { cat } = await props.params;
-  return { title: cat === 'all' ? 'All lines' : categoryBySlug(cat)?.label ?? 'Schedule' };
+  return { title: cat === 'all' ? 'All signage' : categoryBySlug(cat)?.label ?? 'Schedule' };
 }
 
 export default async function SchedulePage(props: {
@@ -70,13 +70,17 @@ export default async function SchedulePage(props: {
     unsold: forSale.reduce((s, r) => s + (r.item.rate_card_price ?? 0), 0),
   };
   const base = `/schedule/${category?.slug ?? 'all'}`;
-  const title = category?.label ?? 'All lines';
-  // The sheet (spec, cost, supplier, status, like the team's spreadsheet) is the default for organiser and sponsor
-  // signage; sponsorship items open on their sales view, and All lines is a working list across the show.
+  const title = category?.label ?? 'All signage';
+  // The sheet (spec, cost, supplier, status, like the team's spreadsheet) is the default for signage and for the
+  // all-signage view; sponsorship items open on their sales view. A link that filters on something only the
+  // workflow view shows (waiting on, flags, sort order) opens that view, so the filter being applied is visible.
+  const workflowOnly = Boolean(filters.waiting || filters.flag || filters.sort);
   const view: 'sheet' | 'workflow' = filters.view === 'sheet' || filters.view === 'workflow' ? filters.view
-    : category && !sponsorship ? 'sheet' : 'workflow';
-  const viewHref = (v: 'sheet' | 'workflow') => `${base}${filterQuery({ ...filters, view: v })}`;
-  const sections = sched.bundle.sections.map((x) => ({ value: x.id, label: x.name }));
+    : sponsorship || workflowOnly ? 'workflow' : 'sheet';
+  const viewHref = (v: 'sheet' | 'workflow') =>
+    `${base}${filterQuery(v === 'sheet' ? { ...filters, waiting: undefined, flag: undefined, sort: undefined, view: v } : { ...filters, view: v })}`;
+  // Sections group organiser signage; sponsor signage is grouped by sponsor instead
+  const sections = category?.key === 'sponsor_signage' || sponsorship ? [] : sched.bundle.sections.map((x) => ({ value: x.id, label: x.name }));
 
   return (
     <>
@@ -88,9 +92,9 @@ export default async function SchedulePage(props: {
             <ButtonLink href={`/api/export/${category?.slug ?? 'all'}${filterQuery(filters)}`} plain>
               <Download size={16} aria-hidden /> Export CSV
             </ButtonLink>
-            {canEdit(user) && category && (
-              <ButtonLink href={`${base}/new`} variant="primary">
-                <Plus size={16} aria-hidden /> {sponsorship ? 'Add item' : 'Add line'}
+            {canEdit(user) && (
+              <ButtonLink href={sponsorship ? `${base}/new` : `/signage/new${category ? `?type=${category.slug}` : ''}`} variant="primary">
+                <Plus size={16} aria-hidden /> {sponsorship ? 'Add item' : 'Add signage'}
               </ButtonLink>
             )}
           </>
@@ -98,7 +102,7 @@ export default async function SchedulePage(props: {
       />
 
       <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-line" aria-label="Schedule categories">
-        {[...CATEGORIES, { slug: 'all', label: 'All lines' }].map((c) => (
+        {[...CATEGORIES, { slug: 'all', label: 'All signage' }].map((c) => (
           <Link key={c.slug} href={`/schedule/${c.slug}`}
             aria-current={c.slug === cat ? 'page' : undefined}
             className={cx('-mb-px whitespace-nowrap border-b-[3px] px-3 py-2 text-[15px] font-semibold',
@@ -138,7 +142,7 @@ export default async function SchedulePage(props: {
         </div>
         <p className="text-[13px] text-muted">
           {view === 'sheet'
-            ? 'Spec, cost, supplier and status for every line, grouped by section. Suppliers and production status save as you change them.'
+            ? `Spec, cost, supplier and status for every line, grouped by ${category?.key === 'sponsor_signage' ? 'sponsor' : category ? 'section' : 'list and section'}. Suppliers and production status save as you change them.`
             : 'What each line is waiting on, with deadlines and flags.'}
         </p>
       </div>
@@ -168,7 +172,11 @@ export default async function SchedulePage(props: {
       {(() => {
         const empty = all.length === 0 ? (
           <Empty title={`No ${title.toLowerCase()} yet`}
-            action={canEdit(user) && category ? <ButtonLink href={`${base}/new`} variant="primary"><Plus size={16} /> {sponsorship ? 'Add the first item' : 'Add the first line'}</ButtonLink> : undefined}>
+            action={canEdit(user) ? (
+              <ButtonLink href={sponsorship ? `${base}/new` : `/signage/new${category ? `?type=${category.slug}` : ''}`} variant="primary">
+                <Plus size={16} /> {sponsorship ? 'Add the first item' : 'Add the first signage'}
+              </ButtonLink>
+            ) : undefined}>
             {sponsorship
               ? <>Add each thing the show sells to sponsors, like lanyards, show bags or seat drops. Each one gets an ID like SI-001 and stays for sale until someone marks it sold.</>
               : <>Add a line for each sign or item. Each one gets an ID like {category?.prefix ?? 'OS'}-001.</>}

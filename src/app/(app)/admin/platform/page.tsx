@@ -13,6 +13,8 @@ import { setSponsorLinks } from '@/app/actions/admin';
 import { setAppName } from '@/app/actions/settings';
 import { setDemoLogin, setMaintenance, signOutEveryoneElse, signOutPerson } from '@/app/actions/superadmin';
 import { runCheck } from '@/app/actions/system';
+import { SampleDataPanel } from '@/components/admin/sample-data';
+import { SAMPLE_SHOW, sampleRecord } from '@/lib/data/sample';
 
 export const metadata: Metadata = { title: 'Platform' };
 
@@ -50,6 +52,8 @@ export default async function PlatformPage() {
   ]);
   const bytes = Number(c.bytes);
   const pct = Math.min(100, (bytes / FREE_BLOB_BYTES) * 100);
+  const sample = await sampleRecord(sql);
+  const [sampleCount] = sample ? await sql<{ n: number }[]>`select count(*)::int as n from items where event_id = ${sample.eventId}` : [{ n: 0 }];
   const blobProblem = blobSetupProblem();
 
   const tiles: { label: string; value: string | number; sub?: string; href: string }[] = [
@@ -173,6 +177,8 @@ export default async function PlatformPage() {
               </ActionForm>
             </div>
           </Panel>
+
+          <SampleDataPanel present={!!sample} showName={SAMPLE_SHOW} lines={sampleCount.n} />
 
           <Panel title="Platform name">
             <ActionForm action={setAppName} className="flex flex-wrap items-end gap-3">

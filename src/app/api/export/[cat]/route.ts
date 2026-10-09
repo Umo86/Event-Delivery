@@ -30,8 +30,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ cat: string
   const stages = sched.bundle.stages;
 
   const sections = new Map(sched.bundle.sections.map((s) => [s.id, s.name]));
-  const header = ['ID', 'Plan code', 'Section', 'List', 'Description', 'Status', 'Sheet status', 'Waiting on', 'Next deadline', 'Flag', 'Days waiting', 'Sponsor', 'Account manager',
-    'Type', 'Side 1', 'Side 2', 'Hall', 'Zone', 'Location', 'Position', 'Width mm', 'Height mm', 'Sides', 'Bleed mm', 'Qty', 'Material', 'Artwork by',
+  const header = ['ID', 'Signage ID', 'Section', 'List', 'Description', 'Status', 'Sheet status', 'Waiting on', 'Next deadline', 'Flag', 'Days waiting', 'Sponsor', 'Account manager',
+    'Type', 'Side A', 'Side B', 'Hall', 'Zone', 'Location', 'Position', 'Width mm', 'Height mm', 'Sides', 'Bleed mm', 'Qty', 'Material', 'Artwork by',
     'Artwork due', 'Artwork version', 'Artwork link', ...stages.map((s) => `${s.name} sign-off`), 'Supplier', 'Print/order deadline',
     'Production status', 'PO number', 'Delivery date', 'Install date', 'Unit cost', 'Total cost',
     // Sponsorship items

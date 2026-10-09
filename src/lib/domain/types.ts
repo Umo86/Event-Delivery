@@ -123,9 +123,9 @@ export interface ItemRow {
   /** The team's own code from plans and the old sheet (F1.1, MBar2). */
   plan_code: string | null;
   item_type: string | null;
-  /** Wording for side 1 (or the only side). */
+  /** Wording for side A (or the only side). */
   wording: string | null;
-  /** Wording for side 2 of a double-sided graphic. */
+  /** Wording for side B of a double-sided graphic. */
   wording_side2: string | null;
   bleed_mm: number | null;
   hall: string | null;

@@ -69,7 +69,7 @@ test('a show started from scratch is set up step by step', async ({ page }) => {
   await progress(page, 'Step 6 of 6: Ready to go');
   await expect(open(page)).toContainText(`${SHOW} is ready for signage.`);
   await expect(page.getByText('5 of 5 done.', { exact: false })).toBeVisible();
-  await expect(open(page).getByRole('link', { name: 'Add organiser signage' })).toHaveAttribute('href', '/schedule/os/new');
+  await expect(open(page).getByRole('link', { name: 'Add signage' })).toHaveAttribute('href', '/signage/new');
 
   // Any step can be opened again; someone missing can be added from the first one
   await page.getByRole('button', { name: 'Change who’s working on it' }).click();

@@ -63,18 +63,21 @@ test('the dashboard summarises progress, workload, cost and sponsors', async ({ 
   await expect(panel(page, 'Latest activity').locator('li').first()).toBeVisible();
   await page.getByRole('link', { name: /Overdue or not signed off/ }).click();
   await expect(page).toHaveURL(/\/schedule\/all\?flag=urgent/);
-  await expect(page.locator('table tbody tr')).toHaveCount(1);
+  // A flag filter belongs to the workflow view, so that's the view it opens in
+  await expect(page.getByRole('group', { name: 'View' }).getByRole('link', { name: 'Workflow' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('combobox', { name: 'Flag' })).toHaveValue('urgent');
+  await expect(page.locator('table tbody tr[data-line]')).toHaveCount(1);
 
   // Every tile opens exactly the lines it counts, with the filter showing what's applied
   await page.goto('/dashboard');
   await page.getByRole('link', { name: /Approved or later/ }).click();
   await expect(page).toHaveURL(/\/schedule\/all\?status=approved_plus/);
-  await expect(page.getByRole('combobox', { name: 'Status' })).toHaveValue('approved_plus');
-  await expect(page.locator('table tbody tr')).toHaveCount(2);
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('approved_plus');
+  await expect(page.locator('table tbody tr[data-line]')).toHaveCount(2);
   await page.goto('/dashboard');
   await page.getByRole('link', { name: /Slow sign-offs/ }).click();
   await expect(page).toHaveURL(/\/schedule\/all\?status=slow/);
-  await expect(page.getByRole('combobox', { name: 'Status' })).toHaveValue('slow');
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('slow');
 });
 
 test('the proof sheet shows the artwork, spec and sign-off record', async ({ page }) => {
@@ -171,7 +174,7 @@ test('a line shows its supplier’s scope of work and suggests the right supplie
   await page.goto('/suppliers');
   await page.locator('li[id^="supplier-"]').filter({ hasText: 'Signs Express' }).getByRole('link', { name: 'View lines' }).click();
   await expect(page).toHaveURL(/\/schedule\/all\?supplier=[0-9a-f-]{36}$/);
-  await expect(page.getByRole('combobox', { name: 'Supplier' }).locator('option:checked')).toHaveText('Signs Express');
+  await expect(page.getByRole('combobox', { name: 'Supplier', exact: true }).locator('option:checked')).toHaveText('Signs Express');
   await expect(page.locator('table tbody')).toContainText('Hall S1 entrance banner');
   await expect(page.locator('table tbody')).not.toContainText('BuildCo branded lanyards');
 

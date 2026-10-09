@@ -50,7 +50,7 @@ export default async function ItemPage(props: {
   const sectionName = item.section_id ? bundle.sections.find((x) => x.id === item.section_id)?.name ?? null : null;
   const sponsorshipSpec: [string, React.ReactNode][] = [
     ['Section', sectionName],
-    ['Plan code', item.plan_code],
+    ['Signage ID', item.plan_code],
     ['Type', item.item_type],
     ['What’s included', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
     ['Material / spec', item.material],
@@ -70,11 +70,11 @@ export default async function ItemPage(props: {
 
   const signageSpec: [string, React.ReactNode][] = [
     ['Sponsor', sponsor ? <>{sponsor.name}{sponsor.account_manager_id ? <span className="text-muted">, managed by {names.get(sponsor.account_manager_id)}</span> : null}</> : <span className="text-muted">None</span>],
-    ['Section', sectionName],
-    ['Plan code', item.plan_code],
+    ...(item.category === 'sponsor_signage' ? [] : [['Section', sectionName] as [string, React.ReactNode]]),
+    ['Signage ID', item.plan_code],
     ['Type', item.item_type],
-    [item.sides === 'double' ? 'Side 1 wording' : 'Wording / content', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
-    ...(item.sides === 'double' ? [['Side 2 wording', item.wording_side2 ? <span className="whitespace-pre-wrap">{item.wording_side2}</span> : null] as [string, React.ReactNode]] : []),
+    [item.sides === 'double' ? 'Side A wording' : 'Wording / content', item.wording ? <span className="whitespace-pre-wrap">{item.wording}</span> : null],
+    ...(item.sides === 'double' ? [['Side B wording', item.wording_side2 ? <span className="whitespace-pre-wrap">{item.wording_side2}</span> : null] as [string, React.ReactNode]] : []),
     ['Hall', item.hall ? <Plate tone="light">{item.hall}</Plate> : null],
     ['Zone / area', item.zone],
     ['Exact location', item.location_detail],

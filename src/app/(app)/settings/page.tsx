@@ -27,7 +27,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
   const steps: { done: boolean; text: string; href: string | null }[] = [
     { done: bundle.users.length > 1, text: 'Add your team', href: '/team' },
     { done: bundle.stages.every((s) => s.uses_account_manager || s.approver_ids.length > 0), text: 'Choose an approver for each sign-off stage', href: '/settings/stages' },
-    { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles in-house artwork and production (below)', href: '#owners' },
+    { done: !!(e.studio_owner_id && e.production_owner_id), text: 'Choose who handles Media10 Studio artwork and production (below)', href: '#owners' },
     { done: bundle.sponsors.length > 0, text: isSuper ? 'Add sponsors and their account managers' : 'Add sponsors', href: '/sponsors' },
     { done: bundle.suppliers.length > 0, text: 'Add your suppliers', href: '/suppliers' },
   ];
@@ -90,7 +90,7 @@ export default async function EventSettingsPage(props: { searchParams: Promise<{
 
         <Panel title="Who handles artwork and production" id="owners">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="In-house artwork" htmlFor="studio_owner_id" help="Gets lines whose artwork comes from your own design team.">
+            <Field label="Media10 Studio artwork" htmlFor="studio_owner_id" help="Gets lines whose artwork the studio designs.">
               <select id="studio_owner_id" name="studio_owner_id" defaultValue={e.studio_owner_id ?? ''} className={inputCls}>
                 <option value="">Not assigned</option>
                 {people.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}

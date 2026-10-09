@@ -18,8 +18,10 @@ export default async function EditItemPage(props: { params: Promise<{ id: string
   return (
     <>
       <PageHeader title={<span className="flex items-center gap-3"><Plate className="text-[18px]">{row.code}</Plate> Edit line</span>}
-        subtitle="Changes are recorded in the line’s history." />
-      <ItemForm bundle={bundle} category={row.item.category} item={row.item} cancelHref={`/items/${id}`} />
+        subtitle="Every part of the line, in the order it was added. Changes are recorded in the line’s history." />
+      <div className="max-w-[980px]">
+        <ItemForm bundle={bundle} category={row.item.category} item={row.item} cancelHref={`/items/${id}`} />
+      </div>
     </>
   );
 }

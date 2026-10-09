@@ -17,7 +17,7 @@ test('organiser signage opens on the sheet, with the status key and a total', as
   const key = page.getByRole('list', { name: 'Status key' });
   for (const w of ['Ready to artwork', 'Artworked', 'Approved', 'Sent', 'Printed', 'Installed']) await expect(key).toContainText(w);
   // Spec columns, like the spreadsheet
-  for (const h of ['Code', 'Description', 'Material', 'Size (mm)', 'Sides', 'Bleed', 'Side 1', 'Side 2', 'Qty', 'Unit cost', 'Total', 'Supplier', 'Status']) {
+  for (const h of ['ID', 'Signage ID', 'Description', 'Status', 'Supplier', 'Material', 'Size (mm)', 'Sides', 'Bleed', 'Side A', 'Side B', 'Qty', 'Unit cost', 'Total']) {
     await expect(page.getByRole('columnheader', { name: h, exact: true })).toBeVisible();
   }
   // Nothing has a section yet, so everything sits under one header
@@ -40,7 +40,7 @@ test('organiser signage opens on the sheet, with the status key and a total', as
   await expect(page.getByRole('columnheader', { name: 'Next deadline' })).toBeVisible();
 });
 
-test('a line gets a section, plan code, bleed and side 2 wording, and the sheet groups by section', async ({ page }) => {
+test('a line gets a section, signage ID, bleed and side B wording, and the sheet groups by section', async ({ page }) => {
   await loginAs(page, 'pete');
   await page.goto(`/items/${itemId('os1')}/edit`);
   await page.locator('#section_id').selectOption('__new__');

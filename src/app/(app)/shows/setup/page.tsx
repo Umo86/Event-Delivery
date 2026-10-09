@@ -176,13 +176,13 @@ export default async function ShowSetupGuide(props: { searchParams: Promise<{ cr
 
     owners: (
       <>
-        <Ask tip="Lines go to them on their own: in-house artwork to the first, approved lines to the second to order and deliver.">
-          Choose who looks after in-house artwork, and who handles print and production.
+        <Ask tip="Lines go to them on their own: Media10 Studio artwork to the first, approved lines to the second to order and deliver.">
+          Choose who looks after Media10 Studio artwork, and who handles print and production.
         </Ask>
         <StepForm action={saveShowOwners} className="space-y-4">
           <input type="hidden" name="event_id" value={event.id} />
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="In-house artwork" htmlFor="gs-studio" help="Gets lines whose artwork comes from your own design team.">
+            <Field label="Media10 Studio artwork" htmlFor="gs-studio" help="Gets lines whose artwork the studio designs.">
               <select id="gs-studio" name="studio_owner_id" defaultValue={event.studio_owner_id ?? ''} className={inputCls}>
                 <option value="">Not chosen yet</option>
                 {team.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
@@ -297,8 +297,7 @@ export default async function ShowSetupGuide(props: { searchParams: Promise<{ cr
           </>
         )}
         <div className="flex flex-wrap gap-2">
-          <ButtonLink href="/schedule/os/new" variant="primary">Add organiser signage</ButtonLink>
-          <ButtonLink href="/schedule/ss/new">Add sponsor signage</ButtonLink>
+          <ButtonLink href="/signage/new" variant="primary">Add signage</ButtonLink>
           <ButtonLink href="/schedule/si/new">Add a sponsorship item</ButtonLink>
           <ButtonLink href="/dashboard" variant="ghost">Go to the dashboard</ButtonLink>
         </div>

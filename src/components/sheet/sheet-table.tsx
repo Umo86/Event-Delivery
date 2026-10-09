@@ -12,16 +12,47 @@ import { StatusCell, SupplierCell } from './cells';
 
 export const lineTotal = (r: ScheduleRow) => (r.item.unit_cost ?? 0) * (r.item.qty && r.item.qty > 0 ? r.item.qty : 1);
 
+export interface SheetGroup { key: string; title: string; rows: ScheduleRow[] }
+
 /** Rows grouped by section, in the show's section order, with lines in no section last. */
-export function groupBySection(rows: ScheduleRow[], sections: SectionRow[]): { section: SectionRow | null; rows: ScheduleRow[] }[] {
+export function groupBySection(rows: ScheduleRow[], sections: SectionRow[], prefix = ''): SheetGroup[] {
   const by = new Map<string | null, ScheduleRow[]>();
   for (const r of rows) {
     const key = r.item.section_id && sections.some((s) => s.id === r.item.section_id) ? r.item.section_id : null;
     (by.get(key) ?? by.set(key, []).get(key)!).push(r);
   }
-  const out: { section: SectionRow | null; rows: ScheduleRow[] }[] = [];
-  for (const s of sections) if (by.has(s.id)) out.push({ section: s, rows: by.get(s.id)! });
-  if (by.has(null)) out.push({ section: null, rows: by.get(null)! });
+  const out: SheetGroup[] = [];
+  for (const s of sections) if (by.has(s.id)) out.push({ key: `sec-${s.id}`, title: `${prefix}${s.name}`, rows: by.get(s.id)! });
+  if (by.has(null)) out.push({ key: 'sec-none', title: `${prefix}No section`, rows: by.get(null)! });
+  return out;
+}
+
+/** Sponsor signage grouped by sponsor, A to Z. */
+export function groupBySponsor(rows: ScheduleRow[], prefix = ''): SheetGroup[] {
+  const by = new Map<string, { title: string; rows: ScheduleRow[] }>();
+  for (const r of rows) {
+    const key = r.sponsor?.id ?? 'none';
+    (by.get(key) ?? by.set(key, { title: r.sponsor?.name ?? 'No sponsor', rows: [] }).get(key)!).rows.push(r);
+  }
+  return [...by.entries()].sort((a, b) => a[1].title.localeCompare(b[1].title))
+    .map(([key, g]) => ({ key: `sp-${key}`, title: `${prefix}${g.title}`, rows: g.rows }));
+}
+
+/**
+ * How the sheet is grouped: organiser signage by section, sponsor signage by sponsor, sponsorship items on their
+ * own. With more than one list on the page, each group says which list it belongs to.
+ */
+export function groupRows(rows: ScheduleRow[], sections: SectionRow[]): SheetGroup[] {
+  const lists = [...new Set(rows.map((r) => r.item.category))];
+  const prefixFor = (c: ScheduleRow['item']['category']) => (lists.length > 1 ? `${categoryInfo(c).label} · ` : '');
+  const out: SheetGroup[] = [];
+  for (const c of ['organiser_signage', 'sponsor_signage', 'sponsor_item'] as const) {
+    const mine = rows.filter((r) => r.item.category === c);
+    if (!mine.length) continue;
+    if (c === 'organiser_signage') out.push(...groupBySection(mine, sections, prefixFor(c)));
+    else if (c === 'sponsor_signage') out.push(...groupBySponsor(mine, prefixFor(c)));
+    else out.push({ key: 'si', title: lists.length > 1 ? categoryInfo(c).label : 'All items', rows: mine });
+  }
   return out;
 }
 
@@ -41,7 +72,7 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
   rows: ScheduleRow[]; bundle: Bundle; canEdit: boolean; showCategory?: boolean; showSponsor?: boolean; empty?: React.ReactNode;
 }) {
   if (!rows.length) return <>{empty}</>;
-  const groups = groupBySection(rows, bundle.sections);
+  const groups = groupRows(rows, bundle.sections);
   const total = rows.reduce((sum, r) => sum + lineTotal(r), 0);
   const qty = rows.reduce((sum, r) => sum + (r.item.qty ?? 0), 0);
   const counts = SHEET_STATUSES.map((s) => ({ ...s, n: rows.filter((r) => sheetStatus(r.state.group) === s.key).length })).filter((s) => s.n > 0);
@@ -51,7 +82,7 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
   const th = 'whitespace-nowrap px-2 py-2 text-left text-[12.5px] font-semibold text-ink-2';
   const td = 'px-2 py-1.5 align-top text-[13px] text-ink';
   const num = `${td} whitespace-nowrap text-right tabular-nums`;
-  const cols = 14 + (showCategory ? 1 : 0);
+  const cols = 15 + (showCategory ? 1 : 0);
 
   return (
     <div>
@@ -68,10 +99,10 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
 
       {/* Phones: one card per line, still grouped by section */}
       <div className="space-y-4 md:hidden">
-        {groups.map(({ section, rows: lines }) => (
-          <section key={section?.id ?? 'none'} aria-label={section ? section.name : 'No section'}>
+        {groups.map(({ key, title, rows: lines }) => (
+          <section key={key} aria-label={title}>
             <h3 className="mb-1.5 flex items-baseline justify-between text-[14px] font-semibold text-ink">
-              <span>{section ? section.name : 'No section'}</span>
+              <span>{title}</span>
               <span className="text-[12.5px] font-normal text-ink-2">{lines.length} line{lines.length === 1 ? '' : 's'}</span>
             </h3>
             <ul className="space-y-2">
@@ -116,7 +147,8 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
           <thead>
             <tr className="border-b border-line bg-paper/70">
               <th scope="col" className={cx(th, 'w-[44px]')}><span className="sr-only">Artwork</span></th>
-              <th scope="col" className={th}>Code</th>
+              <th scope="col" className={th}>ID</th>
+              <th scope="col" className={th}>Signage ID</th>
               <th scope="col" className={cx(th, 'min-w-[220px]')}>Description</th>
               {showCategory && <th scope="col" className={th}>List</th>}
               <th scope="col" className={th}>Status</th>
@@ -125,21 +157,21 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
               <th scope="col" className={th}>Size (mm)</th>
               <th scope="col" className={th}>Sides</th>
               <th scope="col" className={th}>Bleed</th>
-              <th scope="col" className={cx(th, 'min-w-[160px]')}>Side 1</th>
-              <th scope="col" className={cx(th, 'min-w-[120px]')}>Side 2</th>
+              <th scope="col" className={cx(th, 'min-w-[160px]')}>Side A</th>
+              <th scope="col" className={cx(th, 'min-w-[120px]')}>Side B</th>
               <th scope="col" className={cx(th, 'text-right')}>Qty</th>
               <th scope="col" className={cx(th, 'text-right')}>Unit cost</th>
               <th scope="col" className={cx(th, 'text-right')}>Total</th>
             </tr>
           </thead>
-          {groups.map(({ section, rows: lines }) => {
+          {groups.map(({ key, title, rows: lines }) => {
             const sectionTotal = lines.reduce((sum, r) => sum + lineTotal(r), 0);
             return (
-              <tbody key={section?.id ?? 'none'} className="border-b border-line last:border-0">
+              <tbody key={key} className="border-b border-line last:border-0">
                 <tr className="bg-slate-100">
                   <th scope="rowgroup" colSpan={cols} className="px-3 py-1.5 text-left text-[13.5px] font-semibold text-ink">
                     <span className="flex flex-wrap items-baseline gap-x-3">
-                      <span>{section ? section.name : 'No section'}</span>
+                      <span>{title}</span>
                       <span className="text-[12.5px] font-normal text-ink-2">{lines.length} line{lines.length === 1 ? '' : 's'}</span>
                       {sectionTotal > 0 && <span className="ml-auto text-[12.5px] font-semibold tabular-nums text-ink-2">{money(sectionTotal, 2)}</span>}
                     </span>
@@ -157,8 +189,8 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
                       </td>
                       <td className={cx(td, 'whitespace-nowrap')}>
                         <Link href={`/items/${it.id}`} className="block hover:underline"><Plate className="text-[12px]">{r.code}</Plate></Link>
-                        {it.plan_code && <span className="mt-0.5 block text-[12px] text-ink-2">{it.plan_code}</span>}
                       </td>
+                      <td className={cx(td, 'whitespace-nowrap font-semibold')}>{it.plan_code}</td>
                       <td className={td}>
                         <Link href={`/items/${it.id}`} className={cx('font-semibold text-ink hover:underline', cancelled && 'line-through')}>{it.description}</Link>
                         <span className="block text-[12px] text-ink-2">
@@ -198,7 +230,7 @@ export function SheetTable({ rows, bundle, canEdit, showCategory = false, showSp
           })}
           <tfoot>
             <tr className="border-t-2 border-line bg-paper/70 text-[13px] font-semibold text-ink">
-              <td colSpan={11 + (showCategory ? 1 : 0)} className="px-3 py-2">
+              <td colSpan={12 + (showCategory ? 1 : 0)} className="px-3 py-2">
                 Total: {rows.length} line{rows.length === 1 ? '' : 's'}
                 {counts.length > 0 && <span className="font-normal text-ink-2"> · {counts.map((c) => `${c.n} ${sheetStatusInfo(c.key).label.toLowerCase()}`).join(', ')}</span>}
               </td>

@@ -280,3 +280,48 @@ export async function decide(page: Page, stageName: string, decision: 'Approve' 
 export function signoffStage(page: Page, stageName: string) {
   return page.locator('#signoff li').filter({ has: page.getByRole('heading', { name: stageName, exact: true }) });
 }
+
+// ---- The Add signage steps ----------------------------------------------------------
+/** Which step of the Add signage form each field is asked on. */
+const SIGNAGE_STEPS: [string, string[]][] = [
+  ['Which list', ['sponsor_id']],
+  ['What it is', ['description', 'plan_code', 'item_type', 'qty', 'section_id', 'section_new']],
+  ['Where it goes', ['hall', 'zone', 'location_detail', 'position']],
+  ['Size and print', ['width_mm', 'height_mm', 'sides', 'bleed_mm', 'wording', 'wording_side2', 'material']],
+  ['Artwork', ['artwork_by', 'artwork_due', 'artwork_link']],
+  ['Production and cost', ['supplier_id', 'print_deadline', 'delivery_date', 'install_date', 'unit_cost', 'po_number', 'notes']],
+];
+
+/** Fills one field of the Add signage form by id: a select by option label, a radio group by value, anything else by typing. */
+export async function fillSignageField(page: Page, id: string, value: string) {
+  if (id === 'artwork_by') { await page.locator(`input[name=artwork_by][value="${value}"]`).check(); return; }
+  if (id === 'section_new') { await page.getByLabel('New section name').fill(value); return; }
+  const el = page.locator(`#${id}`);
+  const tag = await el.evaluate((e) => e.tagName);
+  if (tag === 'SELECT') await el.selectOption(id === 'section_id' && value === 'New section…' ? '__new__' : { label: value });
+  else await el.fill(value);
+}
+
+/**
+ * Walks the Add signage steps on /signage/new, filling the given fields on the step that asks for them, and stops
+ * on the final check (so the test can press Add signage, or check the summary first).
+ */
+export async function fillSignage(page: Page, type: 'os' | 'ss', fields: Record<string, string>, afterStep?: (title: string) => Promise<void>) {
+  await expect(page.getByRole('heading', { name: 'Add signage', level: 1 })).toBeVisible();
+  await page.locator(`input[name=category][value="${type === 'ss' ? 'sponsor_signage' : 'organiser_signage'}"]`).check();
+  for (const [title, ids] of SIGNAGE_STEPS) {
+    await expect(page.getByText(new RegExp(`^Step \\d of 7: ${title}$`))).toBeVisible();
+    for (const id of ids) if (fields[id] !== undefined) await fillSignageField(page, id, fields[id]);
+    await afterStep?.(title);
+    await page.getByRole('button', { name: /^Next: / }).click();
+  }
+  await expect(page.getByText('Step 7 of 7: Check and add')).toBeVisible();
+}
+
+/** Adds signage from start to finish and waits for its page. */
+export async function addSignage(page: Page, type: 'os' | 'ss', fields: Record<string, string>) {
+  await page.goto(`/signage/new?type=${type}`);
+  await fillSignage(page, type, fields);
+  await page.getByRole('button', { name: 'Add signage' }).click();
+  await expect(page).toHaveURL(/\/items\/[0-9a-f-]{36}\?created=1/);
+}

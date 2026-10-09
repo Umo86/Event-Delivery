@@ -191,8 +191,8 @@ export async function createItem(_prev: ActionResult | null, fd: FormData): Prom
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  description: 'description', sponsor_id: 'sponsor', section_id: 'section', plan_code: 'plan code', item_type: 'type', wording: 'side 1 wording',
-  wording_side2: 'side 2 wording', bleed_mm: 'bleed', hall: 'hall', zone: 'zone',
+  description: 'description', sponsor_id: 'sponsor', section_id: 'section', plan_code: 'signage ID', item_type: 'type', wording: 'side A wording',
+  wording_side2: 'side B wording', bleed_mm: 'bleed', hall: 'hall', zone: 'zone',
   location_detail: 'location', position: 'position', width_mm: 'width', height_mm: 'height', sides: 'sides', qty: 'quantity',
   material: 'material', artwork_by: 'artwork supplier', artwork_due: 'artwork due date', artwork_link: 'artwork link',
   supplier_id: 'supplier', print_deadline: 'print deadline', po_number: 'PO number', delivery_date: 'delivery date',

@@ -2,8 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import {
-  acceptNextDialog, asUser, decide, errorMessage, expectImagesLoaded, expectStatus, idFromUrl, itemId, loginAs, makePdf,
-  makePng, okMessage, panel, saveItem, signoffStage, uploadArtwork, user, waitingOn,
+  acceptNextDialog, addSignage, asUser, decide, errorMessage, expectImagesLoaded, expectStatus, idFromUrl, itemId, loginAs, makePdf, makePng, okMessage, panel, saveItem, signoffStage, uploadArtwork, user, waitingOn,
 } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -298,9 +297,7 @@ test('a sponsor approves through a private link', async ({ browser, page }) => {
 
 test('an admin can delete a line, its artwork files and keep the number retired', async ({ page }) => {
   await loginAs(page, 'admin');
-  await page.goto('/schedule/os/new');
-  await page.fill('#description', 'Temporary test sign');
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await addSignage(page, 'os', { description: 'Temporary test sign' });
   await expect(page.getByText('Line OS-003 added.')).toBeVisible();
   const id = idFromUrl(page);
   await uploadArtwork(page, { name: 'temp.png', mimeType: 'image/png', buffer: makePng(200, 200) });
@@ -331,9 +328,7 @@ test('an admin can delete a line, its artwork files and keep the number retired'
   await expect.poll(filesFor).toHaveLength(0);
 
   // Numbers are never reused
-  await page.goto('/schedule/os/new');
-  await page.fill('#description', 'Seminar theatre timetable board');
-  await page.getByRole('button', { name: 'Add line' }).click();
+  await addSignage(page, 'os', { description: 'Seminar theatre timetable board' });
   await expect(page.getByText('Line OS-004 added.')).toBeVisible();
   saveItem('os4', idFromUrl(page));
 });
